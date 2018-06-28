@@ -108,57 +108,60 @@ case class SDepartment(budget: Int)
 
 object Util {
 
+  type StateField[S, A] = Field[State[S, ?], A]
+
+  object StateField {
+
+    def apply[S, A](g: S => A, p: A => S => S): StateField[S, A] =
+      new Field[State[S, ?], A] {
+        val get = Getter(State.gets(g))
+        val put = Setter(a => State(s => (p(a)(s), ())))
+      }
+
+    def id[S]: StateField[S, S] = Lens.id[S]
+  }
+
   type Lens[S, A] = State[A, ?] ~> State[S, ?]
 
   object Lens {
-
-    def apply[S, A](get: S => A, put: A => S => S): Lens[S, A] =
-      λ[State[A, ?] ~> State[S, ?]] { sta =>
-        State { s =>
-          val (a, x) = sta.run(get(s))
-          (put(a)(s), x)
-        }
-      }
-    
     def id[S]: Lens[S, S] = NaturalTransformation.refl
   }
 
-  implicit def lens2StateField[S, A](ln: Lens[S, A]): Field[State[S, ?], A] =
+  implicit def lens2StateField[S, A](ln: Lens[S, A]): StateField[S, A] =
     new Field[State[S, ?], A] {
       val get = Getter(ln(State.get)) 
       val put = Setter(a => ln(State.put(a)))
+    }
+
+  implicit def stateField2Lens[S, A](fl: StateField[S, A]): Lens[S, A] =
+    λ[State[A, ?] ~> State[S, ?]] { sta =>
+      State { s =>
+        val (a, x) = sta.run(fl.get().eval(s))
+        (fl.put(a).exec(s), x)
+      }
     }
 }
  
 import Util.{ Lens, _ }
 
-// XXX: this interpretation is completely ignored
 object StateDepartment extends Department[State[SDepartment, ?], SDepartment] {
-  // XXX: there's a view from `Lens[S, A]` to `Field[State[S, ?], A]`, which
-  // makes it difficult to see what's going on here.
-  val self   = Lens.id[SDepartment]
-  val budget = Lens[SDepartment, Int](_.budget, b => _.copy(budget = b))
+  val self   = StateField.id
+  val budget = StateField(_.budget, b => _.copy(budget = b))
 }
 
-// XXX: this interpretation is built from scratch (ignoring `StateDepartment`)
+// XXX: this interpretation doesn't exploit `StateDepartment`
 object StateUniversity extends University[State[SUniversity, ?], SUniversity] {
   type D = SDepartment
-  val self = Lens.id[SUniversity]
-  val name = Lens[SUniversity, String](_.name, n => _.copy(name = n))
+  val self = StateField.id
+  val name = StateField(_.name, n => _.copy(name = n))
   val deps = new ListP[Department, State[SUniversity, ?], SDepartment] {
     val apply = State.gets(s => s.departs.toList.map { case (k, v) =>
       new Department[State[SUniversity, ?], D] {
-        val self = Lens[SUniversity, SDepartment](
+        val self = StateField(
           _ => v, // this is safe!
           v2 => s => s.copy(departs = s.departs.updated(k, v2)))
-        // XXX: notice that this should be the composition of the lens that
-        // builds `self` with the lens that builds `StateDepartment.budget`.
-        // However, we're rewriting it here.
-        val budget = Lens[SUniversity, Int](
-          _ => v.budget,
-          v2 => s => s.copy(departs = s.departs.updated(k, v.copy(v2))))
-      }
-    })
+        val budget = self compose StateDepartment.budget
+      }})
   }
 }
 
