@@ -50,6 +50,11 @@ trait ListP[Alg[_[_],_],P[_],S]{
     }
 }
 
+object ListP {
+  def apply[Alg[_[_], _], P[_], S](ap: P[List[Alg[P, S]]]) =
+    new ListP[Alg, P, S] { val apply = ap }
+}
+
 trait StdTraverse[P[_],S] extends ListP[Field,P,S]{
   def getAll(implicit M: Monad[P]): P[List[S]] =
     traverse(_.get())
@@ -80,6 +85,14 @@ trait Department[P[_],D]{
   val budget: IntegerP[P]
 }
 
+object Department {
+  def apply[P[_], D](se: Field[P, D], bu: IntegerP[P]): Department[P, D] =
+    new Department[P, D] {
+      val self = se
+      val budget = bu
+    }
+}
+
 trait University[P[_],U]{
   type D
 
@@ -99,12 +112,10 @@ trait Logic[P[_],U]{
     univ.deps traverse { _.self.get() }
 }
 
-/* Data instance */
 
-
-case class SUniversity(name: String, departs: Map[String, SDepartment])
-
-case class SDepartment(budget: Int)
+/** 
+ * Utilities & Combinators 
+ */
 
 object Util {
 
@@ -140,29 +151,61 @@ object Util {
         (fl.put(a).exec(s), x)
       }
     }
+  
+  // Maps the state-based interpretation of an algebra. 
+  //
+  // XXX: This isn't as generic as I'd like it to be, but we can't go much
+  // further until we are able to combine generic `Field`s.
+  trait AlgFunctor[Alg[_[_], _]] {
+    def amap[S, A, X](ln: Lens[S, A])(
+                      al: Alg[State[A, ?], X]): Alg[State[S, ?], X]
+  }
+
+  object AlgFunctor {
+
+    implicit def DepartmentAlgFunctor = new AlgFunctor[Department] {
+      def amap[S, A, X](ln: Lens[S, A])(
+                        al: Department[State[A, ?], X]) =
+        Department(ln compose al.self, ln compose al.budget)
+    }
+
+    implicit class AlgFunctorOps[Alg[_[_], _], A](al: Alg[State[A, ?], A]) {
+      def amap[S](ln: Lens[S, A])(implicit AF: AlgFunctor[Alg]) =
+        AF.amap(ln)(al)
+    }
+  }
 }
  
-import Util.{ Lens, _ }
+import Util.{ Lens, _ }, AlgFunctor._
+
+
+/** 
+ * Data Layer Interpretation
+ */
+
+case class SUniversity(name: String, departs: Map[String, SDepartment])
+
+case class SDepartment(budget: Int)
 
 object StateDepartment extends Department[State[SDepartment, ?], SDepartment] {
   val self   = StateField.id
   val budget = StateField(_.budget, b => _.copy(budget = b))
 }
 
-// XXX: this interpretation doesn't exploit `StateDepartment`
 object StateUniversity extends University[State[SUniversity, ?], SUniversity] {
+  
   type D = SDepartment
+
   val self = StateField.id
   val name = StateField(_.name, n => _.copy(name = n))
-  val deps = new ListP[Department, State[SUniversity, ?], SDepartment] {
-    val apply = State.gets(s => s.departs.toList.map { case (k, v) =>
-      new Department[State[SUniversity, ?], D] {
-        val self = StateField(
-          _ => v, // this is safe!
-          v2 => s => s.copy(departs = s.departs.updated(k, v2)))
-        val budget = self compose StateDepartment.budget
-      }})
-  }
+  val deps = ListP(State.gets(s => s.departs.toList.map { case (k, d) =>
+    StateDepartment.amap(
+      λ[State[SDepartment, ?] ~> State[SUniversity, ?]] { sd =>
+        State { u => 
+          sd(d).leftMap(d2 => u.copy(departs = u.departs.updated(k, d2)))
+        }
+      })
+    }))
 }
 
 object Main extends App {
@@ -172,7 +215,7 @@ object Main extends App {
   }
   
   val math = SDepartment(3000)
-  val cs = SDepartment(5000)
+  val cs   = SDepartment(5000)
   val univ = SUniversity("urjc", Map("math" -> math, "cs" -> cs))
  
   val univ2 = logic.doubleBudget(implicitly).exec(univ)
