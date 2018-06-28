@@ -132,11 +132,15 @@ object Util {
  
 import Util.{ Lens, _ }
 
+// XXX: this interpretation is completely ignored
 object StateDepartment extends Department[State[SDepartment, ?], SDepartment] {
+  // XXX: there's a view from `Lens[S, A]` to `Field[State[S, ?], A]`, which
+  // makes it difficult to see what's going on here.
   val self   = Lens.id[SDepartment]
   val budget = Lens[SDepartment, Int](_.budget, b => _.copy(budget = b))
 }
 
+// XXX: this interpretation is built from scratch (ignoring `StateDepartment`)
 object StateUniversity extends University[State[SUniversity, ?], SUniversity] {
   type D = SDepartment
   val self = Lens.id[SUniversity]
@@ -145,9 +149,13 @@ object StateUniversity extends University[State[SUniversity, ?], SUniversity] {
     val apply = State.gets(s => s.departs.toList.map { case (k, v) =>
       new Department[State[SUniversity, ?], D] {
         val self = Lens[SUniversity, SDepartment](
-          _ => v, v2 => s => s.copy(departs = s.departs.updated(k, v2)))
+          _ => v, // this is safe!
+          v2 => s => s.copy(departs = s.departs.updated(k, v2)))
+        // XXX: notice that this should be the composition of the lens that
+        // builds `self` with the lens that builds `StateDepartment.budget`.
+        // However, we're rewriting it here.
         val budget = Lens[SUniversity, Int](
-          _ => v.budget, 
+          _ => v.budget,
           v2 => s => s.copy(departs = s.departs.updated(k, v.copy(v2))))
       }
     })
