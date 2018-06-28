@@ -15,6 +15,7 @@ scalacOptions ++= Seq(
   "-feature",
   "-Ypartial-unification",
   "-language:postfixOps",
+  "-language:implicitConversions",
   "-language:higherKinds")
 
 libraryDependencies ++= Seq("org.scalaz" %% "scalaz-core" % "7.2.8")
