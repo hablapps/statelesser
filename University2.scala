@@ -200,6 +200,9 @@ object StateUniversity extends University[State[SUniversity, ?], SUniversity] {
   val name = StateField(_.name, n => _.copy(name = n))
   val deps = ListP(State.gets(s => s.departs.toList.map { case (k, d) =>
     StateDepartment.amap(
+      // XXX: the natural transformation is coupled to this interpretation, but
+      // if we moved it to an external module, we'd need to pass the value as
+      // argument, which seems pretty weird to me.
       λ[State[SDepartment, ?] ~> State[SUniversity, ?]] { sd =>
         State { u => 
           sd(d).leftMap(d2 => u.copy(departs = u.departs.updated(k, d2)))
