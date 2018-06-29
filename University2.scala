@@ -110,7 +110,7 @@ object Util {
   
   // Maps the interpretation of an algebra. 
   trait AlgFunctor[Alg[_[_], _]] {
-    def amap[Q[_], P[_], X](f: Q ~> P)(alg: Alg[Q, X]): Alg[P, X]
+    def amap[Q[_], P[_]](f: Q ~> P): Alg[Q, ?] ~> Alg[P, ?]
   }
 
   object AlgFunctor {
@@ -118,18 +118,24 @@ object Util {
     // XXX: boilerplate instances, consider using Shapeless here?
     
     implicit def GetterAlgFunctor = new AlgFunctor[Getter] {
-      def amap[Q[_], P[_], X](f: Q ~> P)(alg: Getter[Q, X]) =
-        Getter(f(alg.apply))
+      def amap[Q[_], P[_]](f: Q ~> P) =
+        λ[Getter[Q, ?] ~> Getter[P, ?]] { alg =>
+          Getter(f(alg.apply))
+        }
     }
 
     implicit def SetterAlgFunctor = new AlgFunctor[Setter] {
-      def amap[Q[_], P[_], X](f: Q ~> P)(alg: Setter[Q, X]) =
-        Setter(x => f(alg(x)))
+      def amap[Q[_], P[_]](f: Q ~> P) =
+        λ[Setter[Q, ?] ~> Setter[P, ?]] { alg =>
+          Setter(x => f(alg(x)))
+        }
     }
 
     implicit def FieldAlgFunctor = new AlgFunctor[Field] {
-      def amap[Q[_], P[_], X](f: Q ~> P)(alg: Field[Q, X]) =
-        Field(alg.get.amap(f), alg.put.amap(f))
+      def amap[Q[_], P[_]](f: Q ~> P) =
+        λ[Field[Q, ?] ~> Field[P, ?]] { alg =>
+          Field(alg.get.amap(f), alg.put.amap(f))
+        }
     }
     
     implicit class AlgFunctorOps[Alg[_[_], _], Q[_], A](al: Alg[Q, A]) {
@@ -167,8 +173,10 @@ object Department {
     }
 
   implicit def DepartmentAlgFunctor = new AlgFunctor[Department] {
-    def amap[Q[_], P[_], X](f: Q ~> P)(alg: Department[Q, X]) =
-      Department(alg.self.amap(f), alg.budget.amap(f))
+    def amap[Q[_], P[_]](f: Q ~> P) =
+      λ[Department[Q, ?] ~> Department[P, ?]] { alg =>
+        Department(alg.self.amap(f), alg.budget.amap(f))
+      }
   }
 }
 
