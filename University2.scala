@@ -33,6 +33,11 @@ trait Field[P[_],S]{
     get() >>= { s => put(f(s)) } 
 }
 
+object Field {
+  def apply[P[_], S](getter: Getter[P, S], setter: Setter[P, S]) =
+    new Field[P, S] { val get = getter; val put = setter }
+}
+
 trait ListP[Alg[_[_],_],P[_],S]{
   val apply: P[List[Alg[P,S]]]
 
@@ -153,25 +158,36 @@ object Util {
     }
   
   // Maps the state-based interpretation of an algebra. 
-  //
-  // XXX: This isn't as generic as I'd like it to be, but we can't go much
-  // further until we are able to combine generic `Field`s.
   trait AlgFunctor[Alg[_[_], _]] {
-    def amap[S, A, X](ln: Lens[S, A])(
-                      al: Alg[State[A, ?], X]): Alg[State[S, ?], X]
+    def amap[Q[_], P[_], X](f: Q ~> P)(alg: Alg[Q, X]): Alg[P, X]
   }
 
   object AlgFunctor {
 
-    implicit def DepartmentAlgFunctor = new AlgFunctor[Department] {
-      def amap[S, A, X](ln: Lens[S, A])(
-                        al: Department[State[A, ?], X]) =
-        Department(ln compose al.self, ln compose al.budget)
+    // XXX: boilerplate instances, consider using Shapeless here?
+    
+    implicit def GetterAlgFunctor = new AlgFunctor[Getter] {
+      def amap[Q[_], P[_], X](f: Q ~> P)(alg: Getter[Q, X]) =
+        Getter(f(alg.apply))
     }
 
-    implicit class AlgFunctorOps[Alg[_[_], _], A](al: Alg[State[A, ?], A]) {
-      def amap[S](ln: Lens[S, A])(implicit AF: AlgFunctor[Alg]) =
-        AF.amap(ln)(al)
+    implicit def SetterAlgFunctor = new AlgFunctor[Setter] {
+      def amap[Q[_], P[_], X](f: Q ~> P)(alg: Setter[Q, X]) =
+        Setter(x => f(alg(x)))
+    }
+
+    implicit def FieldAlgFunctor = new AlgFunctor[Field] {
+      def amap[Q[_], P[_], X](f: Q ~> P)(alg: Field[Q, X]) =
+        Field(alg.get.amap(f), alg.put.amap(f))
+    }
+    
+    implicit def DepartmentAlgFunctor = new AlgFunctor[Department] {
+      def amap[Q[_], P[_], X](f: Q ~> P)(alg: Department[Q, X]) =
+        Department(alg.self.amap(f), alg.budget.amap(f))
+    }
+
+    implicit class AlgFunctorOps[Alg[_[_], _], Q[_], A](al: Alg[Q, A]) {
+      def amap[P[_]](f: Q ~> P)(implicit AF: AlgFunctor[Alg]) = AF.amap(f)(al)
     }
   }
 }
