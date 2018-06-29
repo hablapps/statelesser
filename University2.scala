@@ -64,57 +64,8 @@ trait StdTraverse[P[_],S] extends ListP[Field,P,S]{
   def getAll(implicit M: Monad[P]): P[List[S]] =
     traverse(_.get())
 
-  // def putAll(values: List[S])(implicit M: Monad[P]): P[List[Unit]] =
-  //   traverseZip(values)(_ put _)
-
   def putAll(values: List[S])(implicit M: Monad[P]): P[List[Unit]] =
-    apply >>= (algs => (algs zip values) traverse {
-      case (alg, v) => alg put v
-    })
-}
-
-/**
- * Data Model
- */
-
-object Primitive{
-  type IntegerP[P[_]]=Field[P,Int]
-  type BooleanP[P[_]]=Field[P,Boolean]
-  type StringP[P[_]]=Field[P,String]
-}
-
-import Primitive._
-
-trait Department[P[_],D]{
-  val self: Field[P,D]
-  val budget: IntegerP[P]
-}
-
-object Department {
-  def apply[P[_], D](se: Field[P, D], bu: IntegerP[P]): Department[P, D] =
-    new Department[P, D] {
-      val self = se
-      val budget = bu
-    }
-}
-
-trait University[P[_],U]{
-  type D
-
-  val self: Field[P,U]
-  val name: StringP[P]
-  val deps: ListP[Department,P,D]
-}
-
-trait Logic[P[_],U]{
-  val univ: University[P,U]
-
-  def doubleBudget(implicit M: Monad[P]): P[List[Unit]] =
-    univ.deps traverse { _.budget.modify(_*2) }
-  
-  // should be reused
-  def getDepts(implicit M: Monad[P]): P[List[univ.D]] = 
-    univ.deps traverse { _.self.get() }
+    traverseZip(values)(_ put _)
 }
 
 
@@ -157,7 +108,7 @@ object Util {
       }
     }
   
-  // Maps the state-based interpretation of an algebra. 
+  // Maps the interpretation of an algebra. 
   trait AlgFunctor[Alg[_[_], _]] {
     def amap[Q[_], P[_], X](f: Q ~> P)(alg: Alg[Q, X]): Alg[P, X]
   }
@@ -181,11 +132,6 @@ object Util {
         Field(alg.get.amap(f), alg.put.amap(f))
     }
     
-    implicit def DepartmentAlgFunctor = new AlgFunctor[Department] {
-      def amap[Q[_], P[_], X](f: Q ~> P)(alg: Department[Q, X]) =
-        Department(alg.self.amap(f), alg.budget.amap(f))
-    }
-
     implicit class AlgFunctorOps[Alg[_[_], _], Q[_], A](al: Alg[Q, A]) {
       def amap[P[_]](f: Q ~> P)(implicit AF: AlgFunctor[Alg]) = AF.amap(f)(al)
     }
@@ -193,6 +139,57 @@ object Util {
 }
  
 import Util.{ Lens, _ }, AlgFunctor._
+
+
+/**
+ * Data Model
+ */
+
+object Primitive{
+  type IntegerP[P[_]]=Field[P,Int]
+  type BooleanP[P[_]]=Field[P,Boolean]
+  type StringP[P[_]]=Field[P,String]
+}
+
+import Primitive._
+
+trait Department[P[_],D]{
+  val self: Field[P,D]
+  val budget: IntegerP[P]
+}
+
+object Department {
+  
+  def apply[P[_], D](se: Field[P, D], bu: IntegerP[P]): Department[P, D] =
+    new Department[P, D] {
+      val self = se
+      val budget = bu
+    }
+
+  implicit def DepartmentAlgFunctor = new AlgFunctor[Department] {
+    def amap[Q[_], P[_], X](f: Q ~> P)(alg: Department[Q, X]) =
+      Department(alg.self.amap(f), alg.budget.amap(f))
+  }
+}
+
+trait University[P[_],U]{
+  type D
+
+  val self: Field[P,U]
+  val name: StringP[P]
+  val deps: ListP[Department,P,D]
+}
+
+trait Logic[P[_],U]{
+  val univ: University[P,U]
+
+  def doubleBudget(implicit M: Monad[P]): P[List[Unit]] =
+    univ.deps traverse { _.budget.modify(_*2) }
+  
+  // should be reused
+  def getDepts(implicit M: Monad[P]): P[List[univ.D]] = 
+    univ.deps traverse { _.self.get() }
+}
 
 
 /** 
@@ -214,11 +211,11 @@ object StateUniversity extends University[State[SUniversity, ?], SUniversity] {
 
   val self = StateField.id
   val name = StateField(_.name, n => _.copy(name = n))
-  val deps = ListP(State.gets(s => s.departs.toList.map { case (k, d) =>
+  val deps = ListP(State.gets(_.departs.toList.map { case (k, d) =>
     StateDepartment.amap(
       // XXX: the natural transformation is coupled to this interpretation, but
       // if we moved it to an external module, we'd need to pass the value as
-      // argument, which seems pretty weird to me.
+      // argument, which seems weird.
       λ[State[SDepartment, ?] ~> State[SUniversity, ?]] { sd =>
         State { u => 
           sd(d).leftMap(d2 => u.copy(departs = u.departs.updated(k, d2)))
