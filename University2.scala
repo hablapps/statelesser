@@ -196,9 +196,18 @@ trait Logic[P[_],U]{
  * Data Layer Interpretation
  */
 
-case class SUniversity(name: String, departs: Map[String, SDepartment])
+case class SUniversity(name: String, deps: Map[String, SDepartment])
 
 case class SDepartment(budget: Int)
+
+object UniversityMorphisms {
+  // XXX: I find `d` quite contrived, but it's the only way to decouple the
+  // natural transformation while avoiding `Option`al values.
+  def stateDep2Univ(k: String, d: SDepartment) =
+    λ[State[SDepartment, ?] ~> State[SUniversity, ?]] { sd =>
+      State(u => sd(d).leftMap(d2 => u.copy(deps = u.deps.updated(k, d2))))
+    }
+}
 
 object StateDepartment extends Department[State[SDepartment, ?], SDepartment] {
   val self   = StateField.id
@@ -211,17 +220,9 @@ object StateUniversity extends University[State[SUniversity, ?], SUniversity] {
 
   val self = StateField.id
   val name = StateField(_.name, n => _.copy(name = n))
-  val deps = ListP(State.gets(_.departs.toList.map { case (k, d) =>
-    StateDepartment.amap(
-      // XXX: the natural transformation is coupled to this interpretation, but
-      // if we moved it to an external module, we'd need to pass the value as
-      // argument, which seems weird.
-      λ[State[SDepartment, ?] ~> State[SUniversity, ?]] { sd =>
-        State { u => 
-          sd(d).leftMap(d2 => u.copy(departs = u.departs.updated(k, d2)))
-        }
-      })
-    }))
+  val deps = ListP(State.gets(_.deps.toList.map { case (k, d) =>
+    StateDepartment.amap(UniversityMorphisms.stateDep2Univ(k, d))
+  }))
 }
 
 object Main extends App {
