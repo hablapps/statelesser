@@ -200,14 +200,16 @@ case class SUniversity(name: String, deps: Map[String, SDepartment])
 
 case class SDepartment(budget: Int)
 
-object UniversityMorphisms {
+object SUniversity {
   // XXX: I find `d` quite contrived, but it's the only way to decouple the
   // natural transformation while avoiding `Option`al values.
-  def stateDep2Univ(k: String, d: SDepartment) =
+  def depLn(k: String, d: SDepartment): Lens[SUniversity, SDepartment] =
     λ[State[SDepartment, ?] ~> State[SUniversity, ?]] { sd =>
       State(u => sd(d).leftMap(d2 => u.copy(deps = u.deps.updated(k, d2))))
     }
 }
+
+import SUniversity.depLn
 
 object StateDepartment extends Department[State[SDepartment, ?], SDepartment] {
   val self   = StateField.id
@@ -221,7 +223,7 @@ object StateUniversity extends University[State[SUniversity, ?], SUniversity] {
   val self = StateField.id
   val name = StateField(_.name, n => _.copy(name = n))
   val deps = ListP(State.gets(_.deps.toList.map { case (k, d) =>
-    StateDepartment.amap(UniversityMorphisms.stateDep2Univ(k, d))
+    StateDepartment.amap(depLn(k, d))
   }))
 }
 
