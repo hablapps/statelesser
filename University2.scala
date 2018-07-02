@@ -1,6 +1,7 @@
 package org.apps.gist
 package university
 
+import Function.const
 import scalaz._, Scalaz._
 
 /**
@@ -85,22 +86,30 @@ object Util {
         val put = Setter(a => State(s => (p(a)(s), ())))
       }
 
-    def id[S]: StateField[S, S] = Lens.id[S]
+    def refl[S]: StateField[S, S] = apply(identity, const)
   }
 
   type Lens[S, A] = State[A, ?] ~> State[S, ?]
 
   object Lens {
+
+    def apply[S, A](get: S => A, set: A => S => S): Lens[S, A] =
+      λ[State[A, ?] ~> State[S, ?]] { sa =>
+        State(s => sa(get(s)).leftMap(set(_)(s)))
+      }
+
     def id[S]: Lens[S, S] = NaturalTransformation.refl
   }
 
-  implicit def lens2StateField[S, A](ln: Lens[S, A]): StateField[S, A] =
+  // Lens & StateField are isomorphic
+
+  def lens2StateField[S, A](ln: Lens[S, A]): StateField[S, A] =
     new Field[State[S, ?], A] {
       val get = Getter(ln(State.get)) 
       val put = Setter(a => ln(State.put(a)))
     }
 
-  implicit def stateField2Lens[S, A](fl: StateField[S, A]): Lens[S, A] =
+  def stateField2Lens[S, A](fl: StateField[S, A]): Lens[S, A] =
     λ[State[A, ?] ~> State[S, ?]] { sta =>
       State { s =>
         val (a, x) = sta.run(fl.get().eval(s))
@@ -206,32 +215,40 @@ trait Logic[P[_],U]{
 
 case class SUniversity(name: String, deps: Map[String, SDepartment])
 
-case class SDepartment(budget: Int)
-
 object SUniversity {
+
+  val nameLn: Lens[SUniversity, String] =
+    Lens(_.name, n => _.copy(name = n))
+  
   // XXX: I find `d` quite contrived, but it's the only way to decouple the
   // natural transformation while avoiding `Option`al values.
   def depLn(k: String, d: SDepartment): Lens[SUniversity, SDepartment] =
-    λ[State[SDepartment, ?] ~> State[SUniversity, ?]] { sd =>
-      State(u => sd(d).leftMap(d2 => u.copy(deps = u.deps.updated(k, d2))))
-    }
+    Lens(const(d), d2 => u => u.copy(deps = u.deps.updated(k, d2)))
 }
 
-import SUniversity.depLn
+case class SDepartment(budget: Int)
+
+object SDepartment {
+  val budgetLn: Lens[SDepartment, Int] =
+    Lens(_.budget, b => _.copy(budget = b))
+}
+
+import StateField.refl
+import SUniversity._, SDepartment._
 
 object StateDepartment extends Department[State[SDepartment, ?], SDepartment] {
-  val self   = StateField.id
-  val budget = StateField(_.budget, b => _.copy(budget = b))
+  val self   = refl
+  val budget = refl amap budgetLn
 }
 
 object StateUniversity extends University[State[SUniversity, ?], SUniversity] {
   
   type D = SDepartment
 
-  val self = StateField.id
-  val name = StateField(_.name, n => _.copy(name = n))
+  val self = refl 
+  val name = refl amap nameLn
   val deps = ListP(State.gets(_.deps.toList.map { case (k, d) =>
-    StateDepartment.amap(depLn(k, d))
+    StateDepartment amap depLn(k, d)
   }))
 }
 
