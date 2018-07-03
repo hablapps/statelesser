@@ -173,14 +173,14 @@ object Department {
 case class University[P[_], U, D](
   self: Field[P, U],
   name: StringP[P],
-  deps: ListP[Department, P, D])
+  math: Department[P, D])
 
 object University {
   implicit def UniversityAlgFunctor[D] = 
     new AlgFunctor[University[?[_], ?, D]] {
       def amap[Q[_]: Functor, P[_]: Functor](f: Q ~> P) =
         λ[University[Q, ?, D] ~> University[P, ?, D]] { alg =>
-          University(alg.self.amap(f), alg.name.amap(f), alg.deps.amap(f))
+          University(alg.self.amap(f), alg.name.amap(f), alg.math.amap(f))
         }
     }
 }
@@ -189,12 +189,12 @@ trait Logic[P[_], U, D]{
 
   val univ: University[P, U, D]
 
-  def doubleBudget(implicit M: Monad[P]): P[List[Unit]] =
-    univ.deps traverse { _.budget.modify(_*2) }
+  def doubleBudget(implicit M: Monad[P]): P[Unit] =
+    univ.math.budget.modify(_ * 2)
   
   // should be reused
-  def getDepts(implicit M: Monad[P]): P[List[D]] = 
-    univ.deps traverse { _.self.get() }
+  def getMathDep: P[D] = 
+    univ.math.self.get()
 }
 
 
@@ -202,17 +202,15 @@ trait Logic[P[_], U, D]{
  * Data Layer Interpretation
  */
 
-case class SUniversity(name: String, deps: Map[String, SDepartment])
+case class SUniversity(name: String, math: SDepartment)
 
 object SUniversity {
 
   val nameLn: Lens[SUniversity, String] =
     Lens(_.name, n => _.copy(name = n))
   
-  // XXX: I find `d` quite contrived, but it's the only way to decouple the
-  // natural transformation while avoiding `Option`al values.
-  def depLn(k: String, d: SDepartment): Lens[SUniversity, SDepartment] =
-    Lens(const(d), d2 => u => u.copy(deps = u.deps.updated(k, d2)))
+  val mathLn: Lens[SUniversity, SDepartment] =
+    Lens(_.math, d2 => _.copy(math = d2))
 }
 
 case class SDepartment(budget: Int)
@@ -235,20 +233,17 @@ object Main extends App {
     University[State[SUniversity, ?], SUniversity, SDepartment](
       refl[SUniversity], 
       refl[String] amap nameLn,
-      ListP(State.gets(_.deps.toList.map { case (k, d) =>
-        StateDepartment amap depLn(k, d)
-      })))
+      StateDepartment amap mathLn)
 
   val logic = new Logic[State[SUniversity, ?], SUniversity, SDepartment] {
     val univ = StateUniversity
   }
   
   val math = SDepartment(3000)
-  val cs   = SDepartment(5000)
-  val univ = SUniversity("urjc", Map("math" -> math, "cs" -> cs))
+  val univ = SUniversity("urjc", math)
  
   val univ2 = logic.doubleBudget(implicitly).exec(univ)
-  val deps  = logic.getDepts(implicitly).eval(univ2)
+  val deps  = logic.getMathDep.eval(univ2)
 
   println(s"univ2 = $univ2")
   println(s"deps  = $deps")

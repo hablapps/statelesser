@@ -2,7 +2,7 @@ name := "scalaintro"
 
 scalaBinaryVersion := "2.12"
 
-scalaVersion := "2.12.1"
+scalaVersion := "2.12.4"
 
 organization := "org.hablapps"
 
@@ -18,4 +18,7 @@ scalacOptions ++= Seq(
   "-language:implicitConversions",
   "-language:higherKinds")
 
-libraryDependencies ++= Seq("org.scalaz" %% "scalaz-core" % "7.2.8")
+libraryDependencies ++= Seq(
+  "org.scalaz" %% "scalaz-core" % "7.2.8",
+  "com.chuusai" %% "shapeless" % "2.3.3")
+
