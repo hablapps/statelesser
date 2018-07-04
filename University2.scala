@@ -24,13 +24,11 @@ case class Field[P[_],S](get: Getter[P,S], put: Setter[P,S]) {
 
 object Field {
 
-  def instance[P[_], S](implicit ev: Field[P, S]): Field[P, S] = ev
- 
   import Util._, StateField._, AlgFunctor._
   
   implicit def genField[P[_]: Functor, A](implicit 
-      ln: State[A, ?] ~> P): Field[P, A] =
-    refl[A] amap ln
+      ln: State[A, ?] ~> P): GetEvidence[Field[P, A]] =
+    GetEvidence(refl[A].apply amap ln)
 }
 
 case class ListP[Alg[_[_],_], P[_], S](algs: P[List[Alg[P, S]]]) {
@@ -85,7 +83,8 @@ object Util {
         Getter(State.gets(g)),
         Setter(a => State(s => (p(a)(s), ()))))
 
-    implicit def refl[S]: StateField[S, S] = apply(identity, const)
+    implicit def refl[S]: GetEvidence[StateField[S, S]] = 
+      GetEvidence(apply[S, S](identity, const))
   }
 
   type Lens[S, A] = State[A, ?] ~> State[S, ?]
@@ -167,9 +166,38 @@ object Util {
         AF.amap(f)(implicitly, implicitly)(al)
     }
   }
+
+  // Shapeless class to automate instances
+  
+  trait GetEvidence[A] {
+    def apply: A
+  }
+
+  object GetEvidence {
+
+    def apply[A](implicit ge: GetEvidence[A]): GetEvidence[A] = ge
+  
+    def apply[A](a: A): GetEvidence[A] =
+      new GetEvidence[A] { def apply = a }
+    
+    implicit val hnil: GetEvidence[HNil] = GetEvidence(HNil)
+
+    implicit def hcons[H, T <: HList](implicit
+        ev0: Lazy[GetEvidence[H]],
+        ev1: GetEvidence[T]): GetEvidence[H :: T] =
+      GetEvidence[H :: T](ev0.value.apply :: ev1.apply)
+
+    implicit def genericGetEvidence[A, R](implicit
+        generic: Generic.Aux[A, R],
+        rInstance: Lazy[GetEvidence[R]]): GetEvidence[A] =
+      GetEvidence[A](generic.from(rInstance.value.apply))
+  }
+  
+  implicit val i = GetEvidence(3)
+  GetEvidence[Int]
 }
  
-import Util.{ Lens, _ }, AlgFunctor._
+import Util.{ Lens, _ }, AlgFunctor._, GetEvidence._
 
 
 /**
@@ -190,13 +218,10 @@ case class Department[P[_],D](
 
 object Department {
 
-  def instance[P[_], D](implicit ev: Department[P, D]): Department[P, D] = ev
+  def instance[P[_], D](implicit 
+      ge: GetEvidence[Department[P, D]]): Department[P, D] = 
+    ge.apply
 
-  implicit def fromFields[P[_], D](implicit
-      self: Field[P, D],
-      budget: IntegerP[P]): Department[P, D] =
-    Department(self, budget)
-  
   implicit val DepartmentAlgFunctor = new AlgFunctor[Department] {
     def amap[Q[_]: Functor, P[_]: Functor](f: Q ~> P) =
       λ[Department[Q, ?] ~> Department[P, ?]] { alg =>
@@ -213,15 +238,9 @@ case class University[P[_], U, D](
 object University {
 
   def instance[P[_], U, D](implicit 
-      ev: University[P, U, D]): University[P, U, D] =
-    ev
+      ge: GetEvidence[University[P, U, D]]): University[P, U, D] =
+    ge.apply
 
-  implicit def fromFields[P[_], U, D](implicit
-      self: Field[P, U],
-      name: StringP[P],
-      math: Department[P, D]): University[P, U, D] =
-    University(self, name, math)
-    
   implicit def UniversityAlgFunctor[D] = 
     new AlgFunctor[University[?[_], ?, D]] {
       def amap[Q[_]: Functor, P[_]: Functor](f: Q ~> P) =
@@ -239,14 +258,8 @@ case class City[P[_], C, U, D](
 object City {
   
   def instance[P[_], C, U, D](implicit
-      ev: City[P, C, U, D]): City[P, C, U, D] =
-    ev
-
-  implicit def fromFields[P[_], C, U, D](implicit
-      self: Field[P, C],
-      popu: Field[P, Double],
-      univ: University[P, U, D]): City[P, C, U, D] =
-    City(self, popu, univ)
+      ge: GetEvidence[City[P, C, U, D]]): City[P, C, U, D] =
+    ge.apply
 }
 
 case class Logic[P[_], U, D](univ: University[P, U, D]) {
@@ -316,7 +329,7 @@ object Main extends App {
   val StateCity = 
     City.instance[State[SCity, ?], SCity, SUniversity, SDepartment]
  
-  val StateUniversity =
+  val StateUniversity = 
     University.instance[State[SUniversity, ?], SUniversity, SDepartment]
 
   val logic = Logic(StateUniversity)
