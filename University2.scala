@@ -3,7 +3,7 @@ package university
 
 import Function.const
 import scalaz._, Scalaz._
-import shapeless._
+import shapeless._, labelled._, shapeless.syntax.singleton._
 
 /**
  * State algebras
@@ -26,9 +26,9 @@ object Field {
 
   import Util._, StateField._, AlgFunctor._
   
-  implicit def genField[P[_]: Functor, A](implicit 
-      ln: State[A, ?] ~> P): GetEvidence[Field[P, A]] =
-    GetEvidence(refl[A].apply amap ln)
+  implicit def genField[K, P[_]: Functor, A](implicit 
+      ln: FieldType[K, State[A, ?] ~> P]): GetEvidence[FieldType[K, Field[P, A]]] =
+    GetEvidence(field[K](refl[A].apply amap ln))
 }
 
 case class ListP[Alg[_[_],_], P[_], S](algs: P[List[Alg[P, S]]]) {
@@ -182,19 +182,25 @@ object Util {
     
     implicit val hnil: GetEvidence[HNil] = GetEvidence(HNil)
 
-    implicit def hcons[H, T <: HList](implicit
-        ev0: Lazy[GetEvidence[H]],
-        ev1: GetEvidence[T]): GetEvidence[H :: T] =
-      GetEvidence[H :: T](ev0.value.apply :: ev1.apply)
+    implicit def hcons[K, H, T <: HList](implicit
+        // witness: Witness.Aux[K], 
+        hev: Lazy[GetEvidence[FieldType[K, H]]],
+        tev: GetEvidence[T]): GetEvidence[FieldType[K, H] :: T] =
+      GetEvidence[FieldType[K, H] :: T](
+        hev.value.apply :: tev.apply)
 
     implicit def genericGetEvidence[A, R](implicit
-        generic: Generic.Aux[A, R],
+        generic: LabelledGeneric.Aux[A, R],
         rInstance: Lazy[GetEvidence[R]]): GetEvidence[A] =
       GetEvidence[A](generic.from(rInstance.value.apply))
-  }
   
-  implicit val i = GetEvidence(3)
-  GetEvidence[Int]
+    // XXX: perhaps this isn't the best idea, but it's what I needed while
+    // debugging implicits with *splain*.
+    implicit def genericGetEvidence2[K, A, R](implicit
+        generic: LabelledGeneric.Aux[A, R],
+        rInstance: Lazy[GetEvidence[R]]): GetEvidence[FieldType[K, A]] =
+      GetEvidence[FieldType[K, A]](field[K](generic.from(rInstance.value.apply)))
+  }
 }
  
 import Util.{ Lens, _ }, AlgFunctor._, GetEvidence._
@@ -281,12 +287,10 @@ case class SCity(population: Double, univ: SUniversity)
 
 object SCity {
  
-  // XXX: if population was an `Int`, there would be a conflict between this
-  // lens and budget lens, leading to a failure while generating the instance
-  implicit val popuLn: Lens[SCity, Double] =
+  val popuLn: Lens[SCity, Double] =
     Lens(_.population, p => _.copy(population = p))
 
-  implicit val univLn: Lens[SCity, SUniversity] =
+  val univLn: Lens[SCity, SUniversity] =
     Lens(_.univ, u => _.copy(univ = u))
 }
 
@@ -294,41 +298,54 @@ case class SUniversity(name: String, math: SDepartment)
 
 object SUniversity {
 
-  implicit val nameLn: Lens[SUniversity, String] =
+  val nameLn: Lens[SUniversity, String] =
     Lens(_.name, n => _.copy(name = n))
   
-  implicit val mathLn: Lens[SUniversity, SDepartment] =
+  val mathLn: Lens[SUniversity, SDepartment] =
     Lens(_.math, d => _.copy(math = d))
-
-  implicit val univNameLn: Lens[SCity, String] =
-    SCity.univLn compose nameLn
-    
-  implicit val univMathLn: Lens[SCity, SDepartment] =
-    SCity.univLn compose mathLn
 }
 
 case class SDepartment(budget: Int)
 
 object SDepartment {
 
-  implicit val budgetLn: Lens[SDepartment, Int] =
-    Lens(_.budget, b => _.copy(budget = b))
-
-  implicit val mathBudgetLn: Lens[SUniversity, Int] =
-    SUniversity.mathLn compose budgetLn
-
-  implicit val univMathBudgetLn: Lens[SCity, Int] =
-    SCity.univLn compose mathBudgetLn
+  val budgetLn = Lens[SDepartment, Int](_.budget, b => _.copy(budget = b))
 }
 
-import StateField.refl
 import SCity._, SUniversity._, SDepartment._
 
 object Main extends App {
 
-  val StateCity = 
-    City.instance[State[SCity, ?], SCity, SUniversity, SDepartment]
- 
+  object TestDepartment {
+    implicit val self = 'self ->> lensId[SDepartment]
+    implicit val budg = 'budget ->> budgetLn
+
+    val StateDepartment =
+      Department.instance[State[SDepartment, ?], SDepartment]
+  }
+
+  object TestCity {
+    implicit val self = 'self ->> lensId[SCity]
+    implicit val popu = 'popu ->> popuLn
+    implicit val univ = 'univ ->> univLn
+    implicit val sel1 = 'self ->> (univ compose lensId[SUniversity])
+    implicit val name = 'name ->> (univ compose nameLn)
+    implicit val math = 'math ->> (univ compose mathLn)
+    implicit val sel2 = 'self ->> (math compose lensId[SDepartment])
+    implicit val budg = 'budget ->> (math compose budgetLn)
+
+    val StateCity = 
+      City.instance[State[SCity, ?], SCity, SUniversity, SDepartment]
+  }
+
+  // University example (includes some logic)
+  
+  implicit val sel1 = 'self ->> lensId[SUniversity]
+  implicit val name = 'name ->> nameLn
+  implicit val matx = 'math ->> mathLn
+  implicit val sel2 = 'self ->> (mathLn compose lensId[SDepartment])
+  implicit val budg = 'budget ->> (mathLn compose budgetLn)
+
   val StateUniversity = 
     University.instance[State[SUniversity, ?], SUniversity, SDepartment]
 
@@ -336,7 +353,7 @@ object Main extends App {
   
   val math = SDepartment(3000)
   val univ = SUniversity("urjc", math)
- 
+
   val univ2 = logic.doubleBudget(implicitly).exec(univ)
   val deps  = logic.getMathDep.eval(univ2)
 

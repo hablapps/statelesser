@@ -1,10 +1,10 @@
-name := "scalaintro"
+name := "single-p"
 
-scalaBinaryVersion := "2.12"
-
-scalaVersion := "2.12.4"
+scalaVersion := "2.12.6"
 
 organization := "org.hablapps"
+
+addCompilerPlugin("io.tryp" % "splain" % "0.3.1" cross CrossVersion.patch)
 
 addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.3")
 
