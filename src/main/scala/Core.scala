@@ -125,6 +125,8 @@ object Util {
 
   object AlgFunctor {
 
+    def apply[Alg[_[_], _]](implicit ev: AlgFunctor[Alg]): AlgFunctor[Alg] = ev
+
     // XXX: boilerplate instances, consider using Shapeless here?
     
     implicit val GetterAlgFunctor = new AlgFunctor[Getter] {
@@ -193,12 +195,10 @@ object Util {
         rInstance: Lazy[GetEvidence[R]]): GetEvidence[A] =
       GetEvidence[A](generic.from(rInstance.value.apply))
   
-    // XXX: perhaps this isn't the best idea, but it's what I needed while
-    // debugging implicits with *splain*.
     implicit def genericGetEvidence2[K, A, R](implicit
         generic: LabelledGeneric.Aux[A, R],
         rInstance: Lazy[GetEvidence[R]]): GetEvidence[FieldType[K, A]] =
-      GetEvidence[FieldType[K, A]](field[K](generic.from(rInstance.value.apply)))
+      GetEvidence[FieldType[K, A]](field[K](genericGetEvidence[A, R].apply)),
   }
 }
  

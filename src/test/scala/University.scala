@@ -3,7 +3,7 @@ package test
 package university
 
 import scalaz._
-import shapeless._, shapeless.syntax.singleton._
+import shapeless._, shapeless.syntax.singleton._, labelled._
 
 import Util.{ Lens, _ }, AlgFunctor._, GetEvidence._
 
@@ -37,7 +37,7 @@ object Department {
   }
 }
 
-case class University[P[_], U, D](
+case class University[D, P[_], U](
   self: Field[P, U],
   name: StringP[P],
   math: Department[P, D])
@@ -45,31 +45,39 @@ case class University[P[_], U, D](
 object University {
 
   def instance[P[_], U, D](implicit 
-      ge: GetEvidence[University[P, U, D]]): University[P, U, D] =
+      ge: GetEvidence[University[D, P, U]]): University[D, P, U] =
     ge.apply
 
   implicit def UniversityAlgFunctor[D] = 
-    new AlgFunctor[University[?[_], ?, D]] {
+    new AlgFunctor[University[D, ?[_], ?]] {
       def amap[Q[_]: Functor, P[_]: Functor](f: Q ~> P) =
-        λ[University[Q, ?, D] ~> University[P, ?, D]] { alg =>
+        λ[University[D, Q, ?] ~> University[D, P, ?]] { alg =>
           University(alg.self.amap(f), alg.name.amap(f), alg.math.amap(f))
         }
     }
 }
 
-case class City[P[_], C, U, D](
+case class City[U, D, P[_], C](
   self: Field[P, C],
   popu: Field[P, Int],
-  univ: University[P, U, D])
+  univ: University[D, P, U])
 
 object City {
   
   def instance[P[_], C, U, D](implicit
-      ge: GetEvidence[City[P, C, U, D]]): City[P, C, U, D] =
+      ge: GetEvidence[City[U, D, P, C]]): City[U, D, P, C] =
     ge.apply
+
+  implicit def CityAlgFunctor[U, D] =
+    new AlgFunctor[City[U, D, ?[_], ?]] {
+      def amap[Q[_]: Functor, P[_]: Functor](f: Q ~> P) =
+        λ[City[U, D, Q, ?] ~> City[U, D, P, ?]] { alg =>
+          City(alg.self.amap(f), alg.popu.amap(f), alg.univ.amap(f))
+        }
+    }
 }
 
-case class Logic[P[_], C, U, D](city: City[P, C, U, D]) {
+case class Logic[P[_], C, U, D](city: City[U, D, P, C]) {
 
   def getPopu: P[Int] =
     city.popu.get()
@@ -91,29 +99,30 @@ case class SCity(population: Int, univ: SUniversity)
 
 object SCity {
  
-  val popuLn: Lens[SCity, Int] =
-    Lens(_.population, p => _.copy(population = p))
+  implicit val popuLn =
+    Lens[SCity, Int](_.population, p => _.copy(population = p))
 
-  val univLn: Lens[SCity, SUniversity] =
-    Lens(_.univ, u => _.copy(univ = u))
+  implicit val univLn =
+    Lens[SCity, SUniversity](_.univ, u => _.copy(univ = u))
 }
 
 case class SUniversity(name: String, math: SDepartment)
 
 object SUniversity {
 
-  val nameLn: Lens[SUniversity, String] =
-    Lens(_.name, n => _.copy(name = n))
+  implicit val nameLn =
+    Lens[SUniversity, String](_.name, n => _.copy(name = n))
   
-  val mathLn: Lens[SUniversity, SDepartment] =
-    Lens(_.math, d => _.copy(math = d))
+  implicit val mathLn =
+    Lens[SUniversity, SDepartment](_.math, d => _.copy(math = d))
 }
 
 case class SDepartment(budget: Int)
 
 object SDepartment {
 
-  val budgetLn = Lens[SDepartment, Int](_.budget, b => _.copy(budget = b))
+  implicit val budgetLn = 
+    Lens[SDepartment, Int](_.budget, b => _.copy(budget = b))
 }
 
 import SCity._, SUniversity._, SDepartment._
