@@ -98,31 +98,40 @@ case class Logic[P[_], C, U, D](city: City[U, D, P, C]) {
 case class SCity(population: Int, univ: SUniversity)
 
 object SCity {
- 
+
+  implicit val selfLn =
+    'self ->> lensId[SCity]
+
   implicit val popuLn =
-    Lens[SCity, Int](_.population, p => _.copy(population = p))
+    'popu ->> Lens[SCity, Int](_.population, p => _.copy(population = p))
 
   implicit val univLn =
-    Lens[SCity, SUniversity](_.univ, u => _.copy(univ = u))
+    'univ ->> Lens[SCity, SUniversity](_.univ, u => _.copy(univ = u))
 }
 
 case class SUniversity(name: String, math: SDepartment)
 
 object SUniversity {
 
+  implicit val selfLn =
+    'self ->> lensId[SUniversity]
+
   implicit val nameLn =
-    Lens[SUniversity, String](_.name, n => _.copy(name = n))
+    'name ->> Lens[SUniversity, String](_.name, n => _.copy(name = n))
   
   implicit val mathLn =
-    Lens[SUniversity, SDepartment](_.math, d => _.copy(math = d))
+    'math ->> Lens[SUniversity, SDepartment](_.math, d => _.copy(math = d))
 }
 
 case class SDepartment(budget: Int)
 
 object SDepartment {
 
+  implicit val selfLn =
+    'self ->> lensId[SDepartment]
+
   implicit val budgetLn = 
-    Lens[SDepartment, Int](_.budget, b => _.copy(budget = b))
+    'budget ->> Lens[SDepartment, Int](_.budget, b => _.copy(budget = b))
 }
 
 import SCity._, SUniversity._, SDepartment._
@@ -133,17 +142,8 @@ class UniversitySpec extends FlatSpec with Matchers {
 
   "Automagic instances" should "be generated for city" in {
 
-    implicit val self = 'self ->> lensId[SCity]
-    implicit val popu = 'popu ->> popuLn
-    implicit val univ = 'univ ->> univLn
-    implicit val sel1 = 'self ->> (univ compose lensId[SUniversity])
-    implicit val name = 'name ->> (univ compose nameLn)
-    implicit val math = 'math ->> (univ compose mathLn)
-    implicit val sel2 = 'self ->> (math compose lensId[SDepartment])
-    implicit val budg = 'budget ->> (math compose budgetLn)
-
-    val StateCity = 
-      City.instance[State[SCity, ?], SCity, SUniversity, SDepartment]
+     val StateCity = 
+       City.instance[State[SCity, ?], SCity, SUniversity, SDepartment]
   
      val logic = Logic(StateCity)
     
@@ -161,20 +161,11 @@ class UniversitySpec extends FlatSpec with Matchers {
 
   it should "be generated for department" in {
     
-    implicit val self = 'self ->> lensId[SDepartment]
-    implicit val budg = 'budget ->> budgetLn
-
     val StateDepartment =
       Department.instance[State[SDepartment, ?], SDepartment]
   }
   
   it should "be generated for university" in {
-
-    implicit val sel1 = 'self ->> lensId[SUniversity]
-    implicit val name = 'name ->> nameLn
-    implicit val matx = 'math ->> mathLn
-    implicit val sel2 = 'self ->> (mathLn compose lensId[SDepartment])
-    implicit val budg = 'budget ->> (mathLn compose budgetLn)
 
     val StateUniversity = 
       University.instance[State[SUniversity, ?], SUniversity, SDepartment]

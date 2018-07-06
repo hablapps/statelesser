@@ -125,7 +125,8 @@ object Util {
 
   object AlgFunctor {
 
-    def apply[Alg[_[_], _]](implicit ev: AlgFunctor[Alg]): AlgFunctor[Alg] = ev
+    def apply[Alg[_[_], _]](implicit ev: AlgFunctor[Alg]): AlgFunctor[Alg] = 
+      ev
 
     // XXX: boilerplate instances, consider using Shapeless here?
     
@@ -195,10 +196,15 @@ object Util {
         rInstance: Lazy[GetEvidence[R]]): GetEvidence[A] =
       GetEvidence[A](generic.from(rInstance.value.apply))
   
-    implicit def genericGetEvidence2[K, A, R](implicit
-        generic: LabelledGeneric.Aux[A, R],
-        rInstance: Lazy[GetEvidence[R]]): GetEvidence[FieldType[K, A]] =
-      GetEvidence[FieldType[K, A]](field[K](genericGetEvidence[A, R].apply)),
+    implicit def genericGetEvidence3[K, Alg[_[_], _], P[_], Q[_], S, R](implicit
+        algf: AlgFunctor[Alg],
+        nat: FieldType[K, Q ~> P],
+        f0: Functor[Q],
+        f1: Functor[P],
+        generic: LabelledGeneric.Aux[Alg[Q, S], R],
+        rInstance: Lazy[GetEvidence[R]]): GetEvidence[FieldType[K, Alg[P, S]]] =
+      GetEvidence(field[K](algf.amap(nat)(f0, f1)(
+        genericGetEvidence[Alg[Q, S], R].apply)))
   }
 }
  
