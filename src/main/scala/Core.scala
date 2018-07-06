@@ -96,6 +96,10 @@ object Util {
       }
   }
  
+  implicit class LensOps[S, A](ln: monocle.Lens[S, A]) {
+    val natural: Lens[S, A] = Lens(ln.get, ln.set)
+  }
+
   def lensId[S]: Lens[S, S] = NaturalTransformation.refl
   
   implicit def self[A] = 'self ->> lensId[A]

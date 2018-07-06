@@ -4,6 +4,7 @@ package university
 
 import scalaz._
 import shapeless._, shapeless.syntax.singleton._
+import monocle.macros.Lenses
 
 import Util.{ Lens, _ }, AlgFunctor._, GetEvidence._
 
@@ -95,72 +96,48 @@ case class Logic[P[_], C, U, D](city: City[U, D, P, C]) {
  * Data Layer Interpretation
  */
 
-case class SCity(population: Int, univ: SUniversity)
+@Lenses case class SCity(population: Int, univ: SUniversity)
+@Lenses case class SUniversity(name: String, math: SDepartment)
+@Lenses case class SDepartment(budget: Int)
 
-object SCity {
-
-  implicit val popuLn =
-    'popu ->> Lens[SCity, Int](_.population, p => _.copy(population = p))
-
-  implicit val univLn =
-    'univ ->> Lens[SCity, SUniversity](_.univ, u => _.copy(univ = u))
-}
-
-case class SUniversity(name: String, math: SDepartment)
-
-object SUniversity {
-
-  implicit val nameLn =
-    'name ->> Lens[SUniversity, String](_.name, n => _.copy(name = n))
-  
-  implicit val mathLn =
-    'math ->> Lens[SUniversity, SDepartment](_.math, d => _.copy(math = d))
-}
-
-case class SDepartment(budget: Int)
-
-object SDepartment {
-
-  implicit val budgetLn = 
-    'budget ->> Lens[SDepartment, Int](_.budget, b => _.copy(budget = b))
-}
-
-import Util.self
 import SCity._, SUniversity._, SDepartment._
 
 import org.scalatest._
 
 class UniversitySpec extends FlatSpec with Matchers {
 
+  // Map between fields and lenses: this is all we need!
+  implicit val popuLn = 'popu ->> population.natural
+  implicit val univLn = 'univ ->> univ.natural
+  implicit val nameLn = 'name ->> name.natural
+  implicit val mathLn = 'math ->> math.natural 
+  implicit val budgLn = 'budget ->> budget.natural
+
   "Automagic instances" should "be generated for city" in {
-
-     val StateCity = 
-       City.instance[State[SCity, ?], SCity, SUniversity, SDepartment]
   
-     val logic = Logic(StateCity)
+    val StateCity = 
+      City.instance[State[SCity, ?], SCity, SUniversity, SDepartment]
+  
+    val logic = Logic(StateCity)
     
-     val urjc = SUniversity("urjc", SDepartment(3000))
-     val most = SCity(200000, urjc)
+    val urjc = SUniversity("urjc", SDepartment(3000))
+    val most = SCity(200000, urjc)
 
-     val popu2 = logic.getPopu.eval(most)
-     val most2 = logic.doubleBudget(implicitly).exec(most)
-     val math2 = logic.getMathDep.eval(most2)
+    val popu2 = logic.getPopu.eval(most)
+    val most2 = logic.doubleBudget(implicitly).exec(most)
+    val math2 = logic.getMathDep.eval(most2)
 
-     popu2 should be (200000)
-     most2 should be (SCity(200000, SUniversity("urjc", SDepartment(6000))))
-     math2 should be (SDepartment(6000))
+    popu2 should be (200000)
+    most2 should be (SCity(200000, SUniversity("urjc", SDepartment(6000))))
+    math2 should be (SDepartment(6000))
   }
 
   it should "be generated for department" in {
-    
-    val StateDepartment =
-      Department.instance[State[SDepartment, ?], SDepartment]
+    Department.instance[State[SDepartment, ?], SDepartment]
   }
   
   it should "be generated for university" in {
-
-    val StateUniversity = 
-      University.instance[State[SUniversity, ?], SUniversity, SDepartment]
+    University.instance[State[SUniversity, ?], SUniversity, SDepartment]
   }
 }
 
