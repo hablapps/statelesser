@@ -99,9 +99,6 @@ case class SCity(population: Int, univ: SUniversity)
 
 object SCity {
 
-  implicit val selfLn =
-    'self ->> lensId[SCity]
-
   implicit val popuLn =
     'popu ->> Lens[SCity, Int](_.population, p => _.copy(population = p))
 
@@ -112,9 +109,6 @@ object SCity {
 case class SUniversity(name: String, math: SDepartment)
 
 object SUniversity {
-
-  implicit val selfLn =
-    'self ->> lensId[SUniversity]
 
   implicit val nameLn =
     'name ->> Lens[SUniversity, String](_.name, n => _.copy(name = n))
@@ -127,9 +121,6 @@ case class SDepartment(budget: Int)
 
 object SDepartment {
 
-  implicit val selfLn =
-    'self ->> lensId[SDepartment]
-
   implicit val budgetLn = 
     'budget ->> Lens[SDepartment, Int](_.budget, b => _.copy(budget = b))
 }
@@ -139,6 +130,8 @@ import SCity._, SUniversity._, SDepartment._
 import org.scalatest._
 
 class UniversitySpec extends FlatSpec with Matchers {
+
+  implicit def self[A] = 'self ->> lensId[A]
 
   "Automagic instances" should "be generated for city" in {
 
