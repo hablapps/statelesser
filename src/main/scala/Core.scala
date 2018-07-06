@@ -2,7 +2,7 @@ package org.hablapps.statesome
 
 import Function.const
 import scalaz._, Scalaz._
-import shapeless._, labelled._
+import shapeless._, shapeless.syntax.singleton._, labelled._
 
 /**
  * State algebras
@@ -97,6 +97,8 @@ object Util {
   }
  
   def lensId[S]: Lens[S, S] = NaturalTransformation.refl
+  
+  implicit def self[A] = 'self ->> lensId[A]
   
   implicit def compNat[P[_], Q[_], R[_]](implicit
       nat1: Q ~> P, 
@@ -196,7 +198,7 @@ object Util {
         rInstance: Lazy[GetEvidence[R]]): GetEvidence[A] =
       GetEvidence[A](generic.from(rInstance.value.apply))
   
-    implicit def genericGetEvidence3[K, Alg[_[_], _], P[_], Q[_], S, R](implicit
+    implicit def genericGetEvidence2[K, Alg[_[_], _], P[_], Q[_], S, R](implicit
         algf: AlgFunctor[Alg],
         nat: FieldType[K, Q ~> P],
         f0: Functor[Q],

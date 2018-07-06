@@ -3,7 +3,7 @@ package test
 package university
 
 import scalaz._
-import shapeless._, shapeless.syntax.singleton._, labelled._
+import shapeless._, shapeless.syntax.singleton._
 
 import Util.{ Lens, _ }, AlgFunctor._, GetEvidence._
 
@@ -125,13 +125,12 @@ object SDepartment {
     'budget ->> Lens[SDepartment, Int](_.budget, b => _.copy(budget = b))
 }
 
+import Util.self
 import SCity._, SUniversity._, SDepartment._
 
 import org.scalatest._
 
 class UniversitySpec extends FlatSpec with Matchers {
-
-  implicit def self[A] = 'self ->> lensId[A]
 
   "Automagic instances" should "be generated for city" in {
 
