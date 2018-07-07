@@ -103,11 +103,10 @@ object Util {
   def lensId[S]: Lens[S, S] = NaturalTransformation.refl
   
   implicit def self[A] = 'self ->> lensId[A]
-  
-  implicit def compNat[P[_], Q[_], R[_]](implicit
-      nat1: Q ~> P, 
-      nat2: R ~> Q): R ~> P =
-    nat1 compose nat2
+
+  implicit def symbolLensAsNat[K, S, A](implicit 
+      ev: FieldType[K, monocle.Lens[S, A]]): FieldType[K, Lens[S, A]] =
+    field[K](ev.natural)
 
   // Lens & StateField are isomorphic
 

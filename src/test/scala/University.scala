@@ -3,10 +3,10 @@ package test
 package university
 
 import scalaz._
-import shapeless._, shapeless.syntax.singleton._
+import shapeless.syntax.singleton._
 import monocle.macros.Lenses
 
-import Util.{ Lens, _ }, AlgFunctor._, GetEvidence._
+import Util._, AlgFunctor._, GetEvidence._
 
 /**
  * Data Model
@@ -106,12 +106,11 @@ import org.scalatest._
 
 class UniversitySpec extends FlatSpec with Matchers {
 
-  // Map between fields and lenses: this is all we need!
-  implicit val popuLn = 'popu ->> population.natural
-  implicit val univLn = 'univ ->> univ.natural
-  implicit val nameLn = 'name ->> name.natural
-  implicit val mathLn = 'math ->> math.natural 
-  implicit val budgLn = 'budget ->> budget.natural
+  implicit val popuLn = 'popu ->> population
+  implicit val univLn = 'univ ->> univ
+  implicit val nameLn = 'name ->> name
+  implicit val mathLn = 'math ->> math 
+  implicit val budgLn = 'budget ->> budget
 
   "Automagic instances" should "be generated for city" in {
   
