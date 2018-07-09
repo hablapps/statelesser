@@ -217,8 +217,14 @@ object Util {
     implicit def hcons[K, H, T <: HList]: TaggedLens[K, FieldType[K, H] :: T, H] =
       TaggedLens(field[K](Lens[FieldType[K, H] :: T, H](
         _.head, h2 => field[K](h2) :: _.tail)))
+    
+    implicit def hcons2[K, H, A, T <: HList](implicit
+        ev: TaggedLens[K, T, A]): TaggedLens[K, H :: T, A] =
+      TaggedLens(field[K](Lens[H :: T, A](
+        l => ev.getTaggedLens(State.get).eval(l.tail), 
+        a2 => l => l.head :: ev.getTaggedLens(State.put(a2)).exec(l.tail))))
 
-     implicit def genericTaggedLens[C, R, K, A](implicit
+    implicit def genericTaggedLens[C, R, K, A](implicit
         generic: LabelledGeneric.Aux[C, R],
         rInstance: Lazy[TaggedLens[K, R, A]])
         : TaggedLens[K, C, A] =
@@ -228,15 +234,9 @@ object Util {
   }
 
   trait TaggedLens1 {
-    implicit def hcons2[K, H, A, T <: HList](implicit
-        ev: TaggedLens[K, T, A]): TaggedLens[K, H :: T, A] =
-      TaggedLens(field[K](Lens[H :: T, A](
-        l => ev.getTaggedLens(State.get).eval(l.tail), 
-        a2 => l => l.head :: ev.getTaggedLens(State.put(a2)).exec(l.tail))))
+    implicit def taggedId[K, S]: TaggedLens[K, S, S] =
+      TaggedLens(field[K](Lens.lensId[S]))
   }
-
-  implicit def getTaggedLensId[K, S]: FieldType[K, Lens[S, S]] =
-    field[K](Lens.lensId[S])
 
   implicit def getTaggedLens[K, S, A](implicit 
       tl: TaggedLens[K, S, A]): FieldType[K, Lens[S, A]] =
