@@ -2,7 +2,7 @@ package org.hablapps.statesome
 
 import Function.const
 import scalaz._, Scalaz._
-import shapeless._, labelled._
+import shapeless._, shapeless.syntax.singleton._, labelled._
 
 /**
  * State algebras
@@ -96,12 +96,17 @@ object Util {
       }
   }
  
+  implicit class LensOps[S, A](ln: monocle.Lens[S, A]) {
+    val natural: Lens[S, A] = Lens(ln.get, ln.set)
+  }
+
   def lensId[S]: Lens[S, S] = NaturalTransformation.refl
   
-  implicit def compNat[P[_], Q[_], R[_]](implicit
-      nat1: Q ~> P, 
-      nat2: R ~> Q): R ~> P =
-    nat1 compose nat2
+  implicit def self[A] = 'self ->> lensId[A]
+
+  implicit def symbolLensAsNat[K, S, A](implicit 
+      ev: FieldType[K, monocle.Lens[S, A]]): FieldType[K, Lens[S, A]] =
+    field[K](ev.natural)
 
   // Lens & StateField are isomorphic
 
@@ -124,6 +129,9 @@ object Util {
   }
 
   object AlgFunctor {
+
+    def apply[Alg[_[_], _]](implicit ev: AlgFunctor[Alg]): AlgFunctor[Alg] = 
+      ev
 
     // XXX: boilerplate instances, consider using Shapeless here?
     
@@ -193,12 +201,15 @@ object Util {
         rInstance: Lazy[GetEvidence[R]]): GetEvidence[A] =
       GetEvidence[A](generic.from(rInstance.value.apply))
   
-    // XXX: perhaps this isn't the best idea, but it's what I needed while
-    // debugging implicits with *splain*.
-    implicit def genericGetEvidence2[K, A, R](implicit
-        generic: LabelledGeneric.Aux[A, R],
-        rInstance: Lazy[GetEvidence[R]]): GetEvidence[FieldType[K, A]] =
-      GetEvidence[FieldType[K, A]](field[K](generic.from(rInstance.value.apply)))
+    implicit def genericGetEvidence2[K, Alg[_[_], _], P[_], Q[_], S, R](implicit
+        algf: AlgFunctor[Alg],
+        nat: FieldType[K, Q ~> P],
+        f0: Functor[Q],
+        f1: Functor[P],
+        generic: LabelledGeneric.Aux[Alg[Q, S], R],
+        rInstance: Lazy[GetEvidence[R]]): GetEvidence[FieldType[K, Alg[P, S]]] =
+      GetEvidence(field[K](algf.amap(nat)(f0, f1)(
+        genericGetEvidence[Alg[Q, S], R].apply)))
   }
 }
  
