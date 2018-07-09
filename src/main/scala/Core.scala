@@ -94,20 +94,10 @@ object Util {
       λ[State[A, ?] ~> State[S, ?]] { sa =>
         State(s => sa(get(s)).leftMap(set(_)(s)))
       }
-  }
- 
-  implicit class LensOps[S, A](ln: monocle.Lens[S, A]) {
-    val natural: Lens[S, A] = Lens(ln.get, ln.set)
-  }
 
-  def lensId[S]: Lens[S, S] = NaturalTransformation.refl
+    def lensId[S]: Lens[S, S] = NaturalTransformation.refl
+  }
   
-  implicit def self[A] = 'self ->> lensId[A]
-
-  implicit def symbolLensAsNat[K, S, A](implicit 
-      ev: FieldType[K, monocle.Lens[S, A]]): FieldType[K, Lens[S, A]] =
-    field[K](ev.natural)
-
   // Lens & StateField are isomorphic
 
   def lens2StateField[S, A](ln: Lens[S, A]): StateField[S, A] =
@@ -211,5 +201,45 @@ object Util {
       GetEvidence(field[K](algf.amap(nat)(f0, f1)(
         genericGetEvidence[Alg[Q, S], R].apply)))
   }
+
+  trait TaggedLens[K, S, A] {
+    val getTaggedLens: FieldType[K, Lens[S, A]]
+  }
+
+  object TaggedLens extends TaggedLens1 {
+
+    def apply[K, S, A](implicit tl: TaggedLens[K, S, A]): TaggedLens[K, S, A] = 
+      tl
+
+    def apply[K, S, A](ft: FieldType[K, Lens[S, A]]): TaggedLens[K, S, A] =
+      new TaggedLens[K, S, A] { val getTaggedLens = ft }
+
+    implicit def hcons[K, H, T <: HList]: TaggedLens[K, FieldType[K, H] :: T, H] =
+      TaggedLens(field[K](Lens[FieldType[K, H] :: T, H](
+        _.head, h2 => field[K](h2) :: _.tail)))
+
+     implicit def genericTaggedLens[C, R, K, A](implicit
+        generic: LabelledGeneric.Aux[C, R],
+        rInstance: Lazy[TaggedLens[K, R, A]])
+        : TaggedLens[K, C, A] =
+      rInstance.value.getTaggedLens |> (ln => TaggedLens(field[K](Lens[C, A](
+        c => ln(State.get).eval(generic.to(c)),
+        a2 => c => generic.from(ln(State.put(a2)).exec(generic.to(c)))))))
+  }
+
+  trait TaggedLens1 {
+    implicit def hcons2[K, H, A, T <: HList](implicit
+        ev: TaggedLens[K, T, A]): TaggedLens[K, H :: T, A] =
+      TaggedLens(field[K](Lens[H :: T, A](
+        l => ev.getTaggedLens(State.get).eval(l.tail), 
+        a2 => l => l.head :: ev.getTaggedLens(State.put(a2)).exec(l.tail))))
+  }
+
+  implicit def getTaggedLensId[K, S]: FieldType[K, Lens[S, S]] =
+    field[K](Lens.lensId[S])
+
+  implicit def getTaggedLens[K, S, A](implicit 
+      tl: TaggedLens[K, S, A]): FieldType[K, Lens[S, A]] =
+    tl.getTaggedLens
 }
  
