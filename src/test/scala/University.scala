@@ -3,8 +3,6 @@ package test
 package university
 
 import scalaz._
-import shapeless.syntax.singleton._
-import monocle.macros.Lenses
 
 import Util._, AlgFunctor._, GetEvidence._
 
@@ -96,21 +94,21 @@ case class Logic[P[_], C, U, D](city: City[U, D, P, C]) {
  * Data Layer Interpretation
  */
 
-@Lenses case class SCity(population: Int, univ: SUniversity)
-@Lenses case class SUniversity(name: String, math: SDepartment)
-@Lenses case class SDepartment(budget: Int)
-
-import SCity._, SUniversity._, SDepartment._
+case class SCity(popu: Int, univ: SUniversity)
+case class SUniversity(name: String, math: SDepartment)
+case class SDepartment(budget: Int)
 
 import org.scalatest._
 
 class UniversitySpec extends FlatSpec with Matchers {
+  
+  import shapeless.syntax.singleton._
 
-  implicit val popuLn = 'popu ->> population
-  implicit val univLn = 'univ ->> univ
-  implicit val nameLn = 'name ->> name
-  implicit val mathLn = 'math ->> math 
-  implicit val budgLn = 'budget ->> budget
+  // implicit val self0 = 'self ->> Util.Lens[SCity, SUniversity](
+  //   _.univ, u2 => _.copy(univ = u2))
+  // implicit val self1 = 'self ->> Util.Lens[SUniversity, SDepartment](
+  //   _.math, d2 => _.copy(math = d2)) 
+  // implicit val self2 = 'self ->> (self0 compose self1)
 
   "Automagic instances" should "be generated for city" in {
   
