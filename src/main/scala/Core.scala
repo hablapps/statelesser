@@ -2,7 +2,7 @@ package org.hablapps.statesome
 
 import Function.const
 import scalaz._, Scalaz._
-import shapeless._, labelled._
+import shapeless._, shapeless.syntax.singleton._, labelled._
 
 /**
  * State algebras
@@ -152,14 +152,6 @@ object Util {
         }
     }
 
-    // implicit def ListPAlgFunctor[Alg[_[_], _]: AlgFunctor] =
-    //   new AlgFunctor[ListP[Alg, ?[_], ?]] {
-    //     def amap[Q[_]: Functor, P[_]: Functor](f: Q ~> P) =
-    //       λ[ListP[Alg, Q, ?] ~> ListP[Alg, P, ?]] { alg =>
-    //         ListP(f(alg.algs.map(_.map(_ amap f))))
-    //       }
-    //   }
-    
     implicit class AlgFunctorOps[Alg[_[_], _], Q[_]: Functor, A](
         al: Alg[Q, A]) {
       def amap[P[_]: Functor](f: Q ~> P)(implicit AF: AlgFunctor[Alg]) = 
@@ -215,6 +207,10 @@ object Util {
     implicit def hcons[K, H, T <: HList]: TaggedLens[K, FieldType[K, H] :: T, H] =
       TaggedLens(field[K](Lens[FieldType[K, H] :: T, H](
         _.head, h2 => field[K](h2) :: _.tail)))
+
+    implicit def hcons1[K, H, T <: HList] =
+      TaggedLens('self ->> Lens[FieldType[K, H] :: T, H](
+        _.head, h2 => field[K](h2) :: _.tail))
     
     implicit def hcons2[K, H, A, T <: HList](implicit
         ev: TaggedLens[K, T, A]): TaggedLens[K, H :: T, A] =

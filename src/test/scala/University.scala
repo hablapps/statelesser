@@ -104,11 +104,11 @@ class UniversitySpec extends FlatSpec with Matchers {
   
   import shapeless.syntax.singleton._
 
-  implicit val self0 = 'self ->> Util.Lens[SCity, SUniversity](
-    _.univ, u2 => _.copy(univ = u2))
-  implicit val self1 = 'self ->> Util.Lens[SUniversity, SDepartment](
-    _.math, d2 => _.copy(math = d2)) 
-  implicit val self2 = 'self ->> (self0 compose self1)
+  // implicit val self0 = 'self ->> Util.Lens[SCity, SUniversity](
+  //   _.univ, u2 => _.copy(univ = u2))
+  // implicit val self1 = 'self ->> Util.Lens[SUniversity, SDepartment](
+  //   _.math, d2 => _.copy(math = d2)) 
+  // implicit val self2 = 'self ->> (self0 compose self1)
 
   "Automagic instances" should "be generated for city" in {
   
