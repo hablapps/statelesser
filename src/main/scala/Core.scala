@@ -226,8 +226,7 @@ object Util {
 
     implicit def genericTaggedLens[C, R, K, A](implicit
         generic: LabelledGeneric.Aux[C, R],
-        rInstance: Lazy[TaggedLens[K, R, A]])
-        : TaggedLens[K, C, A] =
+        rInstance: Lazy[TaggedLens[K, R, A]]): TaggedLens[K, C, A] =
       rInstance.value.getTaggedLens |> (ln => TaggedLens(field[K](Lens[C, A](
         c => ln(State.get).eval(generic.to(c)),
         a2 => c => generic.from(ln(State.put(a2)).exec(generic.to(c)))))))

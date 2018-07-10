@@ -101,25 +101,33 @@ case class SDepartment(budget: Int)
 import org.scalatest._
 
 class UniversitySpec extends FlatSpec with Matchers {
+  
+  import shapeless.syntax.singleton._
 
-  // "Automagic instances" should "be generated for city" in {
-  // 
-  //   val StateCity = 
-  //     City.instance[State[SCity, ?], SCity, SUniversity, SDepartment]
-  // 
-  //   val logic = Logic(StateCity)
-  //   
-  //   val urjc = SUniversity("urjc", SDepartment(3000))
-  //   val most = SCity(200000, urjc)
+  implicit val mathLn = 'math ->> Util.Lens[SUniversity, SDepartment](
+    _.math, d2 => _.copy(math = d2))
 
-  //   val popu2 = logic.getPopu.eval(most)
-  //   val most2 = logic.doubleBudget(implicitly).exec(most)
-  //   val math2 = logic.getMathDep.eval(most2)
+  implicit val univLn = 'univ ->> Util.Lens[SCity, SUniversity](
+    _.univ, u2 => _.copy(univ = u2))
 
-  //   popu2 should be (200000)
-  //   most2 should be (SCity(200000, SUniversity("urjc", SDepartment(6000))))
-  //   math2 should be (SDepartment(6000))
-  // }
+  "Automagic instances" should "be generated for city" in {
+  
+    val StateCity = 
+      City.instance[State[SCity, ?], SCity, SUniversity, SDepartment]
+  
+    val logic = Logic(StateCity)
+    
+    val urjc = SUniversity("urjc", SDepartment(3000))
+    val most = SCity(200000, urjc)
+
+    val popu2 = logic.getPopu.eval(most)
+    val most2 = logic.doubleBudget(implicitly).exec(most)
+    val math2 = logic.getMathDep.eval(most2)
+
+    popu2 should be (200000)
+    most2 should be (SCity(200000, SUniversity("urjc", SDepartment(6000))))
+    math2 should be (SDepartment(6000))
+  }
 
   it should "be generated for department" in {
     Department.instance[State[SDepartment, ?], SDepartment]
