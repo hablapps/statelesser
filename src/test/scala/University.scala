@@ -3,6 +3,7 @@ package test
 package university
 
 import scalaz._
+import shapeless._
 
 import Util._, AlgFunctor._, GetEvidence._
 
@@ -25,7 +26,7 @@ case class Department[P[_],D](
 object Department {
 
   def instance[P[_], D](implicit 
-      ge: GetEvidence[Department[P, D]]): Department[P, D] = 
+      ge: GetEvidence[HNil, Department[P, D]]): Department[P, D] = 
     ge.apply
 
   implicit val DepartmentAlgFunctor = new AlgFunctor[Department] {
@@ -44,7 +45,7 @@ case class University[D, P[_], U](
 object University {
 
   def instance[P[_], U, D](implicit 
-      ge: GetEvidence[University[D, P, U]]): University[D, P, U] =
+      ge: GetEvidence[HNil, University[D, P, U]]): University[D, P, U] =
     ge.apply
 
   implicit def UniversityAlgFunctor[D] = 
@@ -65,7 +66,7 @@ case class City[U, D, P[_], C](
 object City {
   
   def instance[P[_], C, U, D](implicit
-      ge: GetEvidence[City[U, D, P, C]]): City[U, D, P, C] =
+      ge: GetEvidence[HNil, City[U, D, P, C]]): City[U, D, P, C] =
     ge.apply
 
   implicit def CityAlgFunctor[U, D] =
@@ -132,13 +133,13 @@ class UniversitySpec extends FlatSpec with Matchers {
 
     most3 should be (most.copy(univ = SUniversity("URJC", SDepartment(3000))))
   }
-
-  it should "be generated for department" in {
-    Department.instance[State[SDepartment, ?], SDepartment]
-  }
   
   it should "be generated for university" in {
     University.instance[State[SUniversity, ?], SUniversity, SDepartment]
+  }
+
+  it should "be generated for department" in {
+    Department.instance[State[SDepartment, ?], SDepartment]
   }
 }
 

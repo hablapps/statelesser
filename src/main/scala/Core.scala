@@ -2,7 +2,7 @@ package org.hablapps.statesome
 
 import Function.const
 import scalaz._, Scalaz._
-import shapeless._, shapeless.syntax.singleton._, labelled._
+import shapeless._, shapeless.syntax.singleton._, labelled._ 
 
 /**
  * State algebras
@@ -25,12 +25,14 @@ object Field {
 
   import Util._, StateField._, AlgFunctor._
  
-  implicit def genFieldId[K, A]: GetEvidence[FieldType[K, Field[State[A, ?], A]]] =
-    GetEvidence(field[K](refl[A].apply)) 
+  implicit def genFieldId[Ctx <: HList, K, A]
+      : GetEvidence[K :: Ctx, FieldType[K, Field[State[A, ?], A]]] =
+    GetEvidence(field[K](refl[K :: Ctx, A].apply)) 
 
-  implicit def genField[K, P[_]: Functor, A](implicit 
-      ln: FieldType[K, State[A, ?] ~> P]): GetEvidence[FieldType[K, Field[P, A]]] =
-    GetEvidence(field[K](refl[A].apply amap ln))
+  implicit def genField[Ctx <: HList, K, P[_]: Functor, A](implicit 
+      ln: FieldType[K :: Ctx, State[A, ?] ~> P])
+      : GetEvidence[K :: Ctx, FieldType[K, Field[P, A]]] =
+    GetEvidence(field[K](refl[K :: Ctx, A].apply amap ln))
 }
 
 case class ListP[Alg[_[_],_], P[_], S](algs: P[List[Alg[P, S]]]) {
@@ -85,7 +87,7 @@ object Util {
         Getter(State.gets(g)),
         Setter(a => State(s => (p(a)(s), ()))))
 
-    implicit def refl[S]: GetEvidence[StateField[S, S]] = 
+    implicit def refl[Ctx <: HList, S]: GetEvidence[Ctx, StateField[S, S]] = 
       GetEvidence(apply[S, S](identity, const))
   }
 
@@ -161,34 +163,38 @@ object Util {
 
   // Shapeless class to automate instances
   
-  trait GetEvidence[A] {
+  trait GetEvidence[Ctx <: HList, A] {
     def apply: A
   }
 
   object GetEvidence {
 
-    def apply[A](implicit ge: GetEvidence[A]): GetEvidence[A] = ge
+    def apply[Ctx <: HList, A](implicit 
+        ge: GetEvidence[Ctx, A]): GetEvidence[Ctx, A] = 
+      ge
   
-    def apply[A](a: A): GetEvidence[A] =
-      new GetEvidence[A] { def apply = a }
+    def apply[Ctx <: HList, A](a: A): GetEvidence[Ctx, A] =
+      new GetEvidence[Ctx, A] { def apply = a }
     
-    implicit val hnil: GetEvidence[HNil] = GetEvidence(HNil)
+    implicit def hnil[Ctx <: HList]: GetEvidence[Ctx, HNil] = 
+      GetEvidence(HNil)
 
-    implicit def hcons[K, H, T <: HList](implicit
-        // witness: Witness.Aux[K], 
-        hev: Lazy[GetEvidence[FieldType[K, H]]],
-        tev: GetEvidence[T]): GetEvidence[FieldType[K, H] :: T] =
-      GetEvidence[FieldType[K, H] :: T](
+    implicit def hcons[Ctx <: HList, K, H, T <: HList](implicit
+        hev: Lazy[GetEvidence[K :: Ctx, FieldType[K, H]]],
+        tev: GetEvidence[Ctx, T])
+        : GetEvidence[Ctx, FieldType[K, H] :: T] =
+      GetEvidence[Ctx, FieldType[K, H] :: T](
         hev.value.apply :: tev.apply)
 
-    implicit def genericGetEvidence[A, R](implicit
+    implicit def genericGetEvidence[Ctx <: HList, A, R](implicit
         generic: LabelledGeneric.Aux[A, R],
-        rInstance: Lazy[GetEvidence[R]]): GetEvidence[A] =
-      GetEvidence[A](generic.from(rInstance.value.apply))
+        rInstance: Lazy[GetEvidence[Ctx, R]]): GetEvidence[Ctx, A] =
+      GetEvidence(generic.from(rInstance.value.apply))
  
-    implicit def genericGetEvidence2[K, A, R](implicit
+    implicit def genericGetEvidence2[Ctx <: HList, K, A, R](implicit
         generic: LabelledGeneric.Aux[A, R],
-        rInstance: Lazy[GetEvidence[R]]): GetEvidence[FieldType[K, A]] =
+        rInstance: Lazy[GetEvidence[K :: Ctx, R]])
+        : GetEvidence[K :: Ctx, FieldType[K, A]] =
       GetEvidence(field[K](generic.from(rInstance.value.apply)))
   }
 
@@ -233,8 +239,8 @@ object Util {
         a2 => c => generic.from(ln(State.put(a2)).exec(generic.to(c)))))))
   }
 
-  implicit def getTaggedLens[K, S, A](implicit 
-      tl: TaggedLens[K, S, A]): FieldType[K, Lens[S, A]] =
-    tl.getTaggedLens
+  implicit def getTaggedLens[Ctx <: HList, K, S, A](implicit 
+      tl: TaggedLens[K, S, A]): FieldType[K :: Ctx, Lens[S, A]] =
+    field[K :: Ctx](tl.getTaggedLens)
 }
  
