@@ -2,7 +2,7 @@ package org.hablapps.statesome
 
 import Function.const
 import scalaz._, Scalaz._
-import shapeless._, shapeless.syntax.singleton._, labelled._ 
+import shapeless._, labelled._, ops.hlist._
 
 /**
  * State algebras
@@ -198,49 +198,54 @@ object Util {
       GetEvidence(field[K](generic.from(rInstance.value.apply)))
   }
 
-  trait TaggedLens[K, S, A] {
-    val getTaggedLens: FieldType[K, Lens[S, A]]
+  trait TaggedLens[Ctx <: HList, S, A] {
+    val getTaggedLens: FieldType[Ctx, Lens[S, A]]
   }
 
   object TaggedLens {
 
-    def apply[K, S, A](implicit tl: TaggedLens[K, S, A]): TaggedLens[K, S, A] = 
+    def apply[Ctx <: HList, S, A](implicit 
+        tl: TaggedLens[Ctx, S, A]): TaggedLens[Ctx, S, A] = 
       tl
 
-    def apply[K, S, A](ft: FieldType[K, Lens[S, A]]): TaggedLens[K, S, A] =
-      new TaggedLens[K, S, A] { val getTaggedLens = ft }
+    def apply[Ctx <: HList, S, A](
+        ft: FieldType[Ctx, Lens[S, A]]): TaggedLens[Ctx, S, A] =
+      new TaggedLens[Ctx, S, A] { val getTaggedLens = ft }
 
-    implicit def hcons[K, H, T <: HList]: TaggedLens[K, FieldType[K, H] :: T, H] =
-      TaggedLens(field[K](Lens[FieldType[K, H] :: T, H](
+    implicit def hcons[K, H, T <: HList]
+        : TaggedLens[K :: HNil, FieldType[K, H] :: T, H] =
+      TaggedLens(field[K :: HNil](Lens[FieldType[K, H] :: T, H](
         _.head, h2 => field[K](h2) :: _.tail)))
 
     implicit def hcons1[K, H, T <: HList] =
-      TaggedLens('self ->> Lens[FieldType[K, H] :: T, H](
-        _.head, h2 => field[K](h2) :: _.tail))
+      TaggedLens(field[K :: Witness.`'self`.T :: HNil](
+        Lens[FieldType[K, H] :: T, H](
+          _.head, h2 => field[K](h2) :: _.tail)))
     
-    implicit def hcons2[K, H, A, T <: HList](implicit
-        ev: TaggedLens[K, T, A]): TaggedLens[K, H :: T, A] =
-      TaggedLens(field[K](Lens[H :: T, A](
+    implicit def hcons2[Ctx <: HList, K, H, A, T <: HList](implicit
+        ev: TaggedLens[K :: Ctx, T, A]): TaggedLens[K :: Ctx, H :: T, A] =
+      TaggedLens(field[K :: Ctx](Lens[H :: T, A](
         l => ev.getTaggedLens(State.get).eval(l.tail), 
         a2 => l => l.head :: ev.getTaggedLens(State.put(a2)).exec(l.tail))))
 
-    implicit def hcons3[J, K, H, A, T <: HList](implicit
-        ev: TaggedLens[K, H, A]): TaggedLens[K, FieldType[J, H] :: T, A] =
+    implicit def hcons3[Ctx <: HList, J, K, H, A, T <: HList](implicit
+        ev: TaggedLens[Ctx, H, A]): TaggedLens[K :: Ctx, FieldType[J, H] :: T, A] =
       ev.getTaggedLens |> (ln =>
-        TaggedLens(field[K](Lens[FieldType[J, H] :: T, A](
+        TaggedLens(field[K :: Ctx](Lens[FieldType[J, H] :: T, A](
           l => ln(State.get).eval(l.head),
           a2 => l => field[J](ln(State.put(a2)).exec(l.head)) :: l.tail))))
 
-    implicit def genericTaggedLens[C, R, K, A](implicit
+    implicit def genericTaggedLens[C, R, Ctx <: HList, A](implicit
         generic: LabelledGeneric.Aux[C, R],
-        rInstance: Lazy[TaggedLens[K, R, A]]): TaggedLens[K, C, A] =
-      rInstance.value.getTaggedLens |> (ln => TaggedLens(field[K](Lens[C, A](
+        rInstance: Lazy[TaggedLens[Ctx, R, A]]): TaggedLens[Ctx, C, A] =
+      rInstance.value.getTaggedLens |> (ln => TaggedLens(field[Ctx](Lens[C, A](
         c => ln(State.get).eval(generic.to(c)),
         a2 => c => generic.from(ln(State.put(a2)).exec(generic.to(c)))))))
   }
 
-  implicit def getTaggedLens[Ctx <: HList, K, S, A](implicit 
-      tl: TaggedLens[K, S, A]): FieldType[K :: Ctx, Lens[S, A]] =
-    field[K :: Ctx](tl.getTaggedLens)
+  implicit def getTaggedLens[Ctx <: HList, Ctx2 <: HList, S, A](implicit 
+      rv: Reverse.Aux[Ctx, Ctx2],
+      tl: TaggedLens[Ctx2, S, A]): FieldType[Ctx, Lens[S, A]] =
+    field[Ctx](tl.getTaggedLens)
 }
  
