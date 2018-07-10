@@ -2,7 +2,7 @@ package org.hablapps.statesome
 
 import Function.const
 import scalaz._, Scalaz._
-import shapeless._, shapeless.syntax.singleton._, labelled._
+import shapeless._, labelled._
 
 /**
  * State algebras
@@ -24,7 +24,10 @@ case class Field[P[_],S](get: Getter[P,S], put: Setter[P,S]) {
 object Field {
 
   import Util._, StateField._, AlgFunctor._
-  
+ 
+  implicit def genFieldId[K, A]: GetEvidence[FieldType[K, Field[State[A, ?], A]]] =
+    GetEvidence(field[K](refl[A].apply)) 
+
   implicit def genField[K, P[_]: Functor, A](implicit 
       ln: FieldType[K, State[A, ?] ~> P]): GetEvidence[FieldType[K, Field[P, A]]] =
     GetEvidence(field[K](refl[A].apply amap ln))
@@ -190,23 +193,18 @@ object Util {
         generic: LabelledGeneric.Aux[A, R],
         rInstance: Lazy[GetEvidence[R]]): GetEvidence[A] =
       GetEvidence[A](generic.from(rInstance.value.apply))
-  
-    implicit def genericGetEvidence2[K, Alg[_[_], _], P[_], Q[_], S, R](implicit
-        algf: AlgFunctor[Alg],
-        nat: FieldType[K, Q ~> P],
-        f0: Functor[Q],
-        f1: Functor[P],
-        generic: LabelledGeneric.Aux[Alg[Q, S], R],
-        rInstance: Lazy[GetEvidence[R]]): GetEvidence[FieldType[K, Alg[P, S]]] =
-      GetEvidence(field[K](algf.amap(nat)(f0, f1)(
-        genericGetEvidence[Alg[Q, S], R].apply)))
+ 
+    implicit def genericGetEvidence2[K, A, R](implicit
+        generic: LabelledGeneric.Aux[A, R],
+        rInstance: Lazy[GetEvidence[R]]): GetEvidence[FieldType[K, A]] =
+      GetEvidence(field[K](generic.from(rInstance.value.apply)))
   }
 
   trait TaggedLens[K, S, A] {
     val getTaggedLens: FieldType[K, Lens[S, A]]
   }
 
-  object TaggedLens extends TaggedLens1 {
+  object TaggedLens {
 
     def apply[K, S, A](implicit tl: TaggedLens[K, S, A]): TaggedLens[K, S, A] = 
       tl
@@ -224,17 +222,19 @@ object Util {
         l => ev.getTaggedLens(State.get).eval(l.tail), 
         a2 => l => l.head :: ev.getTaggedLens(State.put(a2)).exec(l.tail))))
 
+    implicit def hcons3[J, K, H, A, T <: HList](implicit
+        ev: TaggedLens[K, H, A]): TaggedLens[K, FieldType[J, H] :: T, A] =
+      ev.getTaggedLens |> (ln =>
+        TaggedLens(field[K](Lens[FieldType[J, H] :: T, A](
+          l => ln(State.get).eval(l.head),
+          a2 => l => field[J](ln(State.put(a2)).exec(l.head)) :: l.tail))))
+
     implicit def genericTaggedLens[C, R, K, A](implicit
         generic: LabelledGeneric.Aux[C, R],
         rInstance: Lazy[TaggedLens[K, R, A]]): TaggedLens[K, C, A] =
       rInstance.value.getTaggedLens |> (ln => TaggedLens(field[K](Lens[C, A](
         c => ln(State.get).eval(generic.to(c)),
         a2 => c => generic.from(ln(State.put(a2)).exec(generic.to(c)))))))
-  }
-
-  trait TaggedLens1 {
-    implicit def taggedId[K, S]: TaggedLens[K, S, S] =
-      TaggedLens(field[K](Lens.lensId[S]))
   }
 
   implicit def getTaggedLens[K, S, A](implicit 
