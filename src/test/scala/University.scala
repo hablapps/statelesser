@@ -6,19 +6,11 @@ package university
 import scalaz._
 import shapeless._
 
-import Util._, AlgFunctor._, GetEvidence._
+import Util._, AlgFunctor._, GetEvidence._, Primitive._
 
 /**
  * Data Model
  */
-
-object Primitive{
-  type IntegerP[P[_]]=Field[P,Int]
-  type BooleanP[P[_]]=Field[P,Boolean]
-  type StringP[P[_]]=Field[P,String]
-}
-
-import Primitive._
 
 case class Department[P[_],D](
   self: Field[P,D],
