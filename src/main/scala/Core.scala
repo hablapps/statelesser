@@ -127,7 +127,9 @@ object Util {
       }
     }
 
-  implicit def getTaggedLens[Ctx <: HList, Ctx2 <: HList : Reverse.Aux[Ctx, ?], S, A](implicit 
+  implicit def getTaggedLens[
+        Ctx <: HList, 
+        Ctx2 <: HList : Reverse.Aux[Ctx, ?], S, A](implicit 
       tl: TaggedLens[Ctx2, S, A]): FieldType[Ctx, Lens[S, A]] =
     field[Ctx](tl.getTaggedLens)
 }
