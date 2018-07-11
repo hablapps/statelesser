@@ -22,17 +22,20 @@ case class Field[P[_],S](get: Getter[P,S], put: Setter[P,S]) {
 }
 
 object Field {
-
   import Util._, StateField._, AlgFunctor._
- 
+
+  // Generates an evidence of identity `Field` (same state & focus) for any
+  // label, ignoring the context. We use this for the top `self` attribute.
   implicit def genFieldId[Ctx <: HList, K, A]
-      : GetEvidence[K :: Ctx, FieldType[K, Field[State[A, ?], A]]] =
+      : GetEvidence[K :: Ctx, Field[State[A, ?], A]] =
     GetEvidence(field[K](refl[K :: Ctx, A].apply)) 
 
+  // Generates an evidence of `Field`, as long as we have a lens that respects
+  // the context path. We use this as base case to fulfill most of `Field`s.
   implicit def genField[Ctx <: HList, K, P[_]: Functor, A](implicit 
       ln: FieldType[K :: Ctx, State[A, ?] ~> P])
-      : GetEvidence[K :: Ctx, FieldType[K, Field[P, A]]] =
-    GetEvidence(field[K](refl[K :: Ctx, A].apply amap ln))
+      : GetEvidence[K :: Ctx, Field[P, A]] =
+    GetEvidence(refl[K :: Ctx, A].apply amap ln)
 }
 
 case class ListP[Alg[_[_],_], P[_], S](algs: P[List[Alg[P, S]]]) {
@@ -119,6 +122,9 @@ object Util {
     }
   
   // Maps the interpretation of an algebra. 
+  //
+  // XXX: we're not using this algebra right now, but we keep it since I find
+  // it interesting anyway, so maybe we could use it in the future.
   trait AlgFunctor[Alg[_[_], _]] {
     def amap[Q[_]: Functor, P[_]: Functor](f: Q ~> P): Alg[Q, ?] ~> Alg[P, ?]
   }
@@ -161,8 +167,8 @@ object Util {
     }
   }
 
-  // Shapeless class to automate instances
-  
+  // Just a wrapper of values of type `A` which carries a phantom `Ctx`, that
+  // represents the location of the value. 
   trait GetEvidence[Ctx <: HList, A] {
     def apply: A
   }
@@ -175,27 +181,24 @@ object Util {
   
     def apply[Ctx <: HList, A](a: A): GetEvidence[Ctx, A] =
       new GetEvidence[Ctx, A] { def apply = a }
-    
-    implicit def hnil[Ctx <: HList]: GetEvidence[Ctx, HNil] = 
+  
+    // We can always get an evidence of `HNil`.
+    implicit def emptyProduct[Ctx <: HList]: GetEvidence[Ctx, HNil] = 
       GetEvidence(HNil)
 
-    implicit def hcons[Ctx <: HList, K, H, T <: HList](implicit
-        hev: Lazy[GetEvidence[K :: Ctx, FieldType[K, H]]],
-        tev: GetEvidence[Ctx, T])
-        : GetEvidence[Ctx, FieldType[K, H] :: T] =
+    // Returns an evidence of `H :: T` by searching for an implicit evidende of
+    // `H` and recursing over `T`. While searching for the `H` evidence, the
+    // context is extended with the label, to keep track of the full context.
+    implicit def product[Ctx <: HList, K, H, T <: HList](implicit
+        hev: Lazy[GetEvidence[K :: Ctx, H]],
+        tev: GetEvidence[Ctx, T]): GetEvidence[Ctx, FieldType[K, H] :: T] =
       GetEvidence[Ctx, FieldType[K, H] :: T](
-        hev.value.apply :: tev.apply)
+        field[K](hev.value.apply) :: tev.apply)
 
     implicit def genericGetEvidence[Ctx <: HList, A, R](implicit
         generic: LabelledGeneric.Aux[A, R],
         rInstance: Lazy[GetEvidence[Ctx, R]]): GetEvidence[Ctx, A] =
       GetEvidence(generic.from(rInstance.value.apply))
- 
-    implicit def genericGetEvidence2[Ctx <: HList, K, A, R](implicit
-        generic: LabelledGeneric.Aux[A, R],
-        rInstance: Lazy[GetEvidence[K :: Ctx, R]])
-        : GetEvidence[K :: Ctx, FieldType[K, A]] =
-      GetEvidence(field[K](generic.from(rInstance.value.apply)))
   }
 
   trait TaggedLens[Ctx <: HList, S, A] {
