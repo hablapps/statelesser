@@ -46,7 +46,7 @@ object TaggedLens {
 
   // Provides a lens that points at a subcomponent of this head, which we can
   // see as lens composition, since we are pointing at a nested value.
-  implicit def hcons3[Ctx <: HList, J, K, H, A, T <: HList](implicit
+  implicit def productDepth[Ctx <: HList, J, K, H, A, T <: HList](implicit
       ev: TaggedLens[Ctx, H, A])
       : TaggedLens[K :: Ctx, FieldType[J, H] :: T, A] =
     ev.getTaggedLens |> (ln =>
