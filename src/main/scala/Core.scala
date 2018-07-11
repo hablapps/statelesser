@@ -132,5 +132,8 @@ object Util {
         Ctx2 <: HList : Reverse.Aux[Ctx, ?], S, A](implicit 
       tl: TaggedLens[Ctx2, S, A]): FieldType[Ctx, Lens[S, A]] =
     field[Ctx](tl.getTaggedLens)
+  
+  def make[A](implicit ev: GetEvidence[HNil, A]): A =
+    ev.apply
 }
- 
+

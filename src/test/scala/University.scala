@@ -4,36 +4,13 @@ package test
 package university
 
 import scalaz._
-import shapeless._
-
+import org.scalatest._
 import Util._, GetEvidence._, Primitive._
 
-/**
+
+/*
  * Data Model
  */
-
-case class Department[P[_],D](
-  self: Field[P,D],
-  budget: IntegerP[P])
-
-object Department {
-
-  def apply[P[_], D](implicit
-      ge: GetEvidence[HNil, Department[P, D]]): Department[P, D] =
-    ge.apply
-}
-
-case class University[P[_], U, D](
-  self: Field[P, U],
-  name: StringP[P],
-  math: Department[P, D])
-
-object University {
-
-  def apply[P[_], U, D](implicit
-      ge: GetEvidence[HNil, University[P, U, D]]): University[P, U, D] =
-    ge.apply
-}
 
 case class City[P[_], C, U, D](
   self: Field[P, C],
@@ -41,12 +18,19 @@ case class City[P[_], C, U, D](
   popu: IntegerP[P],
   univ: University[P, U, D])
 
-object City {
+case class University[P[_], U, D](
+  self: Field[P, U],
+  name: StringP[P],
+  math: Department[P, D])
 
-  def apply[P[_], C, U, D](implicit
-      ge: GetEvidence[HNil, City[P, C, U, D]]): City[P, C, U, D] =
-    ge.apply
-}
+case class Department[P[_],D](
+  self: Field[P,D],
+  budget: IntegerP[P])
+
+
+/*
+ * Logic
+ */
 
 case class Logic[P[_], C, U, D](city: City[P, C, U, D]) {
 
@@ -65,22 +49,19 @@ case class Logic[P[_], C, U, D](city: City[P, C, U, D]) {
 }
 
 
-/**
- * Data Layer Interpretation
+/*
+ * Interpretation
  */
 
 case class SCity(popu: Int, name: String, univ: SUniversity)
 case class SUniversity(name: String, math: SDepartment)
 case class SDepartment(budget: Int)
 
-import org.scalatest._
-
 class UniversitySpec extends FlatSpec with Matchers {
 
   "Automagic instances" should "be generated for city" in {
 
-    val StateCity =
-      City[State[SCity, ?], SCity, SUniversity, SDepartment]
+    val StateCity = make[City[State[SCity, ?], SCity, SUniversity, SDepartment]]
 
     val logic = Logic(StateCity)
 
@@ -101,11 +82,11 @@ class UniversitySpec extends FlatSpec with Matchers {
   }
 
   it should "be generated for university" in {
-    University[State[SUniversity, ?], SUniversity, SDepartment]
+    make[University[State[SUniversity, ?], SUniversity, SDepartment]]
   }
 
   it should "be generated for department" in {
-    Department[State[SDepartment, ?], SDepartment]
+    make[Department[State[SDepartment, ?], SDepartment]]
   }
 }
 
