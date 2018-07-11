@@ -1,8 +1,8 @@
-package org.hablapps.statesome
+package org.hablapps.statelesser
 
 import Function.const
 import scalaz._, Scalaz._
-import shapeless._, shapeless.syntax.singleton._, labelled._
+import shapeless._, labelled._, ops.hlist._
 
 /**
  * State algebras
@@ -22,15 +22,26 @@ case class Field[P[_],S](get: Getter[P,S], put: Setter[P,S]) {
 }
 
 object Field {
-
   import Util._, StateField._, AlgFunctor._
- 
-  implicit def genFieldId[K, A]: GetEvidence[FieldType[K, Field[State[A, ?], A]]] =
-    GetEvidence(field[K](refl[A].apply)) 
 
-  implicit def genField[K, P[_]: Functor, A](implicit 
-      ln: FieldType[K, State[A, ?] ~> P]): GetEvidence[FieldType[K, Field[P, A]]] =
-    GetEvidence(field[K](refl[A].apply amap ln))
+  // Generates an evidence of identity `Field` (same state & focus) for any
+  // label, ignoring the context. We use this for the top `self` attribute.
+  implicit def genFieldId[Ctx <: HList, K, A]
+      : GetEvidence[K :: Ctx, Field[State[A, ?], A]] =
+    GetEvidence(field[K](refl[K :: Ctx, A].apply)) 
+
+  // Generates an evidence of `Field`, as long as we have a lens that respects
+  // the context path. We use this as base case to fulfill most of `Field`s.
+  implicit def genField[Ctx <: HList, K, P[_]: Functor, A](implicit 
+      ln: FieldType[K :: Ctx, State[A, ?] ~> P])
+      : GetEvidence[K :: Ctx, Field[P, A]] =
+    GetEvidence(refl[K :: Ctx, A].apply amap ln)
+}
+
+object Primitive{
+  type IntegerP[P[_]]=Field[P,Int]
+  type BooleanP[P[_]]=Field[P,Boolean]
+  type StringP[P[_]]=Field[P,String]
 }
 
 case class ListP[Alg[_[_],_], P[_], S](algs: P[List[Alg[P, S]]]) {
@@ -85,7 +96,7 @@ object Util {
         Getter(State.gets(g)),
         Setter(a => State(s => (p(a)(s), ()))))
 
-    implicit def refl[S]: GetEvidence[StateField[S, S]] = 
+    implicit def refl[Ctx <: HList, S]: GetEvidence[Ctx, StateField[S, S]] = 
       GetEvidence(apply[S, S](identity, const))
   }
 
@@ -115,126 +126,9 @@ object Util {
         (fl.put(a).exec(s), x)
       }
     }
-  
-  // Maps the interpretation of an algebra. 
-  trait AlgFunctor[Alg[_[_], _]] {
-    def amap[Q[_]: Functor, P[_]: Functor](f: Q ~> P): Alg[Q, ?] ~> Alg[P, ?]
-  }
 
-  object AlgFunctor {
-
-    def apply[Alg[_[_], _]](implicit ev: AlgFunctor[Alg]): AlgFunctor[Alg] = 
-      ev
-
-    // XXX: boilerplate instances, consider using Shapeless here?
-    
-    implicit val GetterAlgFunctor = new AlgFunctor[Getter] {
-      def amap[Q[_]: Functor, P[_]: Functor](f: Q ~> P) =
-        λ[Getter[Q, ?] ~> Getter[P, ?]] { alg =>
-          Getter(f(alg.apply))
-        }
-    }
-
-    implicit val SetterAlgFunctor = new AlgFunctor[Setter] {
-      def amap[Q[_]: Functor, P[_]: Functor](f: Q ~> P) =
-        λ[Setter[Q, ?] ~> Setter[P, ?]] { alg =>
-          Setter(x => f(alg(x)))
-        }
-    }
-
-    implicit val FieldAlgFunctor = new AlgFunctor[Field] {
-      def amap[Q[_]: Functor, P[_]: Functor](f: Q ~> P) =
-        λ[Field[Q, ?] ~> Field[P, ?]] { alg =>
-          // XXX: syntax isn't working properly here 
-          Field(
-            GetterAlgFunctor.amap(f)(implicitly, implicitly)(alg.get), 
-            SetterAlgFunctor.amap(f)(implicitly, implicitly)(alg.put))
-        }
-    }
-
-    implicit class AlgFunctorOps[Alg[_[_], _], Q[_]: Functor, A](
-        al: Alg[Q, A]) {
-      def amap[P[_]: Functor](f: Q ~> P)(implicit AF: AlgFunctor[Alg]) = 
-        AF.amap(f)(implicitly, implicitly)(al)
-    }
-  }
-
-  // Shapeless class to automate instances
-  
-  trait GetEvidence[A] {
-    def apply: A
-  }
-
-  object GetEvidence {
-
-    def apply[A](implicit ge: GetEvidence[A]): GetEvidence[A] = ge
-  
-    def apply[A](a: A): GetEvidence[A] =
-      new GetEvidence[A] { def apply = a }
-    
-    implicit val hnil: GetEvidence[HNil] = GetEvidence(HNil)
-
-    implicit def hcons[K, H, T <: HList](implicit
-        // witness: Witness.Aux[K], 
-        hev: Lazy[GetEvidence[FieldType[K, H]]],
-        tev: GetEvidence[T]): GetEvidence[FieldType[K, H] :: T] =
-      GetEvidence[FieldType[K, H] :: T](
-        hev.value.apply :: tev.apply)
-
-    implicit def genericGetEvidence[A, R](implicit
-        generic: LabelledGeneric.Aux[A, R],
-        rInstance: Lazy[GetEvidence[R]]): GetEvidence[A] =
-      GetEvidence[A](generic.from(rInstance.value.apply))
- 
-    implicit def genericGetEvidence2[K, A, R](implicit
-        generic: LabelledGeneric.Aux[A, R],
-        rInstance: Lazy[GetEvidence[R]]): GetEvidence[FieldType[K, A]] =
-      GetEvidence(field[K](generic.from(rInstance.value.apply)))
-  }
-
-  trait TaggedLens[K, S, A] {
-    val getTaggedLens: FieldType[K, Lens[S, A]]
-  }
-
-  object TaggedLens {
-
-    def apply[K, S, A](implicit tl: TaggedLens[K, S, A]): TaggedLens[K, S, A] = 
-      tl
-
-    def apply[K, S, A](ft: FieldType[K, Lens[S, A]]): TaggedLens[K, S, A] =
-      new TaggedLens[K, S, A] { val getTaggedLens = ft }
-
-    implicit def hcons[K, H, T <: HList]: TaggedLens[K, FieldType[K, H] :: T, H] =
-      TaggedLens(field[K](Lens[FieldType[K, H] :: T, H](
-        _.head, h2 => field[K](h2) :: _.tail)))
-
-    implicit def hcons1[K, H, T <: HList] =
-      TaggedLens('self ->> Lens[FieldType[K, H] :: T, H](
-        _.head, h2 => field[K](h2) :: _.tail))
-    
-    implicit def hcons2[K, H, A, T <: HList](implicit
-        ev: TaggedLens[K, T, A]): TaggedLens[K, H :: T, A] =
-      TaggedLens(field[K](Lens[H :: T, A](
-        l => ev.getTaggedLens(State.get).eval(l.tail), 
-        a2 => l => l.head :: ev.getTaggedLens(State.put(a2)).exec(l.tail))))
-
-    implicit def hcons3[J, K, H, A, T <: HList](implicit
-        ev: TaggedLens[K, H, A]): TaggedLens[K, FieldType[J, H] :: T, A] =
-      ev.getTaggedLens |> (ln =>
-        TaggedLens(field[K](Lens[FieldType[J, H] :: T, A](
-          l => ln(State.get).eval(l.head),
-          a2 => l => field[J](ln(State.put(a2)).exec(l.head)) :: l.tail))))
-
-    implicit def genericTaggedLens[C, R, K, A](implicit
-        generic: LabelledGeneric.Aux[C, R],
-        rInstance: Lazy[TaggedLens[K, R, A]]): TaggedLens[K, C, A] =
-      rInstance.value.getTaggedLens |> (ln => TaggedLens(field[K](Lens[C, A](
-        c => ln(State.get).eval(generic.to(c)),
-        a2 => c => generic.from(ln(State.put(a2)).exec(generic.to(c)))))))
-  }
-
-  implicit def getTaggedLens[K, S, A](implicit 
-      tl: TaggedLens[K, S, A]): FieldType[K, Lens[S, A]] =
-    tl.getTaggedLens
+  implicit def getTaggedLens[Ctx <: HList, Ctx2 <: HList : Reverse.Aux[Ctx, ?], S, A](implicit 
+      tl: TaggedLens[Ctx2, S, A]): FieldType[Ctx, Lens[S, A]] =
+    field[Ctx](tl.getTaggedLens)
 }
  
