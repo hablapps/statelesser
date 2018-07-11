@@ -52,8 +52,8 @@ object University {
 
 case class City[U, D, P[_], C](
   self: Field[P, C],
-  name: Field[P, String],
-  popu: Field[P, Int],
+  name: StringP[P],
+  popu: IntegerP[P],
   univ: University[D, P, U])
 
 object City {
