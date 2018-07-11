@@ -34,5 +34,6 @@ object GetEvidence {
       generic: LabelledGeneric.Aux[A, R],
       rInstance: Lazy[GetEvidence[Ctx, R]]): GetEvidence[Ctx, A] =
     GetEvidence(generic.from(rInstance.value.apply))
+
 }
 
