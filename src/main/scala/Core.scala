@@ -1,4 +1,4 @@
-package org.hablapps.statesome
+package org.hablapps.statelesser
 
 import Function.const
 import scalaz._, Scalaz._
