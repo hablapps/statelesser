@@ -8,9 +8,7 @@ import org.scalatest._
 import Util._, GetEvidence._, Primitive._
 
 
-/*
- * Data Model
- */
+/* Data Model */
 
 case class City[P[_], C, U, D](
   self: Field[P, C],
@@ -28,9 +26,7 @@ case class Department[P[_],D](
   budget: IntegerP[P])
 
 
-/*
- * Logic
- */
+/* Logic */
 
 case class Logic[P[_], C, U, D](city: City[P, C, U, D]) {
 
@@ -49,9 +45,7 @@ case class Logic[P[_], C, U, D](city: City[P, C, U, D]) {
 }
 
 
-/*
- * Interpretation
- */
+/* Interpretation */
 
 case class SCity(popu: Int, name: String, univ: SUniversity)
 case class SUniversity(name: String, math: SDepartment)
