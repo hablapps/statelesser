@@ -39,9 +39,9 @@ object Shapelens {
   implicit def productDepth[Ctx <: HList, K, H, A, T <: HList](implicit
       tl: Aux[H, Ctx, A])
       : Aux[FieldType[K, H] :: T, K :: Ctx, A] =
-    tl.getLens |> (ln => apply(Lens[FieldType[K, H] :: T, A](
-      l => ln(State.get).eval(l.head),
-      a2 => l => field[K](ln(State.put(a2)).exec(l.head)) :: l.tail)))
+    apply(Lens[FieldType[K, H] :: T, A](
+      l => tl.getLens(State.get).eval(l.head),
+      a2 => l => field[K](tl.getLens(State.put(a2)).exec(l.head)) :: l.tail))
 
   implicit def genericShapelens[C, R, Ctx <: HList, A](implicit
       generic: LabelledGeneric.Aux[C, R],
