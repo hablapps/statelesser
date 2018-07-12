@@ -1,7 +1,5 @@
 name := "statelesser"
 
-// scalaVersion := "2.12.4"
-
 organization := "org.hablapps"
 
 inThisBuild(Seq(

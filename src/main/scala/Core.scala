@@ -24,18 +24,13 @@ case class Field[P[_],S](get: Getter[P,S], put: Setter[P,S]) {
 object Field {
   import Util._, StateField._, AlgFunctor._
 
-  // Generates an evidence of identity `Field` (same state & focus) for any
-  // label, ignoring the context. We use this for the top `self` attribute.
   implicit def genFieldId[Ctx <: HList, K, A]
       : GetEvidence[K :: Ctx, Field[State[A, ?], A]] =
-    GetEvidence(field[K](refl[K :: Ctx, A].apply)) 
+    GetEvidence(refl[K :: Ctx, A].apply) 
 
-  // Generates an evidence of `Field`, as long as we have a lens that respects
-  // the context path. We use this as base case to fulfill most of `Field`s.
-  implicit def genField[Ctx <: HList, K, P[_]: Functor, A](implicit 
-      ln: FieldType[K :: Ctx, State[A, ?] ~> P])
-      : GetEvidence[K :: Ctx, Field[P, A]] =
-    GetEvidence(refl[K :: Ctx, A].apply amap ln)
+  implicit def genField[Ctx <: HList, P[_]: Functor, S](implicit 
+      ln: FieldType[Ctx, State[S, ?] ~> P]): GetEvidence[Ctx, Field[P, S]] =
+    GetEvidence(refl[Ctx, S].apply.amap(ln))
 }
 
 object Primitive{
@@ -130,8 +125,8 @@ object Util {
   implicit def getTaggedLens[
         Ctx <: HList, 
         Ctx2 <: HList : Reverse.Aux[Ctx, ?], S, A](implicit 
-      tl: TaggedLens[Ctx2, S, A]): FieldType[Ctx, Lens[S, A]] =
-    field[Ctx](tl.getTaggedLens)
+      tl: Shapelens.Aux[S, Ctx2, A]): FieldType[Ctx, Lens[S, A]] =
+    field[Ctx](tl.getLens)
   
   def make[A](implicit ev: GetEvidence[HNil, A]): A =
     ev.apply
