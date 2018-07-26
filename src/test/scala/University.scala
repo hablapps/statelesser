@@ -1,4 +1,5 @@
-package org.hablapps.statelesser
+package org.hablapps
+package statelesser
 
 package test
 package university
