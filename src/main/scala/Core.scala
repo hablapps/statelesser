@@ -25,22 +25,23 @@ case class Field[P[_],S](get: Getter[P,S], put: Setter[P,S]) {
 }
 
 object Field extends FieldLPI {
-  implicit def genFieldId[Ctx <: HList, A]
-      : GetEvidence[self :: Ctx, Field[State[A, ?], A]] =
-    GetEvidence(refl[self :: Ctx, A].apply) 
+  implicit def genSelf[A]: GetEvidence[self :: HNil, Field[State[A, ?], A]] =
+    GetEvidence(refl[self :: HNil, A].apply) 
 }
 
 trait FieldLPI {
 
   type self = Witness.`'self`.T
 
-  implicit def genField[Ctx <: HList, P[_]: Functor, S](implicit
-      ln: FieldType[Ctx, State[S, ?] ~> P]): GetEvidence[self :: Ctx, Field[P, S]] =
-    field[self :: Ctx](GetEvidence(genFieldX[Ctx, P, S].apply))
+  implicit def genNestedSelf[Ctx <: HList, S, A](implicit
+      ln: FieldType[Ctx, State[A, ?] ~> State[S, ?]])
+      : GetEvidence[self :: Ctx, Field[State[S, ?], A]] =
+    field[self :: Ctx](GetEvidence(genField[Ctx, S, A].apply))
 
-  implicit def genFieldX[Ctx <: HList, P[_]: Functor, S](implicit 
-      ln: FieldType[Ctx, State[S, ?] ~> P]): GetEvidence[Ctx, Field[P, S]] =
-    GetEvidence(refl[Ctx, S].apply.amap(ln))
+  implicit def genField[Ctx <: HList, S, A](implicit 
+      ln: FieldType[Ctx, State[A, ?] ~> State[S, ?]])
+      : GetEvidence[Ctx, Field[State[S, ?], A]] =
+    GetEvidence(refl[Ctx, A].apply.amap(ln))
 }
 
 object Primitive{
