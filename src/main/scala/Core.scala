@@ -5,7 +5,7 @@ import Function.const
 import scalaz._, Scalaz._
 import shapeless._, labelled._, ops.hlist._
 import shapelens._
-import Util._, StateField._, AlgFunctor._
+import Util.{Lens, _}, StateField._, AlgFunctor._
 
 /**
  * State algebras
@@ -26,22 +26,24 @@ case class Field[P[_],S](get: Getter[P,S], put: Setter[P,S]) {
 
 object Field extends FieldLPI {
   implicit def genSelf[A]: GetEvidence[self :: HNil, Field[State[A, ?], A]] =
-    GetEvidence(refl[self :: HNil, A].apply) 
+    refl[self :: HNil, A] 
 }
 
 trait FieldLPI {
 
   type self = Witness.`'self`.T
 
-  implicit def genNestedSelf[Ctx <: HList, S, A](implicit
-      ln: FieldType[Ctx, State[A, ?] ~> State[S, ?]])
-      : GetEvidence[self :: Ctx, Field[State[S, ?], A]] =
-    field[self :: Ctx](GetEvidence(genField[Ctx, S, A].apply))
+  implicit def genNestedSelf[Rev <: HList, Ctx <: HList, S, A](implicit
+      rv: Reverse.Aux[Rev, Ctx],
+      ln: Shapelens.Aux[S, Ctx, A])
+      : GetEvidence[self :: Rev, Field[State[S, ?], A]] =
+    field[self :: Rev](GetEvidence(genField[Rev, Ctx, S, A].apply))
 
-  implicit def genField[Ctx <: HList, S, A](implicit 
-      ln: FieldType[Ctx, State[A, ?] ~> State[S, ?]])
-      : GetEvidence[Ctx, Field[State[S, ?], A]] =
-    GetEvidence(refl[Ctx, A].apply.amap(ln))
+  implicit def genField[Rev <: HList, Ctx <: HList, S, A](implicit 
+      rv: Reverse.Aux[Rev, Ctx], 
+      ev: Shapelens.Aux[S, Ctx, A]): GetEvidence[Rev, Field[State[S, ?], A]] =
+    GetEvidence(refl[Rev, A].apply.amap(
+      ev.value |> (ln => Lens(ln.get, ln.set))))
 }
 
 object Primitive{
@@ -133,12 +135,6 @@ object Util {
       }
     }
 
-  implicit def getTaggedLens[
-        Ctx <: HList, 
-        Ctx2 <: HList : Reverse.Aux[Ctx, ?], S, A](implicit 
-      tl: Shapelens.Aux[S, Ctx2, A]): FieldType[Ctx, Lens[S, A]] =
-    field[Ctx](tl.value |> (ln => Lens(ln.get, ln.set)))
-  
   def make[A](implicit ev: GetEvidence[HNil, A]): A =
     ev.apply
 }
