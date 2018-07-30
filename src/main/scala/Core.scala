@@ -40,14 +40,14 @@ trait FieldLPI {
    * compilation timings.
    */
 
-  implicit def genNestedSelf[Rev <: HList, Ctx <: HList, S, A](implicit
-      rv: Reverse.Aux[Rev, Ctx],
+  implicit def genNestedSelf[
+    Rev <: HList, Ctx <: HList : Reverse.Aux[Rev, ?], S, A](implicit
       ln: Shapelens.Aux[S, Ctx, A])
       : GetEvidence[self :: Rev, Field[State[S, ?], A]] =
     field[self :: Rev](GetEvidence(genField[Rev, Ctx, S, A].apply))
 
-  implicit def genField[Rev <: HList, Ctx <: HList, S, A](implicit 
-      rv: Reverse.Aux[Rev, Ctx], 
+  implicit def genField[
+    Rev <: HList, Ctx <: HList : Reverse.Aux[Rev, ?], S, A](implicit 
       ev: Shapelens.Aux[S, Ctx, A]): GetEvidence[Rev, Field[State[S, ?], A]] =
     GetEvidence(refl[Rev, A].apply.amap(
       ev.value |> (ln => Lens(ln.get, ln.set))))
