@@ -17,7 +17,7 @@ object GetEvidence {
 
   implicit def emptyProduct[Ctx <: HList]: GetEvidence[Ctx, HNil] = 
     GetEvidence(HNil)
-
+    
   implicit def product[Ctx <: HList, K, H, T <: HList](implicit
       hev: Lazy[GetEvidence[K :: Ctx, H]],
       tev: GetEvidence[Ctx, T]): GetEvidence[Ctx, FieldType[K, H] :: T] =

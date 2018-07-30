@@ -1,8 +1,11 @@
-package org.hablapps.statelesser
+package org.hablapps
+package statelesser
 
 import Function.const
 import scalaz._, Scalaz._
 import shapeless._, labelled._, ops.hlist._
+import shapelens._
+import Util.{Lens, _}, StateField._, AlgFunctor._
 
 /**
  * State algebras
@@ -21,16 +24,33 @@ case class Field[P[_],S](get: Getter[P,S], put: Setter[P,S]) {
     get() >>= { s => put(f(s)) } 
 }
 
-object Field {
-  import Util._, StateField._, AlgFunctor._
+object Field extends FieldLPI {
+  implicit def genSelf[A]: GetEvidence[self :: HNil, Field[State[A, ?], A]] =
+    refl[self :: HNil, A] 
+}
 
-  implicit def genFieldId[Ctx <: HList, K, A]
-      : GetEvidence[K :: Ctx, Field[State[A, ?], A]] =
-    GetEvidence(refl[K :: Ctx, A].apply) 
+trait FieldLPI {
 
-  implicit def genField[Ctx <: HList, P[_]: Functor, S](implicit 
-      ln: FieldType[Ctx, State[S, ?] ~> P]): GetEvidence[Ctx, Field[P, S]] =
-    GetEvidence(refl[Ctx, S].apply.amap(ln))
+  type self = Witness.`'self`.T
+
+  /* XXX: `GetEvidence` generates the context in the opposite way, ie. the
+   * innermost attribute appears in the head. Thereby, we need to reverse it
+   * before invoking `Shapelens`. I've made several experiments reversing the
+   * `GetEvidence`context, but it leads to compilation errors or looong
+   * compilation timings.
+   */
+
+  implicit def genNestedSelf[Rev <: HList, Ctx <: HList, S, A](implicit
+      rv: Reverse.Aux[Rev, Ctx],
+      ln: Shapelens.Aux[S, Ctx, A])
+      : GetEvidence[self :: Rev, Field[State[S, ?], A]] =
+    field[self :: Rev](GetEvidence(genField[Rev, Ctx, S, A].apply))
+
+  implicit def genField[Rev <: HList, Ctx <: HList, S, A](implicit 
+      rv: Reverse.Aux[Rev, Ctx], 
+      ev: Shapelens.Aux[S, Ctx, A]): GetEvidence[Rev, Field[State[S, ?], A]] =
+    GetEvidence(refl[Rev, A].apply.amap(
+      ev.value |> (ln => Lens(ln.get, ln.set))))
 }
 
 object Primitive{
@@ -122,12 +142,6 @@ object Util {
       }
     }
 
-  implicit def getTaggedLens[
-        Ctx <: HList, 
-        Ctx2 <: HList : Reverse.Aux[Ctx, ?], S, A](implicit 
-      tl: Shapelens.Aux[S, Ctx2, A]): FieldType[Ctx, Lens[S, A]] =
-    field[Ctx](tl.getLens)
-  
   def make[A](implicit ev: GetEvidence[HNil, A]): A =
     ev.apply
 }
