@@ -33,6 +33,13 @@ trait FieldLPI {
 
   type self = Witness.`'self`.T
 
+  /* XXX: `GetEvidence` generates the context in the opposite way, ie. the
+   * innermost attribute appears in the head. Thereby, we need to reverse it
+   * before invoking `Shapelens`. I've made several experiments reversing the
+   * `GetEvidence`context, but it leads to compilation errors or looong
+   * compilation timings.
+   */
+
   implicit def genNestedSelf[Rev <: HList, Ctx <: HList, S, A](implicit
       rv: Reverse.Aux[Rev, Ctx],
       ln: Shapelens.Aux[S, Ctx, A])
