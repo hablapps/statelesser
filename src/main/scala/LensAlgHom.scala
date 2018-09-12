@@ -1,8 +1,7 @@
 package org.hablapps.statelesser
 
 import scalaz._
-import shapeless._, ops.hlist._
-import naturally._
+import shapeless._
 
 trait LensAlgHom[Alg[_[_], _], P[_], A] {
   type Q[_]
@@ -31,17 +30,10 @@ object LensAlgHom {
       def apply() = app2
     }
 
-  implicit def genLensAlg[
-        Rev <: HList, Ctx <: HList : Reverse.Aux[Rev, ?], S, A](implicit 
-      ev: DeepLens.Aux[S, Ctx, A]): GetEvidence[Rev, LensAlg[State[S, ?], A]] =
-    GetEvidence(LensAlg(ev()))
-
-  implicit def genLensAlgHom[
-        Rev <: HList, Ctx <: HList : Reverse.Aux[Rev, ?], 
-        Alg[_[_], _], S, A](implicit 
+  implicit def genLensAlgHom[H, T <: HList, Alg[_[_], _], S, A](implicit 
       ge: GetEvidence[HNil, Alg[State[A, ?], A]],
-      dl: DeepLens.Aux[S, Ctx, A])
-      : GetEvidence[Rev, LensAlgHom[Alg, State[S, ?], A]] =
+      dl: MkFieldLens.Aux[S, H, A])
+      : GetEvidence[H :: T, LensAlgHom[Alg, State[S, ?], A]] =
     GetEvidence(LensAlgHom(ge(), dl()))
 
   trait Syntax {
