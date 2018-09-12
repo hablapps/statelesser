@@ -4,7 +4,7 @@ package statelesser
 import Function.const
 import scalaz._, Scalaz._
 import shapeless._, labelled._, ops.hlist._
-import shapelens._
+import naturally._
 import Util.{Lens, _}, StateField._, AlgFunctor._
 
 /**
@@ -35,22 +35,22 @@ trait FieldLPI {
 
   /* XXX: `GetEvidence` generates the context in the opposite way, ie. the
    * innermost attribute appears in the head. Thereby, we need to reverse it
-   * before invoking `Shapelens`. I've made several experiments reversing the
+   * before invoking `DeepLens`. I've made several experiments reversing the
    * `GetEvidence`context, but it leads to compilation errors or looong
    * compilation timings.
    */
 
   implicit def genNestedSelf[
     Rev <: HList, Ctx <: HList : Reverse.Aux[Rev, ?], S, A](implicit
-      ln: Shapelens.Aux[S, Ctx, A])
+      ln: DeepLens.Aux[S, Ctx, A])
       : GetEvidence[self :: Rev, Field[State[S, ?], A]] =
     field[self :: Rev](GetEvidence(genField[Rev, Ctx, S, A].apply))
 
   implicit def genField[
     Rev <: HList, Ctx <: HList : Reverse.Aux[Rev, ?], S, A](implicit 
-      ev: Shapelens.Aux[S, Ctx, A]): GetEvidence[Rev, Field[State[S, ?], A]] =
+      ev: DeepLens.Aux[S, Ctx, A]): GetEvidence[Rev, Field[State[S, ?], A]] =
     GetEvidence(refl[Rev, A].apply.amap(
-      ev.value |> (ln => Lens(ln.get, ln.set))))
+      ev() |> (ln => Lens(ln.get, ln.set))))
 }
 
 object Primitive{

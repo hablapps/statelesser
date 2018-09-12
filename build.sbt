@@ -26,5 +26,5 @@ libraryDependencies ++= Seq(
   "org.scalactic" %% "scalactic" % "3.0.5", 
   "org.scalatest" %% "scalatest" % "3.0.5" % "test",
   "com.chuusai" %% "shapeless" % "2.3.3",
-  "org.hablapps" %% "shapelens" % "0.1-SNAPSHOT")
+  "org.hablapps" %% "naturally" % "0.1-SNAPSHOT")
 
