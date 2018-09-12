@@ -16,6 +16,9 @@ class UniversitySpec extends FlatSpec with Matchers {
   case class SDepartment(budget: Int, boss: SPerson)
   val math = SDepartment(100000, john)
 
+  case class SUniversity(dep: SDepartment)
+  val urjc = SUniversity(math)
+
   "Automagic instances" should "be generated for a one-field algebra" in {
 
     case class Person[P[_], Per: MonadState[P, ?]](last: LensAlg[P, String])
@@ -29,11 +32,18 @@ class UniversitySpec extends FlatSpec with Matchers {
     upcLast.exec(john) shouldBe john.copy(last = john.last.toUpperCase)
   }
 
-  it should "be generated for an algebra with several fields" in {
+  case class University[Dep, Per, P[_], Univ: MonadState[P, ?]](
+    dep: LensAlgHom[Department[Per, ?[_], ?], P, Dep])
 
-    case class Person[P[_], Per: MonadState[P, ?]](
-      first: LensAlg[P, String],
-      last:  LensAlg[P, String])
+  case class Department[Per, P[_], Dep: MonadState[P, ?]](
+    budget: LensAlg[P, Int],
+    boss: LensAlgHom[Person, P, Per])
+
+  case class Person[P[_], Per: MonadState[P, ?]](
+    first: LensAlg[P, String],
+    last:  LensAlg[P, String])
+
+  it should "be generated for an algebra with several fields" in {
 
     val personState = make[Person[State[SPerson, ?], SPerson]]
 
@@ -47,16 +57,9 @@ class UniversitySpec extends FlatSpec with Matchers {
     getLast(john) shouldBe ((john, john.last))
     upcLast.exec(john) shouldBe john.copy(last = john.last.toUpperCase)
   }
+  
 
   it should "be generated for an algebra with a nested field" in {
-
-    case class Department[Per, P[_], Dep: MonadState[P, ?]](
-      budget: LensAlg[P, Int],
-      boss: LensAlgHom[Person, P, Per])
-
-    case class Person[P[_], Per: MonadState[P, ?]](
-      first: LensAlg[P, String],
-      last:  LensAlg[P, String])
 
     val departmentState = 
       make[Department[SPerson, State[SDepartment, ?], SDepartment]]
@@ -74,6 +77,25 @@ class UniversitySpec extends FlatSpec with Matchers {
     getLast(math) shouldBe ((math, math.boss.last))
     upcLast.exec(math) shouldBe 
       math.copy(boss = math.boss.copy(last = math.boss.last.toUpperCase))
+  }
+
+  it should "be generated for an algebra with several nested fields" in {
+
+    val universityState = 
+      make[University[SDepartment, SPerson, State[SUniversity, ?], SUniversity]]
+
+    import universityState._, dep.alg._, boss.alg._
+
+    val depBossLast = dep composeLens boss composeLens last
+    val getLast = depBossLast.get
+    val upcLast = depBossLast.modify(_.toUpperCase)
+
+    getLast(urjc) shouldBe ((urjc, urjc.dep.boss.last))
+    upcLast.exec(urjc) shouldBe
+      urjc.copy(dep = 
+        urjc.dep.copy(boss = 
+          urjc.dep.boss.copy(last = 
+            urjc.dep.boss.last.toUpperCase)))
   }
 }
 
