@@ -1,6 +1,7 @@
 package org.hablapps.statelesser
 
 import scalaz._, Scalaz._
+import shapeless._
 
 trait TraversalAlgHom[Alg[_[_], _], P[_], A] {
   type Q[_]
@@ -33,6 +34,12 @@ object TraversalAlgHom {
       val alg = alg2
       val hom = hom2
     }
+
+  implicit def genTraversalAlgHom[H, T <: HList, Alg[_[_], _], S, A](implicit 
+      ge: GetEvidence[HNil, Alg[State[A, ?], A]],
+      fl: MkFieldLens.Aux[S, H, List[A]])
+      : GetEvidence[H :: T, TraversalAlgHom[Alg, State[S, ?], A]] =
+    GetEvidence(TraversalAlgHom(ge(), fl()))
 
   trait Syntax {
     implicit class Syntax[P[_], A](ta: TraversalAlg[P, A]) {

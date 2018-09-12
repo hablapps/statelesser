@@ -4,7 +4,7 @@ package statelesser
 package test
 package university
 
-import scalaz._
+import scalaz._, Scalaz._
 import org.scalatest._
 import GetEvidence._
 
@@ -96,6 +96,24 @@ class UniversitySpec extends FlatSpec with Matchers {
         urjc.dep.copy(boss = 
           urjc.dep.boss.copy(last = 
             urjc.dep.boss.last.toUpperCase)))
+  }
+
+  it should "be generated for an algebra with a n-ary field" in {
+    
+    case class Person[P[_], Per: MonadState[P, ?]](
+      nicks: TraversalAlg[P, String])
+
+    case class SPerson(nicks: List[String])
+    val cristina = SPerson(List("cifu", "presi", "cris"))
+
+    val personState = make[Person[State[SPerson, ?], SPerson]]
+
+    val getNicks = personState.nicks.getAll
+    val upcNicks = personState.nicks.modify(_.toUpperCase)
+
+    getNicks(cristina) shouldBe ((cristina, cristina.nicks))
+    upcNicks.exec(cristina) shouldBe 
+      cristina.copy(nicks = cristina.nicks.map(_.toUpperCase))
   }
 }
 
