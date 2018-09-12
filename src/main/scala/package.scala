@@ -30,7 +30,7 @@ package object statelesser {
       ge: GetEvidence[HNil, Alg[State[A, ?], A]],
       dl: DeepLens.Aux[S, Ctx, A])
       : GetEvidence[Rev, LensAlgHom[Alg, State[S, ?], A]] =
-    GetEvidence(LensAlgHom(ge.apply, dl()))
+    GetEvidence(LensAlgHom(ge(), dl()))
 
   def make[A](implicit ev: GetEvidence[HNil, A]): A =
     ev.apply

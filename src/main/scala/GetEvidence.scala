@@ -3,7 +3,7 @@ package org.hablapps.statelesser
 import shapeless._, labelled._
 
 trait GetEvidence[Ctx <: HList, A] {
-  def apply: A
+  def apply(): A
 }
 
 object GetEvidence {
