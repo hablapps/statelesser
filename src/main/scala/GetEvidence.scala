@@ -1,9 +1,10 @@
 package org.hablapps.statelesser
 
+import scalaz._
 import shapeless._, labelled._
 
 trait GetEvidence[Ctx <: HList, A] {
-  def apply: A
+  def apply(): A
 }
 
 object GetEvidence {
@@ -14,6 +15,11 @@ object GetEvidence {
 
   def apply[Ctx <: HList, A](a: A): GetEvidence[Ctx, A] =
     new GetEvidence[Ctx, A] { def apply = a }
+
+  implicit def monadStateGetEvidence[S](implicit 
+      ev: MonadState[State[S, ?], S])
+      : GetEvidence[HNil, MonadState[State[S, ?], S]] =
+    GetEvidence(ev)
 
   implicit def emptyProduct[Ctx <: HList]: GetEvidence[Ctx, HNil] = 
     GetEvidence(HNil)
