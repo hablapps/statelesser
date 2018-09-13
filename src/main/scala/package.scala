@@ -19,6 +19,11 @@ package object statelesser extends LensAlgHom.Syntax
     def apply[P[_], A](hom: State[A, ?] ~> ListT[P, ?]): TraversalAlg[P, A] =
       TraversalAlgHom[MonadState, P, State[A, ?], A](implicitly, hom)
   }
+
+  // XXX: no such method in scalaz?
+  implicit class FunctorTuple[F[_]: Functor, A, B](fab: F[(A, B)]) {
+    val unzip: (F[A], F[B]) = (fab.map(_._1), fab.map(_._2))
+  }
   
   implicit def slensToLens[S, A](
       ln: shapeless.Lens[S, A]): naturally.Lens[S, A] =
@@ -26,11 +31,10 @@ package object statelesser extends LensAlgHom.Syntax
       State(s => sa(ln.get(s)).leftMap(ln.set(s)))
     }
 
-  implicit def slensToWeakTraversal[S, A](
-      ln: shapeless.Lens[S, List[A]]): State[A, ?] ~> ListT[State[S, ?], ?] =
-    new (State[A, ?] ~> ListT[State[S, ?], ?]) { 
-      def apply[X](sa: State[A, X]): ListT[State[S, ?], X] = 
-        ListT(State(s => ln.get(s).map(sa.run).unzip.leftMap(ln.set(s))))
+  implicit def slensToWeakTraversal[F[_]: Traverse, S, A](
+      ln: shapeless.Lens[S, F[A]]): State[A, ?] ~> ListT[State[S, ?], ?] =
+    λ[State[A, ?] ~> ListT[State[S, ?], ?]] { sa =>
+      ListT(State(s => ln.get(s).map(sa.run).unzip.bimap(ln.set(s), _.toList)))
     }
 
   def make[A](implicit ev: GetEvidence[HNil, A]): A = ev.apply()
