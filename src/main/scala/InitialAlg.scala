@@ -13,6 +13,11 @@ object InitialSAlg {
       def apply[Q[_]](alg: MonadState[Q, A]) = alg.get
     }
 
+  def getsMS[A, B](f: A => B): InitialSAlg[MonadState, A, B] =
+    new InitialSAlg[MonadState, A, B] {
+      def apply[Q[_]](alg: MonadState[Q, A]) = alg.gets(f)
+    }
+
   def putMS[A](a: A): InitialSAlg[MonadState, A, Unit] =
     new InitialSAlg[MonadState, A, Unit] {
       def apply[Q[_]](alg: MonadState[Q, A]) = alg.put(a)

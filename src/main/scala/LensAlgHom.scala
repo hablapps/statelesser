@@ -8,7 +8,7 @@ trait LensAlgHom[Alg[_[_], _], P[_], A] {
   val alg: Alg[Q, A]
   val hom: Q ~> P
 
-  def fold[B](f: InitialSAlg[Alg, A, B]): P[B] =
+  def apply[B](f: InitialSAlg[Alg, A, B]): P[B] =
     hom(f(alg))
 
   def composeLens[Alg2[_[_], _], B](
@@ -45,9 +45,9 @@ object LensAlgHom {
 
   trait Syntax {
     implicit class LensAlgSyntax[P[_], A](la: LensAlg[P, A]) {
-      def get: P[A] = la.fold(getMS)
-      def set(a: A): P[Unit] = la.fold(putMS(a))
-      def modify(f: A => A): P[Unit] = la.fold(modMS(f))
+      def get: P[A] = la(getMS)
+      def set(a: A): P[Unit] = la(putMS(a))
+      def modify(f: A => A): P[Unit] = la(modMS(f))
     }
   }
 }
