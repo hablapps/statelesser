@@ -8,10 +8,10 @@ trait TraversalAlgHom[Alg[_[_], _], P[_], A] {
   val alg: Alg[Q, A]
   val hom: Q ~> ListT[P, ?]
 
-  def apply[B](f: Alg[Q, A] => Q[B]): P[List[B]] =
+  def apply[B](f: InitialSAlg[Alg, A, B]): P[List[B]] =
     hom(f(alg)).run
 
-  def fold[B](f: Alg[Q, A] => Q[B])(implicit 
+  def fold[B](f: InitialSAlg[Alg, A, B])(implicit 
       F: Functor[P],
       M: Monoid[B]): P[B] =
     apply(f).map(_.suml)
@@ -48,13 +48,15 @@ object TraversalAlgHom {
       : GetEvidence[H :: T, TraversalAlgHom[Alg, State[S, ?], A]] =
     GetEvidence(TraversalAlgHom(ge(), fl()))
 
+  import InitialSAlg._
+
   trait Syntax {
     implicit class Syntax[P[_], A](ta: TraversalAlg[P, A]) {
       def foldMap[B: Monoid](f: A => B)(implicit F: Functor[P]): P[B] = 
-        ta.fold(_.gets(f))
+        ta.fold(getsMS(f))
       def modify(f: A => A)(implicit F: Functor[P]): P[Unit] = 
-        ta(_.modify(f)).void
-      def getAll: P[List[A]] = ta(_.get)
+        ta(modMS(f)).void
+      def getAll: P[List[A]] = ta(getMS)
     }
   }
 }
