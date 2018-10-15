@@ -16,6 +16,15 @@ trait TraversalAlgHom[Alg[_[_], _], P[_], A] {
       M: Monoid[B]): P[B] =
     apply(f).map(_.suml)
 
+  def filter[B](
+      p: InitialSAlg[Alg, A, Boolean],
+      g: InitialSAlg[Alg, A, B])(implicit
+      F: Functor[P],
+      M: Monad[Q]): P[List[B]] =
+    hom(p(alg).ifM(
+      g(alg).map(_.point[List]), 
+      List.empty[B].point[Q])).run.map(_.suml)
+
   def composeLens[Alg2[_[_], _], B](
       ln: LensAlgHom[Alg2, Q, B]): TraversalAlgHom.Aux[Alg2, P, ln.Q, B] =
     TraversalAlgHom[Alg2, P, ln.Q, B](ln.alg, hom compose ln.hom)
