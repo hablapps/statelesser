@@ -2,12 +2,9 @@ name := "statelesser"
 
 organization := "org.hablapps"
 
-inThisBuild(Seq(
-  scalaOrganization := "org.typelevel",
-  scalaVersion := "2.12.4-bin-typelevel-4"
-))
+scalaVersion := "2.12.7"
 
-addCompilerPlugin("io.tryp" % "splain" % "0.3.1" cross CrossVersion.patch)
+addCompilerPlugin("org.scalamacros" %% "paradise" % "2.1.0" cross CrossVersion.full)
 
 addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.3")
 
