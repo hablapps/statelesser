@@ -89,7 +89,8 @@ object SqlOpticAlg extends OpticAlg[At, Sql] {
     (for {
       a <- tr
       r <- gets[Rel, RelTree](_.sym(a))
-      select = r.leafCols.mkString(", ")
-      from = r.innerTabs.mkString(" INNER JOIN ")
+      select = r.leafs.map(n => s"${n.tab.head.toLower}.${n.att}").mkString(", ")
+      from = r.innerTabs.map(t => s"$t ${t.head.toLower}").mkString(" INNER JOIN ")
     } yield s"SELECT $select FROM $from").eval(Rel())
 }
+

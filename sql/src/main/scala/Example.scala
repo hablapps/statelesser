@@ -8,7 +8,7 @@ object Example extends App {
   // data layer
 
   @Lenses case class Person(name: String, age: Int)
-  @Lenses case class Couple(her: Person, him: Person)
+  @Lenses case class Couple(her: Person, him: Person, since: Long)
 
   type People  = List[Person]
   type Couples = List[Couple]
@@ -23,6 +23,9 @@ object Example extends App {
   def people[E[_], O[_]: OpticAlg[E, ?[_]]]: E[Traversal[People, Person]] = 
     traversal(each, "People")
 
+  def since[E[_], O[_]: OpticAlg[E, ?[_]]]: E[Lens[Couple, Long]] =
+    lens(Couple.since, "Couples", "since")
+  
   def her[E[_], O[_]: OpticAlg[E, ?[_]]]: E[Lens[Couple, Person]] =
     lens(Couple.her, "Couples", "her")
 
@@ -59,6 +62,12 @@ object Example extends App {
   def getHer[E[_], O[_]: OpticAlg[E, ?[_]]]: O[Couples => List[Person]] =
     traversalGetAll(traversalComposeLens(couples, her))
 
+  def getHerAgeAndSince[E[_], O[_]: OpticAlg[E, ?[_]]]
+      : O[Couples => List[(Long, Int)]] =
+    traversalGetAll(traversalComposeLens(
+      couples, 
+      lensHorizComposeLens(since, lensComposeLens(her, age))))
+
   println(getPeople[At, Sql](SqlOpticAlg))
   println(getPeopleName[At, Sql](SqlOpticAlg))
   println(getPeopleAgeAndName[At, Sql](SqlOpticAlg))
@@ -66,5 +75,6 @@ object Example extends App {
   println(getHerAges2[At, Sql](SqlOpticAlg))
   println(getHerAgeAndName[At, Sql](SqlOpticAlg))
   println(getHer[At, Sql](SqlOpticAlg))
+  println(getHerAgeAndSince[At, Sql](SqlOpticAlg))
 }
 
