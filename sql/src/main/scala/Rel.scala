@@ -1,8 +1,6 @@
 package org.hablapps.statelesser
 package sql
 
-import _root_.monocle._
-
 sealed trait RelTree {
 
   def leafs: List[Node] = this match {
@@ -10,8 +8,6 @@ sealed trait RelTree {
     case Node(_, _, tree) => tree.leafs
     case Bunch(xs) => xs.flatMap(_.leafs)
   }
-
-  def leafCols: Set[Column] = leafs.map(_.att).toSet
 
   def innerTabs: Set[Table] = this match {
     case Node(tab, _, tree) => Set(tab) ++ tree.innerTabs

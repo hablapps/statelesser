@@ -4,10 +4,11 @@ package sql
 import _root_.monocle._
 import scalaz.{Lens => _, _}, Scalaz._
 
+// TODO: reduce boilerplate as soon as implementations are stable
 object SqlOpticAlg extends OpticAlg[At, Sql] {
 
   def point[A](a: A): At[A] =
-    ???
+    a.point[At]
 
   def lens[S, A](
       ln: Lens[S, A],
@@ -37,7 +38,14 @@ object SqlOpticAlg extends OpticAlg[At, Sql] {
   def lensComposeTraversal[S, A, B](
       ln: At[Lens[S, A]],
       tr: At[Traversal[A, B]]): At[Traversal[S, B]] =
-    ???
+    for {
+      a <- ln
+      b <- tr
+      c = a composeTraversal b
+      _ <- modify[Rel] { s => 
+        s.copy(sym = s.sym + (c -> s.sym(a).append(s.sym(b))))
+      }
+    } yield c
 
   def traversalComposeLens[S, A, B](
       tr: At[Traversal[S, A]],
@@ -54,7 +62,14 @@ object SqlOpticAlg extends OpticAlg[At, Sql] {
   def traversalComposeTraversal[S, A, B](
       tr1: At[Traversal[S, A]],
       tr2: At[Traversal[A, B]]): At[Traversal[S, B]] =
-    ???
+    for {
+      a <- tr1
+      b <- tr2
+      c = a composeTraversal b
+      _ <- modify[Rel] { s => 
+        s.copy(sym = s.sym + (c -> s.sym(a).append(s.sym(b))))
+      }
+    } yield c
 
   def lensHorizComposeLens[S, A, B](
       ln1: At[Lens[S, A]],
@@ -69,10 +84,18 @@ object SqlOpticAlg extends OpticAlg[At, Sql] {
     } yield c
 
   def lensAsFold[S, A](ln: At[Lens[S, A]]): At[Fold[S, A]] = 
-    ???
+    for {
+      a <- ln
+      b = a.asFold
+      _ <- modify((s: Rel) => s.copy(sym = s.sym + (b -> s.sym(a))))
+    } yield b
 
   def traversalAsFold[S, A](tr: At[Traversal[S, A]]): At[Fold[S, A]] = 
-    ???
+    for {
+      a <- tr
+      b = a.asFold
+      _ <- modify((s: Rel) => s.copy(sym = s.sym + (b -> s.sym(a))))
+    } yield b
 
   def foldWithFilter[S, A, B](
       fl: At[Fold[S, A]], 
