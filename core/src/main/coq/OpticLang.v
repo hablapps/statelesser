@@ -109,8 +109,8 @@ Notation "tr1 *_tr tr2" := (trComposeHoriz tr1 tr2) (at level 40, left associati
 
 Notation "fl1 +_fl fl2" := (flComposeVerti fl1 fl2) (at level 50, left associativity).
 Notation "fl1 *_fl fl2" := (flComposeHoriz fl1 fl2) (at level 40, left associativity).
-Notation "fl1 >>= f" := (bind fl1 f) (at level 50, left associativity).
-Notation "fl1 >> fl2" := (fl1 >>= fun _ => fl2) (at level 50, left associativity).
+Notation "fl1 >>= f"    := (bind fl1 f) (at level 50, left associativity).
+Notation "fl1 >> fl2"   := (fl1 >>= fun _ => fl2) (at level 50, left associativity).
 
 Class OpticLangOpt (expr obs : Type -> Type) `{OpticLang expr obs} :=
 { flLeftId : forall S A (fl : expr (Fold S A)),
@@ -358,8 +358,17 @@ Qed.
 Definition compose (s t : string) `{OpticLang expr obs} : obs (list Couple -> list string) :=
   flGetAll (getAgeFl s >>= (fun a => getAgeFl t >>= (fun b => rangeFl a b))).
 
+Definition compose' (s t : string) `{OpticLang expr obs} : obs (list Couple -> list string) :=
+  flGetAll (getAgeFl s *_fl getAgeFl t >>= (fun x => match x with | (a, b) => rangeFl a b end)).
+
+Definition rangeFlP `{OpticLang expr obs} : nat * nat -> expr (Fold (list Couple) string) :=
+  (fun ab => match ab with | (a, b) => rangeFl a b end).
+
+Definition compose'' (s t : string) `{OpticLang expr obs} : obs (list Couple -> list string) :=
+  flGetAll (getAgeFl s *_fl getAgeFl t >>= rangeFlP).
+
 Definition composeN (s t : string) `{OpticLang expr obs} : obs (list Couple -> list string) :=
-  flGetAll (getAgeFlN s >>= (fun a => getAgeFlN t >>= (fun b => rangeFlN a b))).
+  flGetAll (getAgeFlN s *_fl getAgeFlN t >>= (fun x => match x with | (a, b) => rangeFlN a b end)).
 
 Example normalize_compose : forall expr obs `{OpticLangOpt expr obs} s t,
   compose s t = composeN s t.
