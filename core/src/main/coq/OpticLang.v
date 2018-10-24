@@ -371,10 +371,10 @@ Definition composeN (s t : string) `{OpticLang expr obs} : obs (list Couple -> l
   flGetAll (getAgeFlN s *_fl getAgeFlN t >>= (fun x => match x with | (a, b) => rangeFlN a b end)).
 
 Example normalize_compose : forall expr obs `{OpticLangOpt expr obs} s t,
-  compose s t = composeN s t.
+  compose' s t = composeN s t.
 Proof.
   intros.
-  unfold compose, composeN, getAgeFl, getAgeFlN, rangeFl, rangeFlN.
+  unfold compose', composeN, getAgeFl, getAgeFlN, rangeFl, rangeFlN.
   destruct H0.
   apply f_equal.
   rewrite trAsFoldDistV0, lnAsTravDistH0, trAsFoldDistH0, vertDistHoriz0.
