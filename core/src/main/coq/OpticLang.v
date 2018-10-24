@@ -113,12 +113,15 @@ Notation "fl1 >>= f"    := (bind fl1 f) (at level 50, left associativity).
 Notation "fl1 >> fl2"   := (fl1 >>= fun _ => fl2) (at level 50, left associativity).
 
 Class OpticLangOpt (expr obs : Type -> Type) `{OpticLang expr obs} :=
-{ flLeftId : forall S A (fl : expr (Fold S A)),
+{ (* Fold category laws *)
+  flLeftId : forall S A (fl : expr (Fold S A)),
     fold idFl +_fl fl = fl
 ; flRightId : forall S A (fl : expr (Fold S A)),
     fl +_fl fold idFl = fl
 ; flAssocV : forall S A B C (fl1 : expr (Fold S A)) (fl2 : expr (Fold A B)) (fl3 : expr (Fold B C)),
     fl1 +_fl (fl2 +_fl fl3) = fl1 +_fl fl2 +_fl fl3
+
+  (* spread conversions *)
 ; trAsFoldDistH : forall S A B (tr1 : expr (Traversal S A)) (tr2 : expr (Traversal S B)),
     trAsFold (tr1 *_tr tr2) = trAsFold tr1 *_fl trAsFold tr2
 ; trAsFoldDistV : forall S A B (tr1 : expr (Traversal S A)) (tr2 : expr (Traversal A B)),
@@ -127,18 +130,35 @@ Class OpticLangOpt (expr obs : Type -> Type) `{OpticLang expr obs} :=
     lnAsTraversal (ln1 *_ln ln2) = lnAsTraversal ln1 *_tr lnAsTraversal ln2
 ; lnAsTravDistV : forall S A B (ln1 : expr (Lens S A)) (ln2 : expr (Lens A B)),
     lnAsTraversal (ln1 +_ln ln2) = lnAsTraversal ln1 +_tr lnAsTraversal ln2
+
+  (* preserve identity *)
+; liftIdLn : forall S, lnAsTraversal (lens (@idLn S)) = traversal idTr
+; liftIdTr : forall S, trAsFold (traversal (@idTr S)) = fold idFl
+
+  (* Fold-specific optimizations *)
 ; filterFilter : forall S (p q : S -> Prop),
     filter p +_fl filter q = filter (fun s => p s /\ q s)
 ; filterTrue : forall S, @filter _ _ _ S (fun _ => True) = fold idFl
 ; vertDistHoriz :
     forall S A B C (fl1 : expr (Fold S A)) (fl2 : expr (Fold A B)) (fl3 : expr (Fold A C)),
       fl1 +_fl (fl2 *_fl fl3) = (fl1 +_fl fl2) *_fl (fl1 +_fl fl3)
-; liftIdLn : forall S, lnAsTraversal (lens (@idLn S)) = traversal idTr
-; liftIdTr : forall S, trAsFold (traversal (@idTr S)) = fold idFl
 ; joinFst : forall S A B (fl1 : expr (Fold S A)) (fl2 : expr (Fold S B)),
     fl1 *_fl fl2 +_fl join fst = fl1
 ; joinSnd : forall S A B (fl1 : expr (Fold S A)) (fl2 : expr (Fold S B)),
     fl1 *_fl fl2 +_fl join snd = fl2
+; bindHorizR : 
+    forall S A B C (fl1 : expr (Fold S A)) (f : A -> expr (Fold S B)) (fl2 : expr (Fold S C)),
+      (fl1 >>= f) *_fl fl2 = fl1 >>= (fun a => f a *_fl fl2)
+; bindHorizL : 
+    forall S A B C (fl1 : expr (Fold S A)) (fl2 : expr (Fold S B)) (f : B -> expr (Fold S C)),
+      fl1 *_fl (fl2 >>= f) = fl2 >>= (fun b => fl1 *_fl f b)
+; bindVertR :
+    forall S A B C (fl1 : expr (Fold S A)) (f : A -> expr (Fold S B)) (fl2 : expr (Fold B C)),
+      (fl1 >>= f) +_fl fl2 = fl1 >>= (fun a => f a +_fl fl2)
+  (* XXX this definition is weird, if we compare it to `bindHorizL` *)
+; bindVertL : 
+    forall S A B C (fl1 : expr (Fold S A)) (fl2 : expr (Fold A B)) (f : B -> expr (Fold A C)),
+      fl1 +_fl (fl2 >>= f) = (fl1 +_fl fl2) >>= (fun b => fl1 +_fl f b)
 }.
 
 (* Couples example *)
