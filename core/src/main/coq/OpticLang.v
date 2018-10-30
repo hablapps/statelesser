@@ -56,9 +56,18 @@ Definition idTr {S : Type} : Traversal S S :=
 (* Finally, an optic language *)
 
 Class OpticLang (expr obs : Type -> Type) :=
-{ point : forall A, A -> expr A
 
-  (* lens-related primitives *)
+{ (* higher-order abstract syntax (hoas) *)
+  lift : forall {A : Type}, A -> expr A
+; lam : forall {A B : Type}, (expr A -> expr B) -> expr (A -> B)
+; app : forall {A B : Type}, expr (A -> B) -> expr A -> expr B
+
+  (* product-related primitives *)
+; curry : forall {A B C : Type}, expr (A * B -> C) -> expr (A -> B -> C)
+; uncurry : forall {A B C : Type}, expr (A -> B -> C) -> expr (A * B -> C)
+; product : forall {A B : Type}, expr A -> expr B -> expr (prod A B)
+
+ (* lens-related primitives *)
 ; lens : forall {S A : Type}, Lens S A -> expr (Lens S A)
 ; lnAsTraversal : forall {S A : Type}, expr (Lens S A) -> expr (Traversal S A)
 ; lnComposeHoriz : forall {S A B : Type},
@@ -78,9 +87,17 @@ Class OpticLang (expr obs : Type -> Type) :=
 ; trComposeHorizR : forall {S A B : Type},
     expr (Traversal S A) -> expr (Traversal S B) -> expr (Traversal S (option A * B))
 
+  (* propositional primitives *)
+; and : expr Prop -> expr Prop -> expr Prop
+; or  : expr Prop -> expr Prop -> expr Prop
+; leqt : expr nat -> expr nat -> expr Prop
+; lt : expr nat -> expr nat -> expr Prop
+; eq : expr string -> expr string -> expr Prop
+
   (* fold-related primitives *)
 ; fold : forall {S A : Type}, Fold S A -> expr (Fold S A)
-; filter : forall {S : Type}, (S -> Prop) -> expr (Fold S S)
+; filter : forall {S A : Type},
+    expr (Fold S A) -> expr (A -> Prop) -> expr (Fold S S)
 ; flComposeHoriz : forall {S A B : Type},
     expr (Fold S A) -> expr (Fold S B) -> expr (Fold S (A * B))
 ; flComposeVerti : forall {S A B : Type},
@@ -92,7 +109,7 @@ Class OpticLang (expr obs : Type -> Type) :=
 ; join : forall {A B C : Type},
     (A * B -> C) -> expr (Fold (A * B) C)
 ; bind : forall {S A B : Type},
-    expr (Fold S A) -> (A -> expr (Fold S B)) -> expr (Fold S B)
+    expr (Fold S A) -> expr (A -> Fold S B) -> expr (Fold S B)
 
   (* action primitives *)
 ; flGetAll : forall {S A : Type},
@@ -109,11 +126,17 @@ Notation "tr1 *_tr tr2" := (trComposeHoriz tr1 tr2) (at level 40, left associati
 
 Notation "fl1 +_fl fl2" := (flComposeVerti fl1 fl2) (at level 50, left associativity).
 Notation "fl1 *_fl fl2" := (flComposeHoriz fl1 fl2) (at level 40, left associativity).
-Notation "fl1 >>= f"    := (bind fl1 f) (at level 50, left associativity).
-Notation "fl1 >> fl2"   := (fl1 >>= fun _ => fl2) (at level 50, left associativity).
+Notation "fl1 >>= f"  := (bind fl1 f) (at level 50, left associativity).
+Notation "fl1 >> fl2"  := (fl1 >>= fun _ => fl2) (at level 50, left associativity).
+
+Notation "n1 <= n2" := (leqt n1 n2) (at level 70, no associativity).
+Notation "n1 < n2" := (lt n1 n2) (at level 70, no associativity).
+Notation "n1 == n2" := (eq n1 n2) (at level 70, no associativity).
+Notation "p /\ q" := (and p q) (at level 80, right associativity).
 
 Class OpticLangOpt (expr obs : Type -> Type) `{OpticLang expr obs} :=
-{ (* Fold category laws *)
+
+{ (* fold category laws *)
   flLeftId : forall S A (fl : expr (Fold S A)),
     fold idFl +_fl fl = fl
 ; flRightId : forall S A (fl : expr (Fold S A)),
@@ -135,10 +158,11 @@ Class OpticLangOpt (expr obs : Type -> Type) `{OpticLang expr obs} :=
 ; liftIdLn : forall S, lnAsTraversal (lens (@idLn S)) = traversal idTr
 ; liftIdTr : forall S, trAsFold (traversal (@idTr S)) = fold idFl
 
-  (* Fold-specific optimizations *)
-; filterFilter : forall S (p q : S -> Prop),
-    filter p +_fl filter q = filter (fun s => p s /\ q s)
-; filterTrue : forall S, @filter _ _ _ S (fun _ => True) = fold idFl
+  (* fold-specific optimizations *)
+; filterFilter : forall S (p q : expr (S -> Prop)),
+    filter (fold idFl) p +_fl filter (fold idFl) q = filter (fold idFl) (lam (fun s => and (app p s) (app q s)))
+; filterTrue : forall S A (fl : expr (Fold S A)),
+    filter fl (lam (fun _ => lift True)) = fold idFl
 ; vertDistHoriz :
     forall S A B C (fl1 : expr (Fold S A)) (fl2 : expr (Fold A B)) (fl3 : expr (Fold A C)),
       fl1 +_fl (fl2 *_fl fl3) = (fl1 +_fl fl2) *_fl (fl1 +_fl fl3)
@@ -146,19 +170,18 @@ Class OpticLangOpt (expr obs : Type -> Type) `{OpticLang expr obs} :=
     fl1 *_fl fl2 +_fl join fst = fl1
 ; joinSnd : forall S A B (fl1 : expr (Fold S A)) (fl2 : expr (Fold S B)),
     fl1 *_fl fl2 +_fl join snd = fl2
-; bindHorizR : 
-    forall S A B C (fl1 : expr (Fold S A)) (f : A -> expr (Fold S B)) (fl2 : expr (Fold S C)),
-      (fl1 >>= f) *_fl fl2 = fl1 >>= (fun a => f a *_fl fl2)
+; bindHorizR :
+    forall S A B C (fl1 : expr (Fold S A)) (f : expr (A -> Fold S B)) (fl2 : expr (Fold S C)),
+      (fl1 >>= f) *_fl fl2 = fl1 >>= lam (fun a => (app f a) *_fl fl2)
 ; bindHorizL : 
-    forall S A B C (fl1 : expr (Fold S A)) (fl2 : expr (Fold S B)) (f : B -> expr (Fold S C)),
-      fl1 *_fl (fl2 >>= f) = fl2 >>= (fun b => fl1 *_fl f b)
+    forall S A B C (fl1 : expr (Fold S A)) (fl2 : expr (Fold S B)) (f : expr (B -> Fold S C)),
+      fl1 *_fl (fl2 >>= f) = fl2 >>= lam (fun b => fl1 *_fl app f b)
 ; bindVertR :
-    forall S A B C (fl1 : expr (Fold S A)) (f : A -> expr (Fold S B)) (fl2 : expr (Fold B C)),
-      (fl1 >>= f) +_fl fl2 = fl1 >>= (fun a => f a +_fl fl2)
-  (* XXX this definition is weird, if we compare it to `bindHorizL` *)
+    forall S A B C (fl1 : expr (Fold S A)) (f : expr (A -> Fold S B)) (fl2 : expr (Fold B C)),
+      (fl1 >>= f) +_fl fl2 = fl1 >>= lam (fun a => app f a +_fl fl2)
 ; bindVertL : 
-    forall S A B C (fl1 : expr (Fold S A)) (fl2 : expr (Fold A B)) (f : B -> expr (Fold A C)),
-      fl1 +_fl (fl2 >>= f) = (fl1 +_fl fl2) >>= (fun b => fl1 +_fl f b)
+    forall S A B C (fl1 : expr (Fold S A)) (fl2 : expr (Fold A B)) (f : expr (B -> Fold A C)),
+      fl1 +_fl (fl2 >>= f) = (fl1 +_fl fl2) >>= lam (fun b => fl1 +_fl app f b)
 }.
 
 (* Couples example *)
@@ -246,13 +269,13 @@ Qed.
 
 Definition getPeopleOnTheirThirties `{OpticLang expr obs} : obs (list Person -> list Person) :=
   flGetAll (trAsFold (traversal peopleTr +_tr lnAsTraversal (lens idLn *_ln lens ageLn)) +_fl
-            filter ((fun a => (30 <= a) /\ (a < 40)) ∘ snd) +_fl
+            filter (trAsFold (lnAsTraversal (lens sndLn))) (lam (fun a => lift 30 <= a /\ a < lift 40)) +_fl
             join fst).
 
 Definition getPeopleOnTheirThirtiesN `{OpticLang expr obs} : obs (list Person -> list Person) :=
   flGetAll (trAsFold (traversal peopleTr) *_fl 
              (trAsFold (traversal peopleTr) +_fl trAsFold (lnAsTraversal (lens ageLn))) +_fl
-            filter ((fun a => (30 <= a) /\ (a < 40)) ∘ snd) +_fl
+            filter (trAsFold (lnAsTraversal (lens sndLn))) (lam (fun a => lift 30 <= a /\ a < lift 40)) +_fl
             join fst).
 
 Example normalize_getPeopleOnTheirThirties : forall expr obs `{OpticLangOpt expr obs},
@@ -271,7 +294,8 @@ Definition difference `{OpticLang expr obs} : obs (list Couple -> list (string *
   let herNameAge := lens herLn +_ln lens nameLn *_ln lens ageLn in
   flGetAll (
     trAsFold (traversal couplesTr +_tr lnAsTraversal (himAge *_ln herNameAge)) +_fl
-      filter (fun all => match all with | (ma, (_, wa)) => wa < ma end) +_fl
+      filter (trAsFold (lnAsTraversal (lens fstLn)) *_fl (trAsFold (lnAsTraversal (lens sndLn +_ln lens sndLn))))
+            (uncurry (lam (fun ma => lam (fun wa => ma < wa)))) +_fl
       (join snd +_fl join fst) *_fl
         (join fst *_fl (join snd +_fl join snd) +_fl join (fun ab => snd ab - fst ab))).
 
@@ -284,7 +308,8 @@ Definition differenceN `{OpticLang expr obs} : obs (list Couple -> list (string 
   let shared := (couples +_fl him +_fl age) *_fl
       ((couples +_fl her +_fl name) *_fl
        (couples +_fl her +_fl age)) +_fl
-    filter (fun all => match all with | (ma, (_, wa)) => wa < ma end) in
+    filter (trAsFold (lnAsTraversal (lens fstLn)) *_fl (trAsFold (lnAsTraversal (lens sndLn +_ln lens sndLn))))
+            (uncurry (lam (fun ma => lam (fun wa => ma < wa)))) in
   flGetAll((shared +_fl (join snd +_fl join fst)) *_fl
     ((shared +_fl join fst) *_fl (shared +_fl join snd +_fl join snd) +_fl join (fun ab => snd ab - fst ab))).
 
@@ -299,37 +324,37 @@ Qed.
 
 (* Query [range] *)
 
-Definition rangeFl (a b : nat) `{OpticLang expr obs} : expr (Fold (list Couple) string) :=
+Definition rangeFl `{OpticLang expr obs} (a b : expr nat) : expr (Fold (list Couple) string) :=
   trAsFold (traversal bothTr +_tr lnAsTraversal (lens nameLn *_ln lens ageLn)) +_fl
-  filter (fun x => match x with | (_, i) => a <= i /\ i < b end) +_fl
+  filter (trAsFold (lnAsTraversal (lens sndLn))) (lam (fun i => a <= i /\ i < b)) +_fl
   join fst.
 
-Definition rangeFlN (a b : nat) `{OpticLang expr obs} : expr (Fold (list Couple) string) :=
+Definition rangeFlN `{OpticLang expr obs} (a b : expr nat)  : expr (Fold (list Couple) string) :=
   let both := trAsFold (traversal bothTr) in
   let bothName := both +_fl trAsFold (lnAsTraversal (lens nameLn)) in
   let bothAge := both +_fl trAsFold (lnAsTraversal (lens ageLn)) in
   bothName *_fl bothAge +_fl
-  filter (fun x => match x with | (_, i) => a <= i /\ i < b end) +_fl
+  filter (trAsFold (lnAsTraversal (lens sndLn))) (lam (fun i => a <= i /\ i < b)) +_fl
   join fst.
 
 Example normalize_rangeFl : forall expr obs `{OpticLangOpt expr obs} a b,
   rangeFl a b = rangeFlN a b.
-Proof. 
+Proof.
   intros.
   destruct H0.
   unfold rangeFl, rangeFlN.
   congruence.
 Qed.
 
-Definition range (a b : nat) `{OpticLang expr obs} : obs (list Couple -> list string) :=
+Definition range `{OpticLang expr obs} (a b : expr nat) : obs (list Couple -> list string) :=
   flGetAll (rangeFl a b).
 
-Definition rangeN (a b : nat) `{OpticLang expr obs} : obs (list Couple -> list string) :=
+Definition rangeN `{OpticLang expr obs} (a b : expr nat) : obs (list Couple -> list string) :=
   flGetAll (rangeFlN a b).
 
 Example normalize_range : forall expr obs `{OpticLangOpt expr obs} a b,
   rangeFl a b = rangeFlN a b.
-Proof. 
+Proof.
   intros.
   destruct H0.
   unfold range, rangeN.
@@ -338,16 +363,16 @@ Qed.
 
 (* Query [getAge] *)
 
-Definition getAgeFl (s : string) `{OpticLang expr obs} : expr (Fold (list Couple) nat) :=
-  trAsFold (traversal bothTr +_tr lnAsTraversal (lens nameLn *_ln lens ageLn)) +_fl 
-  filter (fun x => match x with | (n, _) => n = s end) +_fl
+Definition getAgeFl `{OpticLang expr obs} (s : expr string) : expr (Fold (list Couple) nat) :=
+  trAsFold (traversal bothTr +_tr lnAsTraversal (lens nameLn *_ln lens ageLn)) +_fl
+  filter (trAsFold (lnAsTraversal (lens fstLn))) (lam (fun n => n == s)) +_fl
   join snd.
 
-Definition getAgeFlN (s : string) `{OpticLang expr obs} : expr (Fold (list Couple) nat) :=
+Definition getAgeFlN `{OpticLang expr obs} (s : expr string)  : expr (Fold (list Couple) nat) :=
   let bothName := trAsFold (traversal bothTr) +_fl trAsFold (lnAsTraversal (lens nameLn)) in
   let bothAge := trAsFold (traversal bothTr) +_fl trAsFold (lnAsTraversal (lens ageLn)) in
   bothName *_fl bothAge +_fl
-  filter (fun x => match x with | (n, _) => n = s end) +_fl
+  filter (trAsFold (lnAsTraversal (lens fstLn))) (lam (fun n => n == s)) +_fl
   join snd.
 
 Example normalize_getAgeFl : forall expr obs `{OpticLangOpt expr obs} s,
@@ -359,10 +384,10 @@ Proof.
   congruence.
 Qed.
 
-Definition getAge (s : string) `{OpticLang expr obs} : obs (list Couple -> option nat) :=
+Definition getAge `{OpticLang expr obs} (s : expr string)  : obs (list Couple -> option nat) :=
   flGetHead (getAgeFl s).
 
-Definition getAgeN (s : string) `{OpticLang expr obs} : obs (list Couple -> option nat) :=
+Definition getAgeN `{OpticLang expr obs} (s : expr string)  : obs (list Couple -> option nat) :=
   flGetHead (getAgeFlN s).
 
 Example normalize_getAge : forall expr obs `{OpticLangOpt expr obs} s,
@@ -375,20 +400,20 @@ Qed.
 
 (* Query [compose] *)
 
-Definition compose (s t : string) `{OpticLang expr obs} : obs (list Couple -> list string) :=
-  flGetAll (getAgeFl s >>= (fun a => getAgeFl t >>= (fun b => rangeFl a b))).
+Definition compose `{OpticLang expr obs} (s t : expr string) : obs (list Couple -> list string) :=
+  flGetAll (getAgeFl s >>= lam (fun a => getAgeFl t >>= lam (fun b => rangeFl a b))).
 
-Definition compose' (s t : string) `{OpticLang expr obs} : obs (list Couple -> list string) :=
-  flGetAll (getAgeFl s *_fl getAgeFl t >>= (fun x => match x with | (a, b) => rangeFl a b end)).
+Definition compose' `{OpticLang expr obs} (s t : expr string) : obs (list Couple -> list string) :=
+  flGetAll (getAgeFl s *_fl getAgeFl t >>= uncurry (lam (fun a => lam (fun b => rangeFl a b)))).
 
-Definition rangeFlP `{OpticLang expr obs} : nat * nat -> expr (Fold (list Couple) string) :=
-  (fun ab => match ab with | (a, b) => rangeFl a b end).
+Definition rangeFlP `{OpticLang expr obs} : expr (prod nat nat -> Fold (list Couple) string) :=
+  uncurry (lam (fun a => lam (fun b => rangeFl a b))).
 
-Definition compose'' (s t : string) `{OpticLang expr obs} : obs (list Couple -> list string) :=
+Definition compose'' `{OpticLang expr obs} (s t : expr string) : obs (list Couple -> list string) :=
   flGetAll (getAgeFl s *_fl getAgeFl t >>= rangeFlP).
 
-Definition composeN (s t : string) `{OpticLang expr obs} : obs (list Couple -> list string) :=
-  flGetAll (getAgeFlN s *_fl getAgeFlN t >>= (fun x => match x with | (a, b) => rangeFlN a b end)).
+Definition composeN `{OpticLang expr obs} (s t : expr string) : obs (list Couple -> list string) :=
+  flGetAll (getAgeFlN s *_fl getAgeFlN t >>= uncurry (lam (fun a => lam (fun b => rangeFlN a b)))).
 
 Example normalize_compose : forall expr obs `{OpticLangOpt expr obs} s t,
   compose' s t = composeN s t.
@@ -396,8 +421,5 @@ Proof.
   intros.
   unfold compose', composeN, getAgeFl, getAgeFlN, rangeFl, rangeFlN.
   destruct H0.
-  apply f_equal.
-  rewrite trAsFoldDistV0, lnAsTravDistH0, trAsFoldDistH0, vertDistHoriz0.
-  apply f_equal.
-  now extensionality a.
+  now rewrite trAsFoldDistV0, lnAsTravDistH0, trAsFoldDistH0, vertDistHoriz0.
 Qed.
