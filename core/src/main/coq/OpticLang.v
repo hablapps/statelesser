@@ -298,7 +298,7 @@ Definition difference `{OpticLang expr obs} : obs (list Couple -> list (string *
   let herNameAge := herLn +_ln nameLn *_ln ageLn in
   flGetAll (
     trAsFold (couplesTr +_tr lnAsTraversal (himAge *_ln herNameAge)) +_fl
-      filter (lnAsFold (lens fstLn) *_fl (lnAsFold (lens sndLn +_ln lens sndLn)))
+      filter (lnAsFold (lens fstLn *_ln (lens sndLn +_ln lens sndLn)))
             (uncurry (lam (fun ma => lam (fun wa => ma < wa)))) +_fl
       (join second +_fl join first) *_fl
         (join first *_fl (join second +_fl join second) +_fl join (liftLam (fun ab => snd ab - fst ab)))).
