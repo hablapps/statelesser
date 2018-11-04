@@ -11,7 +11,9 @@ Open Scope program_scope.
 
 Generalizable All Variables.
 
+(****************)
 (* Plain optics *)
+(****************)
 
 Record Lens S A := mkLens
 { get : S -> A
@@ -66,7 +68,9 @@ Arguments mkGetter [S A].
 Definition idGt {S : Type} : Getter S S :=
   mkGetter id.
 
+(******************************)
 (* Finally, an optic language *)
+(******************************)
 
 Class OpticLang (expr obs : Type -> Type) :=
 
@@ -135,6 +139,9 @@ Class OpticLang (expr obs : Type -> Type) :=
 ; getAll : forall {S A : Type}, expr (Fold S A) -> expr (S -> list A)
 ; getHead : forall {S A : Type}, expr (Fold S A) -> expr (S -> option A)
 ; foldM : forall {S A M : Type} `{Monoid M}, expr (Fold S A) -> expr (A -> M) -> expr (S -> M)
+; all : forall {S A : Type}, expr (Fold S A) -> expr (A -> Prop) -> expr (S -> Prop)
+; any : forall {S A : Type}, expr (Fold S A) -> expr (A -> Prop) -> expr (S -> Prop)
+; contains : forall {S A : Type}, expr (Fold S A) -> expr A -> expr (S -> Prop)
 
   (* derived methods *)
 ; liftLam {A B : Type} : (A -> B) -> expr (A -> B) := fun f => lam (app (lift f))
@@ -198,7 +205,9 @@ Class OpticLangOpt (expr obs : Type -> Type) `{OpticLang expr obs} :=
       fl1 +_fl (fl2 *_fl fl3) = (fl1 +_fl fl2) *_fl (fl1 +_fl fl3)
 }.
 
+(*******************)
 (* Couples example *)
+(*******************)
 
 Record Person := mkPerson
 { name: string
@@ -292,4 +301,43 @@ Definition compose2 `{OpticLang expr obs} (s t : expr string) : expr (list Coupl
     app (foldM (getAgeFl s *_fl getAgeFl t) (lam (fun ages =>
       app (getAll (app (uncurry (lam (lam ∘ rangeFl))) ages)) cs))) cs).
 
-(* Query [nested] *)
+(**********************)
+(* Department example *)
+(**********************)
+
+Definition Task : Type := string.
+
+Record Employee :=
+{ emp : string
+; tasks : list Task
+}.
+
+Record Department := mkNestedOrg
+{ dpt : string
+; employees : list Employee
+}.
+
+Definition NestedOrg := list Department.
+
+Definition eachFl {A : Type} `{OpticLang expr obs} : expr (Fold (list A) A).
+Proof. Admitted.
+
+Definition empLn `{OpticLang expr obs} : expr (Lens Employee string).
+Proof. Admitted.
+
+Definition tasksLn `{OpticLang expr obs} : expr (Lens Employee (list Task)).
+Proof. Admitted.
+
+Definition dptLn `{OpticLang expr obs} : expr (Lens Department string).
+Proof. Admitted.
+
+Definition employeesLn `{OpticLang expr obs} : expr (Lens Department (list Employee)).
+Proof. Admitted.
+
+(* Query [expertise] *)
+
+Definition expertise `{OpticLang expr obs} (tsk : expr Task) : expr (NestedOrg -> list string) :=
+  getAll (eachFl +_fl
+    filtered (lnAsGetter employeesLn)
+            (all eachFl (contains (lnAsFold tasksLn +_fl eachFl) tsk)) +_fl
+    lnAsFold dptLn).
