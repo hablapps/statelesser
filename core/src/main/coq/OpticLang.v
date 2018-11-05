@@ -72,7 +72,7 @@ Definition idGt {S : Type} : Getter S S :=
 (* Finally, an optic language *)
 (******************************)
 
-Class OpticLang (expr obs : Type -> Type) :=
+Class OpticLang (expr : Type -> Type) :=
 
 { (* higher-order abstract syntax (hoas) *)
   lift : forall {A : Type}, A -> expr A
@@ -108,17 +108,21 @@ Class OpticLang (expr obs : Type -> Type) :=
     expr (Traversal S A) -> expr (Traversal S B) -> expr (Traversal S (A * option B))
 ; trComposeHorizR : forall {S A B : Type},
     expr (Traversal S A) -> expr (Traversal S B) -> expr (Traversal S (option A * B))
+; unsafeFiltered : forall {S A : Type},
+    expr (Getter S A) -> expr (A -> Prop) -> expr (Traversal S S)
 
   (* getter-related primitives *)
 ; getter : forall {S A : Type}, Getter S A -> expr (Getter S A)
 
-  (* propositional primitives *)
+  (* propositional primitives and generic methods *)
 ; and : expr Prop -> expr Prop -> expr Prop
 ; or  : expr Prop -> expr Prop -> expr Prop
 ; leqt : expr nat -> expr nat -> expr Prop
 ; lt : expr nat -> expr nat -> expr Prop
 ; eq : expr string -> expr string -> expr Prop
 ; sub : expr (prod nat nat -> nat)
+; upper : expr (string -> string)
+; incr : expr (nat -> nat)
 
   (* fold-related primitives *)
 ; fold : forall {S A : Type}, Fold S A -> expr (Fold S A)
@@ -142,7 +146,8 @@ Class OpticLang (expr obs : Type -> Type) :=
 ; all : forall {S A : Type}, expr (Fold S A) -> expr (A -> Prop) -> expr (S -> Prop)
 ; any : forall {S A : Type}, expr (Fold S A) -> expr (A -> Prop) -> expr (S -> Prop)
 ; contains : forall {S A : Type}, expr (Fold S A) -> expr A -> expr (S -> Prop)
-; put : forall {S A : Type}, expr (Traversal S A) -> expr A -> expr (S -> S)
+; putAll : forall {S A : Type}, expr (Traversal S A) -> expr A -> expr (S -> S)
+; modifyAll : forall {S A : Type}, expr (Traversal S A) -> expr (A -> A) -> expr (S -> S)
 
   (* derived methods *)
 ; liftLam {A B : Type} : (A -> B) -> expr (A -> B) := fun f => lam (app (lift f))
@@ -171,7 +176,9 @@ Notation "n1 < n2" := (lt n1 n2) (at level 70, no associativity).
 Notation "n1 == n2" := (eq n1 n2) (at level 70, no associativity).
 Notation "p /\ q" := (and p q) (at level 80, right associativity).
 
-Class OpticLangOpt (expr obs : Type -> Type) `{OpticLang expr obs} :=
+Notation "a |*| b" := (product a b) (at level 40, left associativity).
+
+Class OpticLangOpt (expr : Type -> Type) `{OpticLang expr} :=
 
 { (* fold category laws *)
   flLeftId : forall S A (fl : expr (Fold S A)),
@@ -220,56 +227,87 @@ Record Couple := mkCouple
 ; him: Person
 }.
 
-Definition nameLn `{OpticLang expr obs} : expr (Lens Person string). 
+Definition nameLn `{OpticLang expr} : expr (Lens Person string). 
 Proof. Admitted.
 
-Definition ageLn `{OpticLang expr obs} : expr (Lens Person nat). 
+Definition ageLn `{OpticLang expr} : expr (Lens Person nat). 
 Proof. Admitted.
 
-Definition herLn `{OpticLang expr obs} : expr (Lens Couple Person). 
+Definition herLn `{OpticLang expr} : expr (Lens Couple Person). 
 Proof. Admitted.
 
-Definition himLn `{OpticLang expr obs} : expr (Lens Couple Person).
+Definition himLn `{OpticLang expr} : expr (Lens Couple Person).
 Proof. Admitted.
 
-Definition peopleTr `{OpticLang expr obs} : expr (Traversal (list Person) Person).
+Definition peopleTr `{OpticLang expr} : expr (Traversal (list Person) Person).
 Proof. Admitted.
 
-Definition couplesTr `{OpticLang expr obs} : expr (Traversal (list Couple) Couple).
+Definition couplesTr `{OpticLang expr} : expr (Traversal (list Couple) Couple).
 Proof. Admitted.
 
-Definition bothTr `{OpticLang expr obs} : expr (Traversal (list Couple) Person).
+Definition bothTr `{OpticLang expr} : expr (Traversal (list Couple) Person).
 Proof. Admitted.
 
 (* Query [getPeople], already normalized *)
 
-Definition getPeople `{OpticLang expr obs} : expr (list Person -> list Person) :=
+Definition getPeople `{OpticLang expr} : expr (list Person -> list Person) :=
   getAll (trAsFold peopleTr).
 
 (* Query [getName] *)
 
-Definition getName `{OpticLang expr obs} : expr (list Person -> list string) :=
-  getAll (trAsFold (peopleTr +_tr lnAsTraversal nameLn)).
+Definition personNameTr `{OpticLang expr} : expr (Traversal (list Person) string) :=
+  peopleTr +_tr lnAsTraversal nameLn.
+
+Definition getName `{OpticLang expr} : expr (list Person -> list string) :=
+  getAll (trAsFold personNameTr).
+
+(* Todos mis amigos se llaman Cayetano ~ https://www.youtube.com/watch?v=ZiUhV12G024  *)
+Definition putName `{OpticLang expr} : expr (list Person -> list Person) :=
+  putAll personNameTr (str "Cayetano").
+
+Definition modifyName `{OpticLang expr} : expr (list Person -> list Person) :=
+  modifyAll personNameTr upper.
 
 (* Query [getAgeAndName] *)
 
-Definition getAgeAndName `{OpticLang expr obs} : expr (list Person -> list (nat * string)) :=
-  getAll (trAsFold (peopleTr +_tr lnAsTraversal (ageLn *_ln nameLn))).
+Definition personAgeAndNameTr `{OpticLang expr} : expr (Traversal (list Person) (nat * string)) :=
+  peopleTr +_tr lnAsTraversal (ageLn *_ln nameLn).
+
+Definition getAgeAndName `{OpticLang expr} : expr (list Person -> list (nat * string)) :=
+  getAll (trAsFold personAgeAndNameTr).
+
+Definition putAgeAndName `{OpticLang expr} : expr (list Person -> list Person) :=
+  putAll personAgeAndNameTr (ntr 33 |*| str "Cayetano").
 
 (* Query [getHerAges] *)
 
-Definition getHerAges `{OpticLang expr obs} : expr (list Couple -> list nat) :=
-  getAll (trAsFold (couplesTr +_tr lnAsTraversal (herLn +_ln ageLn))).
+Definition herAgesTr `{OpticLang expr} : expr (Traversal (list Couple) nat) :=
+  couplesTr +_tr lnAsTraversal (herLn +_ln ageLn).
+
+Definition getHerAges `{OpticLang expr} : expr (list Couple -> list nat) :=
+  getAll (trAsFold herAgesTr).
+
+Definition putHerAges `{OpticLang expr} : expr (list Couple -> list Couple) :=
+  putAll herAgesTr (ntr 33).
+
+Definition modifyHerAges `{OpticLang expr} : expr (list Couple -> list Couple) :=
+  modifyAll herAgesTr incr.
 
 (* Query [getPeopleOnTheirThirties] *)
 
-Definition getPeopleOnTheirThirties `{OpticLang expr obs} : expr (list Person -> list Person) :=
-  getAll (trAsFold peopleTr +_fl 
-    filtered (lnAsGetter ageLn) (lam (fun a => ntr 30 <= a /\ a < ntr 40))).
+Definition peopleOnTheirThirtiesTr `{OpticLang expr} : expr (Traversal (list Person) Person) :=
+  peopleTr +_tr unsafeFiltered (lnAsGetter ageLn) (lam (fun a => ntr 30 <= a /\ a < ntr 40)).
+
+Definition getPeopleOnTheirThirties `{OpticLang expr} : expr (list Person -> list Person) :=
+  getAll (trAsFold peopleOnTheirThirtiesTr).
+
+(* This is safe, since Cayetano is 33 years old, and therefore traversal laws hold. *)
+Definition putPeopleOnTheirThirties `{OpticLang expr} : expr (list Person -> list Person) :=
+  putAll peopleOnTheirThirtiesTr (lift (mkPerson "Cayetano" 33)).
 
 (* Query [difference] *)
 
-Definition difference `{OpticLang expr obs} :=
+Definition difference `{OpticLang expr} :=
   getAll (trAsFold couplesTr +_fl
     lnAsFold (herLn +_ln nameLn) *_fl 
       (lnAsFold ((herLn +_ln ageLn) *_ln (himLn +_ln ageLn)) +_fl mapped' sub) +_fl
@@ -277,43 +315,43 @@ Definition difference `{OpticLang expr obs} :=
 
 (* Query [range] *)
 
-Definition rangeFl `{OpticLang expr obs} (a b : expr nat) : expr (Fold (list Couple) string) :=
+Definition rangeFl `{OpticLang expr} (a b : expr nat) : expr (Fold (list Couple) string) :=
   trAsFold (bothTr +_tr lnAsTraversal (nameLn *_ln ageLn)) +_fl
     filtered secondGt (lam (fun i => a <= i /\ i < b)) +_fl
     lnAsFold firstLn.
 
 (* Query [getAge] *)
 
-Definition getAgeFl `{OpticLang expr obs} (s : expr string) : expr (Fold (list Couple) nat) :=
+Definition getAgeFl `{OpticLang expr} (s : expr string) : expr (Fold (list Couple) nat) :=
   trAsFold (bothTr +_tr lnAsTraversal (nameLn *_ln ageLn)) +_fl
     filtered firstGt (lam (fun n => n == s)) +_fl
     lnAsFold secondLn.
 
 (* Query [compose] *)
 
-Definition bind `{OpticLang expr obs} {S A M} `{Monoid M} 
+Definition bind `{OpticLang expr} {S A M} `{Monoid M} 
     (fl : expr (Fold S A)) (f : expr A -> expr (S -> M)) : expr (S -> M) :=
   lam (fun s => app (foldM fl (lam (fun a => app (app (lam f) a) s))) s).
 
 Notation "fl >>= f" := (bind fl f) (at level 40, left associativity).
 
-Definition compose `{OpticLang expr obs} 
+Definition compose `{OpticLang expr} 
     (s t : expr string) : expr (list Couple -> list string) :=
   getAgeFl s >>= (fun a1 => getAgeFl t >>= (fun a2 => getAll (rangeFl a1 a2))).
 
-Definition compose' `{OpticLang expr obs} 
+Definition compose' `{OpticLang expr} 
     (s t : expr string) : expr (list Couple -> list string) :=
   getAgeFl s *_fl getAgeFl t >>= (getAll ∘ (app (uncurry (lam (lam ∘ rangeFl))))).
 
 Notation "'do' a ← e ; c" := (e >>= (fun a => c)) (at level 60, right associativity).
 
-Definition compose_do `{OpticLang expr obs} 
+Definition compose_do `{OpticLang expr} 
     (s t : expr string) : expr (list Couple -> list string) :=
   do a1 ← getAgeFl s;
   do a2 ← getAgeFl t;
   getAll (rangeFl a1 a2).
 
-Definition compose'_do `{OpticLang expr obs} 
+Definition compose'_do `{OpticLang expr} 
     (s t : expr string) : expr (list Couple -> list string) :=
   do ages ← getAgeFl s *_fl getAgeFl t;
   getAll (app (uncurry (lam (lam ∘ rangeFl))) ages).
@@ -336,24 +374,24 @@ Record Department := mkNestedOrg
 
 Definition NestedOrg := list Department.
 
-Definition eachFl {A : Type} `{OpticLang expr obs} : expr (Fold (list A) A).
+Definition eachFl {A : Type} `{OpticLang expr} : expr (Fold (list A) A).
 Proof. Admitted.
 
-Definition empLn `{OpticLang expr obs} : expr (Lens Employee string).
+Definition empLn `{OpticLang expr} : expr (Lens Employee string).
 Proof. Admitted.
 
-Definition tasksLn `{OpticLang expr obs} : expr (Lens Employee (list Task)).
+Definition tasksLn `{OpticLang expr} : expr (Lens Employee (list Task)).
 Proof. Admitted.
 
-Definition dptLn `{OpticLang expr obs} : expr (Lens Department string).
+Definition dptLn `{OpticLang expr} : expr (Lens Department string).
 Proof. Admitted.
 
-Definition employeesLn `{OpticLang expr obs} : expr (Lens Department (list Employee)).
+Definition employeesLn `{OpticLang expr} : expr (Lens Department (list Employee)).
 Proof. Admitted.
 
 (* Query [expertise] *)
 
-Definition expertise `{OpticLang expr obs} (tsk : expr Task) : expr (NestedOrg -> list string) :=
+Definition expertise `{OpticLang expr} (tsk : expr Task) : expr (NestedOrg -> list string) :=
   getAll (eachFl +_fl
     filtered (lnAsGetter employeesLn)
              (all eachFl (contains (lnAsFold tasksLn +_fl eachFl) tsk)) +_fl
