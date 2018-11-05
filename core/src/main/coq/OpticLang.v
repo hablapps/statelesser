@@ -17,7 +17,7 @@ Generalizable All Variables.
 
 Record Lens S A := mkLens
 { get : S -> A
-; put : S -> A -> S
+; set : S -> A -> S
 }.
 
 Arguments mkLens [S A].
@@ -136,12 +136,13 @@ Class OpticLang (expr obs : Type -> Type) :=
     expr (Fold S A) -> expr (Fold S B) -> expr (Fold S (option A * B))
 
   (* action primitives *)
+; foldM : forall {S A M : Type} `{Monoid M}, expr (Fold S A) -> expr (A -> M) -> expr (S -> M)
 ; getAll : forall {S A : Type}, expr (Fold S A) -> expr (S -> list A)
 ; getHead : forall {S A : Type}, expr (Fold S A) -> expr (S -> option A)
-; foldM : forall {S A M : Type} `{Monoid M}, expr (Fold S A) -> expr (A -> M) -> expr (S -> M)
 ; all : forall {S A : Type}, expr (Fold S A) -> expr (A -> Prop) -> expr (S -> Prop)
 ; any : forall {S A : Type}, expr (Fold S A) -> expr (A -> Prop) -> expr (S -> Prop)
 ; contains : forall {S A : Type}, expr (Fold S A) -> expr A -> expr (S -> Prop)
+; put : forall {S A : Type}, expr (Traversal S A) -> expr A -> expr (S -> S)
 
   (* derived methods *)
 ; liftLam {A B : Type} : (A -> B) -> expr (A -> B) := fun f => lam (app (lift f))
@@ -291,23 +292,20 @@ Definition getAgeFl `{OpticLang expr obs} (s : expr string) : expr (Fold (list C
 (* Query [compose] *)
 
 Definition bind `{OpticLang expr obs} {S A M} `{Monoid M} 
-    (fl : expr (Fold S A)) (f : expr (A -> S -> M)) : expr (S -> M) :=
-  lam (fun s => app (foldM fl (lam (fun a => app (app f a) s))) s).
+    (fl : expr (Fold S A)) (f : expr A -> expr (S -> M)) : expr (S -> M) :=
+  lam (fun s => app (foldM fl (lam (fun a => app (app (lam f) a) s))) s).
 
 Notation "fl >>= f" := (bind fl f) (at level 40, left associativity).
 
 Definition compose `{OpticLang expr obs} 
     (s t : expr string) : expr (list Couple -> list string) :=
-  getAgeFl s >>= (lam (fun a1 => 
-    getAgeFl t >>= (lam (fun a2 => 
-      getAll (rangeFl a1 a2))))).
+  getAgeFl s >>= (fun a1 => getAgeFl t >>= (fun a2 => getAll (rangeFl a1 a2))).
 
 Definition compose' `{OpticLang expr obs} 
     (s t : expr string) : expr (list Couple -> list string) :=
-  getAgeFl s *_fl getAgeFl t >>= (lam (fun ages => 
-    getAll (app (uncurry (lam (lam ∘ rangeFl))) ages))).
+  getAgeFl s *_fl getAgeFl t >>= (getAll ∘ (app (uncurry (lam (lam ∘ rangeFl))))).
 
-Notation "'do' a ← e ; c" := (e >>= (lam (fun a => c))) (at level 60, right associativity).
+Notation "'do' a ← e ; c" := (e >>= (fun a => c)) (at level 60, right associativity).
 
 Definition compose_do `{OpticLang expr obs} 
     (s t : expr string) : expr (list Couple -> list string) :=
