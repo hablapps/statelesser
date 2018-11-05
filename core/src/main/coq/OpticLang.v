@@ -264,7 +264,7 @@ Definition getHerAges `{OpticLang expr obs} : expr (list Couple -> list nat) :=
 
 Definition getPeopleOnTheirThirties `{OpticLang expr obs} : expr (list Person -> list Person) :=
   getAll (trAsFold peopleTr +_fl 
-          filtered (lnAsGetter ageLn) (lam (fun a => ntr 30 <= a /\ a < ntr 40))).
+    filtered (lnAsGetter ageLn) (lam (fun a => ntr 30 <= a /\ a < ntr 40))).
 
 (* Query [difference] *)
 
@@ -272,7 +272,7 @@ Definition difference `{OpticLang expr obs} :=
   getAll (trAsFold couplesTr +_fl
     lnAsFold (herLn +_ln nameLn) *_fl 
       (lnAsFold ((herLn +_ln ageLn) *_ln (himLn +_ln ageLn)) +_fl mapped' sub) +_fl
-    filtered secondGt (lam (fun n => ntr 0 <= n))).
+    filtered secondGt (lam (leqt (ntr 0)))).
 
 (* Query [range] *)
 
@@ -290,16 +290,35 @@ Definition getAgeFl `{OpticLang expr obs} (s : expr string) : expr (Fold (list C
 
 (* Query [compose] *)
 
-Definition compose `{OpticLang expr obs} (s t : expr string) : expr (list Couple -> list string) :=
-  lam (fun cs =>
-    app (foldM (getAgeFl s) (lam (fun a1 =>
-      app (foldM (getAgeFl t) (lam (fun a2 => 
-        app (getAll (rangeFl a1 a2)) cs))) cs))) cs).
+Definition bind `{OpticLang expr obs} {S A M} `{Monoid M} 
+    (fl : expr (Fold S A)) (f : expr (A -> S -> M)) : expr (S -> M) :=
+  lam (fun s => app (foldM fl (lam (fun a => app (app f a) s))) s).
 
-Definition compose2 `{OpticLang expr obs} (s t : expr string) : expr (list Couple -> list string) :=
-  lam (fun cs =>
-    app (foldM (getAgeFl s *_fl getAgeFl t) (lam (fun ages =>
-      app (getAll (app (uncurry (lam (lam ∘ rangeFl))) ages)) cs))) cs).
+Notation "fl >>= f" := (bind fl f) (at level 40, left associativity).
+
+Definition compose `{OpticLang expr obs} 
+    (s t : expr string) : expr (list Couple -> list string) :=
+  getAgeFl s >>= (lam (fun a1 => 
+    getAgeFl t >>= (lam (fun a2 => 
+      getAll (rangeFl a1 a2))))).
+
+Definition compose' `{OpticLang expr obs} 
+    (s t : expr string) : expr (list Couple -> list string) :=
+  getAgeFl s *_fl getAgeFl t >>= (lam (fun ages => 
+    getAll (app (uncurry (lam (lam ∘ rangeFl))) ages))).
+
+Notation "'do' a ← e ; c" := (e >>= (lam (fun a => c))) (at level 60, right associativity).
+
+Definition compose_do `{OpticLang expr obs} 
+    (s t : expr string) : expr (list Couple -> list string) :=
+  do a1 ← getAgeFl s;
+  do a2 ← getAgeFl t;
+  getAll (rangeFl a1 a2).
+
+Definition compose'_do `{OpticLang expr obs} 
+    (s t : expr string) : expr (list Couple -> list string) :=
+  do ages ← getAgeFl s *_fl getAgeFl t;
+  getAll (app (uncurry (lam (lam ∘ rangeFl))) ages).
 
 (**********************)
 (* Department example *)
@@ -339,5 +358,5 @@ Proof. Admitted.
 Definition expertise `{OpticLang expr obs} (tsk : expr Task) : expr (NestedOrg -> list string) :=
   getAll (eachFl +_fl
     filtered (lnAsGetter employeesLn)
-            (all eachFl (contains (lnAsFold tasksLn +_fl eachFl) tsk)) +_fl
+             (all eachFl (contains (lnAsFold tasksLn +_fl eachFl) tsk)) +_fl
     lnAsFold dptLn).
