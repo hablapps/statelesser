@@ -123,6 +123,7 @@ Class OpticLang (expr : Type -> Type) :=
 ; sub : expr (prod nat nat -> nat)
 ; upper : expr (string -> string)
 ; incr : expr (nat -> nat)
+; append : forall {A : Type}, expr A -> expr (list A) -> expr (list A)
 
   (* fold-related primitives *)
 ; fold : forall {S A : Type}, Fold S A -> expr (Fold S A)
@@ -362,7 +363,7 @@ Definition compose'_do `{OpticLang expr}
 
 Definition Task : Type := string.
 
-Record Employee :=
+Record Employee := mkEmployee
 { emp : string
 ; tasks : list Task
 }.
@@ -373,6 +374,9 @@ Record Department := mkNestedOrg
 }.
 
 Definition NestedOrg := list Department.
+
+Definition eachTr {A : Type} `{OpticLang expr} : expr (Traversal (list A) A).
+Proof. Admitted.
 
 Definition eachFl {A : Type} `{OpticLang expr} : expr (Fold (list A) A).
 Proof. Admitted.
@@ -396,3 +400,12 @@ Definition expertise `{OpticLang expr} (tsk : expr Task) : expr (NestedOrg -> li
     filtered (lnAsGetter employeesLn)
              (all eachFl (contains (lnAsFold tasksLn +_fl eachFl) tsk)) +_fl
     lnAsFold dptLn).
+
+(* Bonus: Query [newEmployee] *)
+
+(* We could use this trick to insert new values, while working with optics *)
+
+(* Cayetano works in all departments *)
+Definition insertCayetano `{OpticLang expr} : expr (NestedOrg -> NestedOrg) :=
+  modifyAll (eachTr +_tr lnAsTraversal employeesLn) 
+            (lam (append (lift (mkEmployee "Cayetano" List.nil)))).
