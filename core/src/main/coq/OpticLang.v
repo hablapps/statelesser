@@ -68,6 +68,9 @@ Arguments mkGetter [S A].
 Definition idGt {S : Type} : Getter S S :=
   mkGetter id.
 
+Record AffineFold S A := mkAffineFold
+{ afold : S -> option A }.
+
 (******************************)
 (* Finally, an optic language *)
 (******************************)
@@ -112,7 +115,12 @@ Class OpticLang (expr : Type -> Type) :=
     expr (Getter S A) -> expr (A -> Prop) -> expr (Traversal S S)
 
   (* getter-related primitives *)
-; getter : forall {S A : Type}, Getter S A -> expr (Getter S A)
+; getter : forall {S A : Type}, expr (S -> A) -> expr (Getter S A)
+; gtAsFold : forall {S A : Type}, expr (Getter S A) -> expr (Fold S A)
+; gtComposeHoriz : forall {S A B : Type},
+    expr (Getter S A) -> expr (Getter S B) -> expr (Getter S (A * B))
+; gtComposeVerti : forall {S A B : Type},
+    expr (Getter S A) -> expr (Getter A B) -> expr (Getter S B)
 
   (* propositional primitives and generic methods *)
 ; and : expr Prop -> expr Prop -> expr Prop
@@ -124,13 +132,18 @@ Class OpticLang (expr : Type -> Type) :=
 ; upper : expr (string -> string)
 ; incr : expr (nat -> nat)
 ; append : forall {A : Type}, expr A -> expr (list A) -> expr (list A)
+; identity {A : Type} : expr (A -> A)
+; first {A B : Type} : expr (A * B -> A)
+; second {A B : Type} : expr (A * B -> B)
+
+  (* affine fold-related primitives*)
+; affineFold : forall {S A : Type}, AffineFold S A -> expr (AffineFold S A)
+; aflAsFold : forall {S A : Type}, expr (AffineFold S A) -> expr (Fold S A)
+; afolding : forall {S A : Type}, expr (S -> option A) -> expr (AffineFold S A)
+; filtered : forall {S A : Type}, expr (Getter S A) -> expr (A -> Prop) -> expr (AffineFold S S)
 
   (* fold-related primitives *)
 ; fold : forall {S A : Type}, Fold S A -> expr (Fold S A)
-; filtered : forall {S A : Type},
-    expr (Getter S A) -> expr (A -> Prop) -> expr (Fold S S)
-; mapped : forall {S A B : Type},
-    expr (Getter S A) -> expr (A -> B) -> expr (Fold S B)
 ; flComposeHoriz : forall {S A B : Type},
     expr (Fold S A) -> expr (Fold S B) -> expr (Fold S (A * B))
 ; flComposeVerti : forall {S A B : Type},
@@ -151,16 +164,12 @@ Class OpticLang (expr : Type -> Type) :=
 ; modifyAll : forall {S A : Type}, expr (Traversal S A) -> expr (A -> A) -> expr (S -> S)
 
   (* derived methods *)
-; liftLam {A B : Type} : (A -> B) -> expr (A -> B) := fun f => lam (app (lift f))
-; first {A B : Type} : expr (A * B -> A) := liftLam fst
-; second {A B : Type} : expr (A * B -> B) := liftLam snd
 ; firstLn {A B : Type} : expr (Lens (A * B) A) := lens fstLn
 ; secondLn {A B : Type} : expr (Lens (A * B) B) := lens sndLn
-; firstGt {A B : Type} : expr (Getter (A * B) A) := getter (mkGetter fst)
-; secondGt {A B : Type} : expr (Getter (A * B) B) := getter (mkGetter snd)
+; firstGt {A B : Type} : expr (Getter (A * B) A) := getter first
+; secondGt {A B : Type} : expr (Getter (A * B) B) := getter second
 ; lnAsFold {S A : Type} (ln : expr (Lens S A)) : expr (Fold S A) := trAsFold (lnAsTraversal ln)
-; mapped' {S A : Type} (f : expr (S -> A)) : expr (Fold S A) := mapped (getter idGt) f
-; filtered' {S : Type} (p : expr (S -> Prop)) : expr (Fold S S) := filtered (getter idGt) p
+; filtered' {S : Type} (p : expr (S -> Prop)) : expr (AffineFold S S) := filtered (getter identity) p
 }.
 
 Notation "ln1 +_ln ln2" := (lnComposeVerti ln1 ln2) (at level 50, left associativity).
@@ -168,6 +177,9 @@ Notation "ln1 *_ln ln2" := (lnComposeHoriz ln1 ln2) (at level 40, left associati
 
 Notation "tr1 +_tr tr2" := (trComposeVerti tr1 tr2) (at level 50, left associativity).
 Notation "tr1 *_tr tr2" := (trComposeHoriz tr1 tr2) (at level 40, left associativity).
+
+Notation "gt1 +_gt gt2" := (gtComposeVerti gt1 gt2) (at level 50, left associativity).
+Notation "gt1 *_gt gt2" := (gtComposeHoriz gt1 gt2) (at level 40, left associativity).
 
 Notation "fl1 +_fl fl2" := (flComposeVerti fl1 fl2) (at level 50, left associativity).
 Notation "fl1 *_fl fl2" := (flComposeHoriz fl1 fl2) (at level 40, left associativity).
@@ -178,41 +190,6 @@ Notation "n1 == n2" := (eq n1 n2) (at level 70, no associativity).
 Notation "p /\ q" := (and p q) (at level 80, right associativity).
 
 Notation "a |*| b" := (product a b) (at level 40, left associativity).
-
-Class OpticLangOpt (expr : Type -> Type) `{OpticLang expr} :=
-
-{ (* fold category laws *)
-  flLeftId : forall S A (fl : expr (Fold S A)),
-    fold idFl +_fl fl = fl
-; flRightId : forall S A (fl : expr (Fold S A)),
-    fl +_fl fold idFl = fl
-; flAssocV : forall S A B C (fl1 : expr (Fold S A)) (fl2 : expr (Fold A B)) (fl3 : expr (Fold B C)),
-    fl1 +_fl (fl2 +_fl fl3) = fl1 +_fl fl2 +_fl fl3
-
-  (* spread conversions *)
-; trAsFoldDistH : forall S A B (tr1 : expr (Traversal S A)) (tr2 : expr (Traversal S B)),
-    trAsFold (tr1 *_tr tr2) = trAsFold tr1 *_fl trAsFold tr2
-; trAsFoldDistV : forall S A B (tr1 : expr (Traversal S A)) (tr2 : expr (Traversal A B)),
-    trAsFold (tr1 +_tr tr2) = trAsFold tr1 +_fl trAsFold tr2
-; lnAsTravDistH : forall S A B (ln1 : expr (Lens S A)) (ln2 : expr (Lens S B)),
-    lnAsTraversal (ln1 *_ln ln2) = lnAsTraversal ln1 *_tr lnAsTraversal ln2
-; lnAsTravDistV : forall S A B (ln1 : expr (Lens S A)) (ln2 : expr (Lens A B)),
-    lnAsTraversal (ln1 +_ln ln2) = lnAsTraversal ln1 +_tr lnAsTraversal ln2
-
-  (* preserve identity *)
-; liftIdLn : forall S, lnAsTraversal (lens (@idLn S)) = traversal idTr
-; liftIdTr : forall S, trAsFold (traversal (@idTr S)) = fold idFl
-
-  (* fold-specific optimizations *)
-; filterFilter : forall S (p q : expr (S -> Prop)),
-    filtered (getter idGt) p +_fl filtered (getter idGt) q = 
-      filtered (getter idGt) (lam (fun s => and (app p s) (app q s)))
-; filterTrue : forall S A (gt : expr (Getter S A)),
-    filtered gt (lam (fun _ => lift True)) = fold idFl
-; vertDistHoriz :
-    forall S A B C (fl1 : expr (Fold S A)) (fl2 : expr (Fold A B)) (fl3 : expr (Fold A C)),
-      fl1 +_fl (fl2 *_fl fl3) = (fl1 +_fl fl2) *_fl (fl1 +_fl fl3)
-}.
 
 (*******************)
 (* Couples example *)
@@ -311,21 +288,21 @@ Definition putPeopleOnTheirThirties `{OpticLang expr} : expr (list Person -> lis
 Definition difference `{OpticLang expr} :=
   getAll (trAsFold couplesTr +_fl
     lnAsFold (herLn +_ln nameLn) *_fl 
-      (lnAsFold ((herLn +_ln ageLn) *_ln (himLn +_ln ageLn)) +_fl mapped' sub) +_fl
-    filtered secondGt (lam (leqt (ntr 0)))).
+      gtAsFold (lnAsGetter ((herLn +_ln ageLn) *_ln (himLn +_ln ageLn)) +_gt getter sub) +_fl
+    aflAsFold (filtered secondGt (lam (leqt (ntr 0))))).
 
 (* Query [range] *)
 
 Definition rangeFl `{OpticLang expr} (a b : expr nat) : expr (Fold (list Couple) string) :=
   trAsFold (bothTr +_tr lnAsTraversal (nameLn *_ln ageLn)) +_fl
-    filtered secondGt (lam (fun i => a <= i /\ i < b)) +_fl
+    aflAsFold (filtered secondGt (lam (fun i => a <= i /\ i < b))) +_fl
     lnAsFold firstLn.
 
 (* Query [getAge] *)
 
 Definition getAgeFl `{OpticLang expr} (s : expr string) : expr (Fold (list Couple) nat) :=
   trAsFold (bothTr +_tr lnAsTraversal (nameLn *_ln ageLn)) +_fl
-    filtered firstGt (lam (fun n => n == s)) +_fl
+    aflAsFold (filtered firstGt (lam (fun n => n == s))) +_fl
     lnAsFold secondLn.
 
 (* Query [compose] *)
@@ -397,15 +374,15 @@ Proof. Admitted.
 
 Definition expertise `{OpticLang expr} (tsk : expr Task) : expr (NestedOrg -> list string) :=
   getAll (eachFl +_fl
-    filtered (lnAsGetter employeesLn)
-             (all eachFl (contains (lnAsFold tasksLn +_fl eachFl) tsk)) +_fl
+    aflAsFold (filtered (lnAsGetter employeesLn)
+      (all eachFl (contains (lnAsFold tasksLn +_fl eachFl) tsk))) +_fl
     lnAsFold dptLn).
 
-(* Bonus: Query [newEmployee] *)
+(* Bonus: Query [insertCayetano] *)
 
 (* We could use this trick to insert new values, while working with optics *)
 
 (* Cayetano works in all departments *)
 Definition insertCayetano `{OpticLang expr} : expr (NestedOrg -> NestedOrg) :=
-  modifyAll (eachTr +_tr lnAsTraversal employeesLn) 
+  modifyAll (eachTr +_tr lnAsTraversal employeesLn)
             (lam (append (lift (mkEmployee "Cayetano" List.nil)))).
