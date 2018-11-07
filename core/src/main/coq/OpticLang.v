@@ -11,9 +11,69 @@ Open Scope program_scope.
 
 Generalizable All Variables.
 
+(* koky *)
+
+Class Monoid (M : Type) :=
+{ mempty : M
+; mappend : M -> M -> M
+}.
+
+Instance listMonoid {A : Type} : Monoid (list A) :=
+
+{| mempty := List.nil
+;  mappend m1 m2 := m1 ++ m2
+|}.
+
 (****************)
 (* Plain optics *)
 (****************)
+
+Record Fold (S A : Type) := mkFold
+{ foldMap `{Monoid M} : (A -> M) -> S -> M }.
+
+Arguments mkFold [S A].
+Arguments foldMap [S A].
+
+Check foldMap.
+
+Definition flVertCompose {S A B} (fl1 : Fold S A) (fl2 : Fold A B) : Fold S B :=
+  mkFold (fun M _ f s => foldMap fl1 _ _ (foldMap fl2 _ _ f) s).
+
+Definition flProdCompose {S A B}
+    (fl1 : Fold S A) (fl2 : Fold S B) : Fold S (A * B) :=
+  mkFold (fun M _ f s => foldMap fl1 _ _ (fun a => 
+    foldMap fl2 _ _ (fun b => f (a, b)) s) s).
+
+Definition flHoriCompose {S A B}
+    (fl1 : Fold S A) (fl2 : Fold S B) : Fold S (prod A B) :=
+  mkFold (fun M _ f s => 
+    List.fold_right (mappend ∘ f) mempty (
+      List.combine (foldMap fl1 _ _ (fun a => List.cons a List.nil) s) 
+                   (foldMap fl2 _ _ (fun b => List.cons b List.nil) s))).
+
+Definition idFl {S : Type} : Fold S S :=
+  mkFold (fun M _ f s => f s).
+
+Definition result S A (n : nat) : Type := 
+  t A n * (t A n -> S).
+
+Record Traversal S A := mkTraversal
+{ extract : S -> sigT (result S A) }.
+
+Arguments mkTraversal [S A].
+
+Definition idTr {S : Type} : Traversal S S :=
+  mkTraversal (fun s => existT (result S S) 1 (cons S s 0 (nil S), hd)).
+
+Record Iso S A := mkIso
+{ to : S -> A
+; from : A -> S
+}.
+
+Arguments mkIso [S A].
+
+Definition idIso {S : Type} : Iso S S :=
+  mkIso id id.
 
 Record Lens S A := mkLens
 { get : S -> A
@@ -31,34 +91,6 @@ Definition fstLn {A B : Type} : Lens (A * B) A :=
 Definition sndLn {A B : Type} : Lens (A * B) B :=
   mkLens snd (fun ab b => (fst ab, b)).
 
-Class Monoid (M : Type) :=
-{ mempty : M
-; mappend : M -> M -> M
-}.
-
-Instance listMonoid {A : Type} : Monoid (list A) :=
-{| mempty := List.nil
-;  mappend m1 m2 := m1 ++ m2
-|}.
-
-Record Fold (S A : Type) := mkFold 
-{ foldMap : forall M `{Monoid M}, (A -> M) -> S -> M }.
-
-Arguments mkFold [S A].
-
-Definition idFl {S : Type} : Fold S S :=
-  mkFold (fun M _ f s => f s).
-
-Definition result S A (n : nat) : Type := 
-  t A n * (t A n -> S).
-
-Record Traversal S A := mkTraversal
-{ extract : S -> sigT (result S A) }.
-
-Arguments mkTraversal [S A].
-
-Definition idTr {S : Type} : Traversal S S :=
-  mkTraversal (fun s => existT (result S S) 1 (cons S s 0 (nil S), hd)).
 
 Record Getter S A := mkGetter
 { view : S -> A }.
@@ -386,3 +418,4 @@ Definition expertise `{OpticLang expr} (tsk : expr Task) : expr (NestedOrg -> li
 Definition insertCayetano `{OpticLang expr} : expr (NestedOrg -> NestedOrg) :=
   modifyAll (eachTr +_tr lnAsTraversal employeesLn)
             (lam (append (lift (mkEmployee "Cayetano" List.nil)))).
+
