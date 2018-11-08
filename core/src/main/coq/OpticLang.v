@@ -278,24 +278,43 @@ Definition idGt {S : Type} : Getter S S :=
 
 (* AFFINE TRAVERSAL *)
 
+Record AffineTraversal (S A : Type) := mkAffineTraversal
+{ preview : S -> option A
+; set : A -> S -> S
+}.
+
+Arguments mkAffineTraversal [S A].
+Arguments preview [S A].
+Arguments set [S A].
+
+Definition atrVerCompose {S A B}
+    (atr1 : AffineTraversal S A) (atr2 : AffineTraversal A B) : AffineTraversal S B :=
+  mkAffineTraversal 
+    (fun s => preview atr1 s >>= preview atr2) 
+    (fun b s => option_fold (fun a => set atr1 (set atr2 b a) s) s (preview atr1 s)).
+
+(* TODO : follow here *)
+Definition atrHorCompose {S A B}
+    (atr1 : AffineTraversal S A) (atr2 : AffineTraversal S B) : AffineTraversal S (A * B).
+
 (* LENS *)
 
 Record Lens S A := mkLens
 { get : S -> A
-; set : A -> S -> S
+; put : A -> S -> S
 }.
 
 Arguments mkLens [S A].
 Arguments get [S A].
-Arguments set [S A].
+Arguments put [S A].
 
 Definition lnVerCompose {S A B} (ln1 : Lens S A) (ln2 : Lens A B) : Lens S B :=
-  mkLens (get ln2 ∘ get ln1) (fun b s => set ln1 (set ln2 b (get ln1 s)) s).
+  mkLens (get ln2 ∘ get ln1) (fun b s => put ln1 (put ln2 b (get ln1 s)) s).
 
 Definition lnHorCompose {S A B} 
     (ln1 : Lens S A) (ln2 : Lens S B) : Lens S (A * B) :=
   mkLens (fork (get ln1) (get ln2)) (fun ab => 
-    match ab with | (a, b) => set ln2 b ∘ set ln1 a end).
+    match ab with | (a, b) => put ln2 b ∘ put ln1 a end).
 
 Definition lnAsGetter {S A} (ln : Lens S A) : Getter S A :=
   mkGetter (get ln).
