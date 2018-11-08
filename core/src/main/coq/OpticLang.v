@@ -13,6 +13,9 @@ Generalizable All Variables.
 
 (* koky *)
 
+Definition fork {S A B} (f : S -> A) (g : S -> B) : S -> A * B :=
+  fun s => (f s, g s).
+
 Inductive listCart (A : Type) : Type :=
 | wrap : list A -> listCart A.
 
@@ -254,9 +257,13 @@ Record Getter S A := mkGetter
 Arguments mkGetter [S A].
 Arguments view [S A].
 
-Definition gtVerCompose {S A B} 
+Definition gtVerCompose {S A B}
     (gt1 : Getter S A) (gt2 : Getter A B) : Getter S B :=
   mkGetter (view gt2 ∘ view gt1).
+
+Definition getHorCompose {S A B}
+    (gt1 : Getter S A) (gt2 : Getter S B) : Getter S (A * B) :=
+  mkGetter (fork (view gt1) (view gt2)).
 
 Definition gtAsFold1 {S A} (gt : Getter S A) : Fold1 S A :=
   mkFold1 (fun _ _ f => f ∘ view gt).
@@ -266,6 +273,43 @@ Definition gtAsAffineFold {S A} (gt : Getter S A) : AffineFold S A :=
 
 Definition idGt {S : Type} : Getter S S :=
   mkGetter id.
+
+(* TRAVERSAL1 *)
+
+(* AFFINE TRAVERSAL *)
+
+(* LENS *)
+
+Record Lens S A := mkLens
+{ get : S -> A
+; set : A -> S -> S
+}.
+
+Arguments mkLens [S A].
+Arguments get [S A].
+Arguments set [S A].
+
+Definition lnVerCompose {S A B} (ln1 : Lens S A) (ln2 : Lens A B) : Lens S B :=
+  mkLens (get ln2 ∘ get ln1) (fun b s => set ln1 (set ln2 b (get ln1 s)) s).
+
+Definition lnHorCompose {S A B} 
+    (ln1 : Lens S A) (ln2 : Lens S B) : Lens S (A * B) :=
+  mkLens (fork (get ln1) (get ln2)) (fun ab => 
+    match ab with | (a, b) => set ln2 b ∘ set ln1 a end).
+
+Definition lnAsGetter {S A} (ln : Lens S A) : Getter S A :=
+  mkGetter (get ln).
+
+Definition idLn {S : Type} : Lens S S :=
+  mkLens id Basics.const.
+
+Definition fstLn {A B : Type} : Lens (A * B) A :=
+  mkLens fst (fun a ab => (a, snd ab)).
+
+Definition sndLn {A B : Type} : Lens (A * B) B :=
+  mkLens snd (fun b ab => (fst ab, b)).
+
+(* PRISM *)
 
 (* ISO *)
 
@@ -278,24 +322,6 @@ Arguments mkIso [S A].
 
 Definition idIso {S : Type} : Iso S S :=
   mkIso id id.
-
-(* LENS *)
-
-Record Lens S A := mkLens
-{ get : S -> A
-; set : S -> A -> S
-}.
-
-Arguments mkLens [S A].
-
-Definition idLn {S : Type} : Lens S S :=
-  mkLens id (fun _ s => s).
-
-Definition fstLn {A B : Type} : Lens (A * B) A :=
-  mkLens fst (fun ab a => (a, snd ab)).
-
-Definition sndLn {A B : Type} : Lens (A * B) B :=
-  mkLens snd (fun ab b => (fst ab, b)).
 
 (******************************)
 (* Finally, an optic language *)
