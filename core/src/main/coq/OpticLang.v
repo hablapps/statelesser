@@ -45,6 +45,15 @@ Class Foldable (F : Type -> Type) :=
 Instance listFoldable : Foldable list :=
 { fold := fun _ _ _ _ f => List.fold_right (mappend ∘ f) mempty }.
 
+Definition option_fold {A B} (some : A -> B) (none : B) (oa : option A) : B :=
+  match oa with
+  | Some a => some a
+  | None => none
+end.
+
+Instance optionFoldable : Foldable option :=
+{ fold := fun _ _ _ _ f s => option_fold f mempty s}.
+
 Inductive nel (A : Type) : Type :=
 | nel_nil : A -> nel A
 | nel_cons : A -> nel A -> nel A.
@@ -134,11 +143,10 @@ Arguments foldMap [S A].
 Definition flVerCompose {S A B} (fl1 : Fold S A) (fl2 : Fold A B) : Fold S B :=
   mkFold (fun _ _ _ f s => foldMap fl1 _ _ _ (foldMap fl2 _ _ _ f) s).
 
-
 Definition flGenCompose {S A B} F 
     `{Applicative F, Foldable F, Monoid (F A), Monoid (F B)}
     (fl1 : Fold S A) (fl2 : Fold S B) : Fold S (A * B) :=
-  mkFold (fun _ _ _ f s => fold f (@tupled F _ _ _
+  mkFold (fun _ _ _ f s => @fold F _ _ _ _ _ f (tupled
     (foldMap fl1 _ _ _ pure s)
     (foldMap fl2 _ _ _ pure s))).
 
@@ -231,6 +239,12 @@ Definition aflVerCompose {S A B}
 Definition aflProCompose {S A B}
     (af1 : AffineFold S A) (af2 : AffineFold S B) : AffineFold S (A * B) :=
   mkAffineFold (fun s => tupled (afold af1 s) (afold af2 s)).
+
+Definition aflAsFold {S A} (afl : AffineFold S A) : Fold S A :=
+  mkFold (fun _ _ _ f s => fold f (afold afl s)).
+
+Definition idAfl {S} : AffineFold S S :=
+  mkAffineFold Some.
 
 (* ISO *)
 
