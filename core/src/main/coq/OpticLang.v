@@ -246,6 +246,27 @@ Definition aflAsFold {S A} (afl : AffineFold S A) : Fold S A :=
 Definition idAfl {S} : AffineFold S S :=
   mkAffineFold Some.
 
+(* GETTER *)
+
+Record Getter S A := mkGetter
+{ view : S -> A }.
+
+Arguments mkGetter [S A].
+Arguments view [S A].
+
+Definition gtVerCompose {S A B} 
+    (gt1 : Getter S A) (gt2 : Getter A B) : Getter S B :=
+  mkGetter (view gt2 ∘ view gt1).
+
+Definition gtAsFold1 {S A} (gt : Getter S A) : Fold1 S A :=
+  mkFold1 (fun _ _ f => f ∘ view gt).
+
+Definition gtAsAffineFold {S A} (gt : Getter S A) : AffineFold S A :=
+  mkAffineFold (Some ∘ view gt).
+
+Definition idGt {S : Type} : Getter S S :=
+  mkGetter id.
+
 (* ISO *)
 
 Record Iso S A := mkIso
@@ -275,16 +296,6 @@ Definition fstLn {A B : Type} : Lens (A * B) A :=
 
 Definition sndLn {A B : Type} : Lens (A * B) B :=
   mkLens snd (fun ab b => (fst ab, b)).
-
-(* GETTER *)
-
-Record Getter S A := mkGetter
-{ view : S -> A }.
-
-Arguments mkGetter [S A].
-
-Definition idGt {S : Type} : Getter S S :=
-  mkGetter id.
 
 (******************************)
 (* Finally, an optic language *)
