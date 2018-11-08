@@ -13,20 +13,117 @@ Generalizable All Variables.
 
 (* koky *)
 
-Class Monoid (M : Type) :=
-{ mempty : M
-; mappend : M -> M -> M
-}.
+Inductive listCart (A : Type) : Type :=
+| wrap : list A -> listCart A.
+
+Arguments wrap [A].
+
+Definition unwrap {A} (w : listCart A) : list A :=
+  match w with | wrap xs => xs end.
+
+Class Semigroup (M : Type) :=
+{ mappend : M -> M -> M }.
+
+Class Monoid (M : Type) `{Semigroup M} :=
+{ mempty : M }.
+
+Instance listSemigroup {A : Type} : Semigroup (list A) :=
+{ mappend m1 m2 := m1 ++ m2 }.
 
 Instance listMonoid {A : Type} : Monoid (list A) :=
+{ mempty := List.nil }.
 
-{| mempty := List.nil
-;  mappend m1 m2 := m1 ++ m2
-|}.
+Instance listCartSemigroup {A : Type} : Semigroup (listCart A) :=
+{ mappend m1 m2 := wrap (mappend (unwrap m1) (unwrap m2)) }.
+
+Instance listCartMonoid {A : Type} : Monoid (listCart A) :=
+{ mempty := wrap (List.nil) }.
+
+Class Foldable (F : Type -> Type) :=
+{ fold : forall {A} `{Monoid M}, (A -> M) -> F A -> M }.
+
+Instance listFoldable : Foldable list :=
+{ fold := fun _ _ _ _ f => List.fold_right (mappend ∘ f) mempty }.
+
+Inductive nel (A : Type) : Type :=
+| nel_nil : A -> nel A
+| nel_cons : A -> nel A -> nel A.
+
+Arguments nel_nil [A].
+Arguments nel_cons [A].
+
+Fixpoint nel_fold {A B} (f : A -> B -> B) (g : A -> B) (xs : nel A) : B :=
+  match xs with
+  | nel_nil a => g a
+  | nel_cons a xs' => f a (nel_fold f g xs')
+  end.
+
+Fixpoint nel_combine {A B} (xs : nel A) (ys : nel B) : nel (A * B) :=
+  match (xs, ys) with
+  | (nel_nil a, nel_nil b) => nel_nil (a,  b)
+  | (nel_nil a, nel_cons b _) => nel_nil (a, b)
+  | (nel_cons a _, nel_nil b) => nel_nil (a, b)
+  | (nel_cons a xs', nel_cons b ys') => nel_cons (a, b) (nel_combine xs' ys')
+  end.
+
+Fixpoint nel_cat {A} (xs : nel A) (ys : nel A) : nel A :=
+  nel_fold (fun a b => nel_cons a b) (fun a => nel_cons a ys) xs.
+
+Instance nelSemigroup {A : Type} : Semigroup (nel A) :=
+{ mappend m1 m2 := nel_cat m1 m2 }.
+
+Class Foldable1 (F : Type -> Type) :=
+{ fold1 : forall {A} `{Semigroup M}, (A -> M) -> F A -> M }.
+
+Instance nelFoldable1 : Foldable1 nel :=
+{ fold1 := fun _ _ _ f s => nel_fold (mappend ∘ f) f s }.
+
+Class Applicative (M : Type -> Type) : Type :=
+{ pure : forall {A}, A -> M A
+; ap : forall {A B}, M A -> M (A -> B) -> M B
+; tupled {A B} (ma : M A) (mb : M B) : M (prod A B) :=
+    ap mb (ap ma (pure pair))
+}.
+
+Instance listApplicative : Applicative list :=
+{ pure := fun _ a => List.cons a List.nil
+; ap := fun _ _ la lf => 
+    List.map (fun fa => match fa with | (a, f) => f a end) (List.combine la lf)
+}.
+
+Instance listCartFoldable : Foldable listCart :=
+{ fold := fun _ _ _ _ f s => fold f (unwrap s) }.
+
+Instance listCartApplicative : Applicative listCart :=
+{ pure := fun _ a => wrap (pure a)
+; ap := fun A B la lf =>
+    let f := fun pair => match pair with | (a, f) => f a end in
+    wrap (List.map f (list_prod (unwrap la) (unwrap lf)))
+}.
+
+Instance optionApplicative : Applicative option :=
+{ pure := fun _ => Some
+; ap := fun _ _ oa og => match (oa, og) with
+    | (Some a, Some g) => Some (g a)
+    | _ => None
+    end
+}.
+
+Class Monad (M : Type -> Type) `{Applicative M} : Type :=
+{ bind : forall {A B}, M A -> (A -> M B) -> M B
+}.
+
+Notation "ma >>= f" := (bind ma f) (at level 40, left associativity).
+
+Instance optionMonad : Monad option :=
+{ bind := fun _ _ oa f => match oa with | Some a => f a | None => None end 
+}.
 
 (****************)
 (* Plain optics *)
 (****************)
+
+(* FOLD *)
 
 Record Fold (S A : Type) := mkFold
 { foldMap `{Monoid M} : (A -> M) -> S -> M }.
@@ -34,25 +131,76 @@ Record Fold (S A : Type) := mkFold
 Arguments mkFold [S A].
 Arguments foldMap [S A].
 
-Check foldMap.
+Definition flVerCompose {S A B} (fl1 : Fold S A) (fl2 : Fold A B) : Fold S B :=
+  mkFold (fun _ _ _ f s => foldMap fl1 _ _ _ (foldMap fl2 _ _ _ f) s).
 
-Definition flVertCompose {S A B} (fl1 : Fold S A) (fl2 : Fold A B) : Fold S B :=
-  mkFold (fun M _ f s => foldMap fl1 _ _ (foldMap fl2 _ _ f) s).
 
-Definition flProdCompose {S A B}
+Definition flGenCompose {S A B} F 
+    `{Applicative F, Foldable F, Monoid (F A), Monoid (F B)}
     (fl1 : Fold S A) (fl2 : Fold S B) : Fold S (A * B) :=
-  mkFold (fun M _ f s => foldMap fl1 _ _ (fun a => 
-    foldMap fl2 _ _ (fun b => f (a, b)) s) s).
+  mkFold (fun _ _ _ f s => fold f (@tupled F _ _ _
+    (foldMap fl1 _ _ _ pure s)
+    (foldMap fl2 _ _ _ pure s))).
 
-Definition flHoriCompose {S A B}
-    (fl1 : Fold S A) (fl2 : Fold S B) : Fold S (prod A B) :=
-  mkFold (fun M _ f s => 
-    List.fold_right (mappend ∘ f) mempty (
-      List.combine (foldMap fl1 _ _ (fun a => List.cons a List.nil) s) 
-                   (foldMap fl2 _ _ (fun b => List.cons b List.nil) s))).
+Definition flProCompose {S A B}
+    (fl1 : Fold S A) (fl2 : Fold S B) : Fold S (A * B) :=
+  flGenCompose listCart fl1 fl2.
+
+Definition flHorCompose {S A B}
+    (fl1 : Fold S A) (fl2 : Fold S B) : Fold S (A * B) :=
+  flGenCompose list fl1 fl2.
 
 Definition idFl {S : Type} : Fold S S :=
-  mkFold (fun M _ f s => f s).
+  mkFold (fun _ _ _ f s => f s).
+
+(* SETTER *)
+
+Record Setter (S A : Type) := mkSetter
+{ modify : (A -> A) -> S -> S
+}.
+
+Arguments mkSetter [S A].
+Arguments modify [S A].
+
+Definition stVerCompose {S A B}
+    (st1 : Setter S A) (st2: Setter A B) : Setter S B :=
+  mkSetter (fun f => modify st1 (modify st2 f)).
+
+(* I wasn't able to implement horizontal composition for Setters! *)
+
+Definition idSt {S : Type} : Setter S S :=
+  mkSetter id.
+
+(* FOLD1 *)
+
+Record Fold1 S A := mkFold1
+{ foldMap1 `{Semigroup M} : (A -> M) -> S -> M }.
+
+Arguments mkFold1 [S A].
+Arguments foldMap1 [S A].
+
+Definition fl1VerCompose {S A B} 
+    (fl1 : Fold1 S A) (fl2 : Fold1 A B) : Fold1 S B :=
+  mkFold1 (fun _ _ f => foldMap1 fl1 _ _ (foldMap1 fl2 _ _ f)).
+
+Definition fl1ProCompose {S A B}
+    (fl1 : Fold1 S A) (fl2 : Fold1 S B) : Fold1 S (A * B) :=
+  mkFold1 (fun _ _ f s => foldMap1 fl1 _ _ (fun a => 
+    foldMap1 fl2 _ _ (fun b => f (a, b)) s) s).
+
+Definition fl1HorCompose {S A B}
+    (fl1 : Fold1 S A) (fl2 : Fold1 S B) : Fold1 S (A * B) :=
+  mkFold1 (fun M m f s => fold1 f (nel_combine
+    (foldMap1 fl1 _ _ (fun a => nel_nil a) s)
+    (foldMap1 fl2 _ _ (fun b => nel_nil b) s))).
+
+Definition fl1AsFold {S A} (fl : Fold1 S A) : Fold S A :=
+  mkFold (fun _ _ _ => foldMap1 fl _ _).
+
+Definition idFl1 {S : Type} : Fold1 S S :=
+  mkFold1 (fun _ _ => id).
+
+(* TRAVERSAL *)
 
 Definition result S A (n : nat) : Type := 
   t A n * (t A n -> S).
@@ -61,9 +209,30 @@ Record Traversal S A := mkTraversal
 { extract : S -> sigT (result S A) }.
 
 Arguments mkTraversal [S A].
+Arguments extract [S A].
+
+(* TODO: Combinators for this Traversal representation aren't trivial at all! *)
 
 Definition idTr {S : Type} : Traversal S S :=
   mkTraversal (fun s => existT (result S S) 1 (cons S s 0 (nil S), hd)).
+
+(* AFFINE FOLD *)
+
+Record AffineFold S A := mkAffineFold
+{ afold : S -> option A }.
+
+Arguments mkAffineFold [S A].
+Arguments afold [S A].
+
+Definition aflVerCompose {S A B}
+    (af1 : AffineFold S A) (af2 : AffineFold A B) : AffineFold S B :=
+  mkAffineFold (fun s => afold af1 s >>= (fun a => afold af2 a)).
+
+Definition aflProCompose {S A B}
+    (af1 : AffineFold S A) (af2 : AffineFold S B) : AffineFold S (A * B) :=
+  mkAffineFold (fun s => tupled (afold af1 s) (afold af2 s)).
+
+(* ISO *)
 
 Record Iso S A := mkIso
 { to : S -> A
@@ -74,6 +243,8 @@ Arguments mkIso [S A].
 
 Definition idIso {S : Type} : Iso S S :=
   mkIso id id.
+
+(* LENS *)
 
 Record Lens S A := mkLens
 { get : S -> A
@@ -91,6 +262,7 @@ Definition fstLn {A B : Type} : Lens (A * B) A :=
 Definition sndLn {A B : Type} : Lens (A * B) B :=
   mkLens snd (fun ab b => (fst ab, b)).
 
+(* GETTER *)
 
 Record Getter S A := mkGetter
 { view : S -> A }.
@@ -99,9 +271,6 @@ Arguments mkGetter [S A].
 
 Definition idGt {S : Type} : Getter S S :=
   mkGetter id.
-
-Record AffineFold S A := mkAffineFold
-{ afold : S -> option A }.
 
 (******************************)
 (* Finally, an optic language *)
