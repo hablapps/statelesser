@@ -235,6 +235,9 @@ Record AffineFold S A := mkAffineFold
 Arguments mkAffineFold [S A].
 Arguments afold [S A].
 
+Definition filtered {S} (p : S -> bool) : AffineFold S S :=
+  mkAffineFold (fun s => if p s then Some s else None).
+
 Definition aflVerCompose {S A B}
     (af1 : AffineFold S A) (af2 : AffineFold A B) : AffineFold S B :=
   mkAffineFold (fun s => afold af1 s >>= (fun a => afold af2 a)).
