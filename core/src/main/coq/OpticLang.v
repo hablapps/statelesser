@@ -276,6 +276,8 @@ Definition idGt {S : Type} : Getter S S :=
 
 (* TRAVERSAL1 *)
 
+Record Traversal1 (S A : Type).
+
 (* AFFINE TRAVERSAL *)
 
 Record AffineTraversal (S A : Type) := mkAffineTraversal
@@ -336,6 +338,10 @@ Definition lnAsGetter {S A} (ln : Lens S A) : Getter S A :=
 Definition lnAsAffineTraversal {S A} (ln : Lens S A) : AffineTraversal S A :=
   mkAffineTraversal (Some ∘ get ln) (put ln). 
 
+(* TODO *)
+Definition lnAsTraversal1 {S A} (ln : Lens S A) : Traversal1 S A.
+Proof. Admitted.
+
 Definition idLn {S : Type} : Lens S S :=
   mkLens id Basics.const.
 
@@ -347,6 +353,34 @@ Definition sndLn {A B : Type} : Lens (A * B) B :=
 
 (* PRISM *)
 
+Record Prism S A := mkPrism
+{ peek : S -> option A
+; build : A -> S
+}.
+
+Arguments mkPrism [S A].
+Arguments peek [S A].
+Arguments build [S A].
+
+Definition prVerCompose {S A B}
+    (pr1 : Prism S A) (pr2 : Prism A B) : Prism S B :=
+  mkPrism (fun s => peek pr1 s >>= peek pr2) (build pr1 ∘build pr2).
+
+(* XXX: can't compose prisms horizontally! Notice how building, though possible, 
+ * makes no sense, because we would ignore one of the building methods.
+ * 
+ * Definition prHorCompose {S A B}
+ *     (pr1 : Prism S A) (pr2 : Prism S B) : Prism S (A * B) :=
+ *   mkPrism (fun s => (peek pr1 s, peek pr2 s))
+ *           (fun ab => match ab with | (a, b) => ??? end)
+ *)
+
+Definition prAsAffineTraversal {S A} (pr : Prism S A) : AffineTraversal S A :=
+  mkAffineTraversal (peek pr) (fun a _ => build pr a).
+
+Definition idPr {S} : Prism S S :=
+  mkPrism Some id.
+
 (* ISO *)
 
 Record Iso S A := mkIso
@@ -355,6 +389,8 @@ Record Iso S A := mkIso
 }.
 
 Arguments mkIso [S A].
+Arguments to [S A].
+Arguments from [S A].
 
 Definition idIso {S : Type} : Iso S S :=
   mkIso id id.
