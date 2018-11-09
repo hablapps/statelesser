@@ -392,6 +392,24 @@ Arguments mkIso [S A].
 Arguments to [S A].
 Arguments from [S A].
 
+Definition isoVerCompose {S A B}
+    (iso1 : Iso S A) (iso2 : Iso A B) : Iso S B :=
+  mkIso (to iso2 ∘ to iso1) (from iso1 ∘ from iso2).
+
+(* XXX: can't compose isos horizontally!
+ * 
+ * Definition isoHorCompose {S A B}
+ *     (iso1 : Iso S A) (iso2 : Iso S B) : Iso S (A * B) :=
+ *   mkIso (fun s => (to iso1 s) (to iso2 s))
+ *         (fun ab => match ab with | (a, b) => ? end).
+ *)
+
+Definition isoAsLens {S A} (iso : Iso S A) : Lens S A :=
+  mkLens (to iso) (fun a _ => from iso a).
+
+Definition isoAsPrism {S A} (iso : Iso S A) : Prism S A :=
+  mkPrism (Some ∘ to iso) (from iso).
+
 Definition idIso {S : Type} : Iso S S :=
   mkIso id id.
 
