@@ -81,6 +81,15 @@ Fixpoint nel_combine {A B} (xs : nel A) (ys : nel B) : nel (A * B) :=
 Fixpoint nel_cat {A} (xs : nel A) (ys : nel A) : nel A :=
   nel_fold (fun a b => nel_cons a b) (fun a => nel_cons a ys) xs.
 
+Fixpoint vec1ToNelAux {A n} (v : t A n) (prev : A) : nel A :=
+  match v with
+  | nil _ => nel_nil prev
+  | cons _ nprev _ v2 => nel_cons prev (vec1ToNelAux v2 nprev)
+  end.
+
+Definition vec1ToNel {A n} (v : t A (S n)) : nel A :=
+  vec1ToNelAux (tl v) (hd v).
+
 Instance nelSemigroup {A : Type} : Semigroup (nel A) :=
 { mappend m1 m2 := nel_cat m1 m2 }.
 
@@ -279,7 +288,18 @@ Definition idGt {S : Type} : Getter S S :=
 
 (* TRAVERSAL1 *)
 
-Record Traversal1 (S A : Type).
+Definition result1 T A (n : nat) : Type :=
+  t A (S n) * (t A (S n) -> T).
+
+Record Traversal1 (S A : Type) :=
+{ extract1 : S -> sigT (result1 S A) }.
+
+Arguments extract1 [S A].
+
+Definition tr1AsFold1 {S A} (tr1 : Traversal1 S A) : Fold1 S A :=
+  mkFold1 (fun _ _ f s => match extract1 tr1 s with 
+                          | existT _ _ (v, _) => fold1 f (vec1ToNel v)
+                          end).
 
 (* AFFINE TRAVERSAL *)
 
