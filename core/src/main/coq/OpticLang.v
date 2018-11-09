@@ -293,9 +293,23 @@ Definition atrVerCompose {S A B}
     (fun s => preview atr1 s >>= preview atr2) 
     (fun b s => option_fold (fun a => set atr1 (set atr2 b a) s) s (preview atr1 s)).
 
-(* TODO : follow here *)
 Definition atrHorCompose {S A B}
-    (atr1 : AffineTraversal S A) (atr2 : AffineTraversal S B) : AffineTraversal S (A * B).
+    (atr1 : AffineTraversal S A) (atr2 : AffineTraversal S B) : AffineTraversal S (A * B) :=
+  mkAffineTraversal
+    (fun s => tupled (preview atr1 s) (preview atr2 s))
+    (fun ab => match ab with | (a, b) => set atr2 b ∘ set atr1 a end).
+
+Definition atrAsAffineFold {S A} (atr : AffineTraversal S A) : AffineFold S A :=
+  mkAffineFold (preview atr).
+
+Definition atrAsTraversal {S A} (atr : AffineTraversal S A) : Traversal S A :=
+  mkTraversal (fun s => option_fold 
+    (fun a => existT _ _ (cons _ a _ (nil A), fun v => set atr (hd v) s)) 
+    (existT  _ _ (nil A, fun _ => s)) 
+    (preview atr s)).
+
+Definition idAtr {S} : AffineTraversal S S :=
+  mkAffineTraversal Some Basics.const.
 
 (* LENS *)
 
@@ -318,6 +332,9 @@ Definition lnHorCompose {S A B}
 
 Definition lnAsGetter {S A} (ln : Lens S A) : Getter S A :=
   mkGetter (get ln).
+
+Definition lnAsAffineTraversal {S A} (ln : Lens S A) : AffineTraversal S A :=
+  mkAffineTraversal (Some ∘ get ln) (put ln). 
 
 Definition idLn {S : Type} : Lens S S :=
   mkLens id Basics.const.
