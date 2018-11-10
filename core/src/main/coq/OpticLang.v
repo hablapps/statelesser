@@ -492,6 +492,11 @@ Instance trVerComLn : VerCompose Traversal Lens Traversal :=
     trVerCompose tr (tr1AsTraversal (lnAsTraversal1 ln))
 }.
 
+Instance lnVerComAfl : VerCompose Lens AffineFold AffineFold :=
+{ verCompose S A B (ln : Lens S A) (afl : AffineFold A B) :=
+    aflVerCompose (gtAsAffineFold (lnAsGetter ln)) afl
+}.
+
 Class HorCompose
   (op1 : Type -> Type -> Type) 
   (op2 : Type -> Type -> Type)
@@ -540,6 +545,10 @@ Definition nameAndAgeTr : Traversal (list Person) (string * nat) :=
 
 Definition getPeopleAgeAndName : list Person -> list (string * nat) :=
   getAll (each › nameLn × ageLn).
+
+(* TODO *)
+Definition getPeopleGt30 : list Person -> list string :=
+  getAll (each › nameLn × (ageLn › filtered' (Nat.ltb 30)) › fstLn).
 
 (******************************)
 (* Finally, an optic language *)
