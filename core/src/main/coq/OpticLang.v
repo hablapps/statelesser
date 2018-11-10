@@ -258,9 +258,6 @@ Record AffineFold S A := mkAffineFold
 Arguments mkAffineFold [S A].
 Arguments afold [S A].
 
-Definition filtered {S} (p : S -> bool) : AffineFold S S :=
-  mkAffineFold (fun s => if p s then Some s else None).
-
 Definition aflVerCompose {S A B}
     (af1 : AffineFold S A) (af2 : AffineFold A B) : AffineFold S B :=
   mkAffineFold (fun s => afold af1 s >>= (fun a => afold af2 a)).
@@ -299,6 +296,17 @@ Definition gtAsAffineFold {S A} (gt : Getter S A) : AffineFold S A :=
 
 Definition idGt {S : Type} : Getter S S :=
   mkGetter id.
+
+(* Notice that the following combinators build [AffineFold]s but they are placed
+   here because of the dependency with [Getter] *)
+
+(* XXX: the gt parameter is not standard in optics but it's practical to deal
+   with product types. *)
+Definition filtered {S A} (gt : Getter S A) (p : A -> bool) : AffineFold S S :=
+  mkAffineFold (fun s => if p (view gt s) then Some s else None).
+
+Definition filtered' {S} (p : S -> bool) : AffineFold S S :=
+  filtered idGt p.
 
 (* TRAVERSAL1 *)
 
