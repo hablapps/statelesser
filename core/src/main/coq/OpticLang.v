@@ -236,6 +236,10 @@ Arguments extract [S A].
 
 (* TODO: Combinators for this Traversal representation aren't trivial at all! *)
 
+Definition trVerCompose {S A B}
+    (tr1 : Traversal S A) (tr2 : Traversal A B) : Traversal S B.
+Proof. Admitted.
+
 (* XXX: I was not able to prove this statement, but I think it makes a lot of 
    sense. Broadly, I think that you can't provide a cartesian combinator for 
    traversals, but you can provide the horizontal (zip) one, as long as both 
@@ -248,7 +252,10 @@ Definition trHorCompose {S A B}
 Proof. Admitted.
 
 Definition idTr {S : Type} : Traversal S S :=
-  mkTraversal (fun s => existT (result S S) 1 (cons S s 0 (nil S), hd)).
+  mkTraversal (fun s => existT _ 1 (cons S s 0 (nil S), hd)).
+
+Definition each {S : Type} : Traversal (list S) S :=
+  mkTraversal (fun xs => existT _ (length xs) (of_list xs, to_list)).
 
 (* AFFINE FOLD *)
 
@@ -462,6 +469,77 @@ Definition isoAsPrism {S A} (iso : Iso S A) : Prism S A :=
 
 Definition idIso {S : Type} : Iso S S :=
   mkIso id id.
+
+(*******************)
+(* COUPLES EXAMPLE *)
+(*******************)
+
+Record Person := mkPerson
+{ name : string
+; age : nat
+}.
+
+Class VerCompose 
+  (op1 : Type -> Type -> Type) 
+  (op2 : Type -> Type -> Type)
+  (res : Type -> Type -> Type) :=
+{ verCompose : forall {S A B}, op1 S A -> op2 A B -> res S B }.
+
+Notation "op1 › op2" := (verCompose op1 op2) (at level 50, left associativity).
+
+Instance trVerComLn : VerCompose Traversal Lens Traversal :=
+{ verCompose S A B (tr : Traversal S A) (ln : Lens A B) :=
+    trVerCompose tr (tr1AsTraversal (lnAsTraversal1 ln))
+}.
+
+Class HorCompose
+  (op1 : Type -> Type -> Type) 
+  (op2 : Type -> Type -> Type)
+  (res : Type -> Type -> Type) :=
+{ horCompose : forall {S A B}, op1 S A -> op2 S B -> res S (prod A B) }.
+
+Notation "op1 ‡ op2" := (horCompose op1 op2) (at level 49, left associativity).
+
+Class ProdCompose
+  (op1 : Type -> Type -> Type) 
+  (op2 : Type -> Type -> Type)
+  (res : Type -> Type -> Type) :=
+{ prodCompose : forall {S A B}, op1 S A -> op2 S B -> res S (prod A B) }.
+
+Notation "op1 × op2" := (prodCompose op1 op2) (at level 48, left associativity).
+
+Instance lnProdCompLn : ProdCompose Lens Lens Lens :=
+{ prodCompose S A B (ln1 : Lens S A) (ln2 : Lens S B) := lnHorCompose ln1 ln2
+}.
+
+Class GetAllAble (op : Type -> Type -> Type) :=
+{ getAll : forall {S A}, op S A -> S -> list A }.
+
+Instance trGetAllAble : GetAllAble Traversal :=
+{ getAll S A tr s :=
+    match extract tr s with | existT _ _ (v, _) => to_list v end
+}.
+
+Definition getPeople : list Person -> list Person :=
+  getAll each.
+
+Definition nameLn : Lens Person string.
+Proof. Admitted.
+
+Definition ageLn : Lens Person nat.
+Proof. Admitted.
+
+Definition nameTr : Traversal (list Person) string :=
+  each › nameLn.
+
+Definition nameAndAgeLn : Lens Person (string * nat) :=
+  nameLn × ageLn.
+
+Definition nameAndAgeTr : Traversal (list Person) (string * nat) :=
+  each › (nameLn × ageLn).
+
+Definition getPeopleAgeAndName : list Person -> list (string * nat) :=
+  getAll (each › nameLn × ageLn).
 
 (******************************)
 (* Finally, an optic language *)
