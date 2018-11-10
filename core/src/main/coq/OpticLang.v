@@ -225,6 +225,9 @@ Definition idFl1 {S : Type} : Fold1 S S :=
 Definition result S A (n : nat) : Type := 
   t A n * (t A n -> S).
 
+Definition nResult {S A} (sig : sigT (result S A)) : nat :=
+  match sig with | existT _ n _ => n end.
+
 Record Traversal S A := mkTraversal
 { extract : S -> sigT (result S A) }.
 
@@ -232,6 +235,17 @@ Arguments mkTraversal [S A].
 Arguments extract [S A].
 
 (* TODO: Combinators for this Traversal representation aren't trivial at all! *)
+
+(* XXX: I was not able to prove this statement, but I think it makes a lot of 
+   sense. Broadly, I think that you can't provide a cartesian combinator for 
+   traversals, but you can provide the horizontal (zip) one, as long as both 
+   traversals have the very same number of foci. Only in this case it's feasible 
+   to implement putAll. *)
+Definition trHorCompose {S A B}
+    (tr1 : Traversal S A) (tr2 : Traversal S B)
+    (pro : forall s, nResult (extract tr1 s) = nResult (extract tr2 s))
+    : Traversal S (A * B).
+Proof. Admitted.
 
 Definition idTr {S : Type} : Traversal S S :=
   mkTraversal (fun s => existT (result S S) 1 (cons S s 0 (nil S), hd)).
@@ -300,6 +314,11 @@ Definition tr1AsFold1 {S A} (tr1 : Traversal1 S A) : Fold1 S A :=
   mkFold1 (fun _ _ f s => match extract1 tr1 s with 
                           | existT _ _ (v, _) => fold1 f (vec1ToNel v)
                           end).
+
+Definition tr1AsTraversal {S A} (tr1 : Traversal1 S A) : Traversal S A :=
+  mkTraversal (fun s => match extract1 tr1 s with
+                        | existT _ _ (v, f) => existT _ _ (v, f)
+                        end).
 
 (* AFFINE TRAVERSAL *)
 
