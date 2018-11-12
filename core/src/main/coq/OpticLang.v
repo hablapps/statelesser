@@ -257,6 +257,13 @@ Definition idTr {S : Type} : Traversal S S :=
 Definition each {S : Type} : Traversal (list S) S :=
   mkTraversal (fun xs => existT _ (length xs) (of_list xs, to_list)).
 
+Definition trAsSetter {S A} (tr : Traversal S A) : Setter S A.
+Proof. Admitted.
+
+Definition trAsFold {S A} (tr : Traversal S A) : Fold S A :=
+  mkFold (fun _ _ _ f s =>
+    match extract tr s with | existT _ _ (v, _) => fold f (to_list v) end).
+
 (* AFFINE FOLD *)
 
 Record AffineFold S A := mkAffineFold
@@ -324,6 +331,10 @@ Record Traversal1 (S A : Type) :=
 { extract1 : S -> sigT (result1 S A) }.
 
 Arguments extract1 [S A].
+
+Definition tr1VerCompose {S A B}
+    (tr1 : Traversal1 S A) (tr2 : Traversal1 A B) : Traversal1 S B.
+Proof. Admitted.
 
 Definition tr1AsFold1 {S A} (tr1 : Traversal1 S A) : Fold1 S A :=
   mkFold1 (fun _ _ f s => match extract1 tr1 s with 
@@ -470,14 +481,123 @@ Definition isoAsPrism {S A} (iso : Iso S A) : Prism S A :=
 Definition idIso {S : Type} : Iso S S :=
   mkIso id id.
 
-(*******************)
-(* COUPLES EXAMPLE *)
-(*******************)
+(* Optic class hierarchy *)
 
-Record Person := mkPerson
-{ name : string
-; age : nat
-}.
+Class AsIso (op : Type -> Type -> Type) :=
+{ asIso : forall {S A}, op S A -> Iso S A }.
+
+Instance isoAsIso : AsIso Iso :=
+{ asIso S A := id }.
+
+Class AsLens (op : Type -> Type -> Type) :=
+{ asLens : forall {S A}, op S A -> Lens S A }.
+
+Instance lnToLens : AsLens Lens :=
+{ asLens S A := id }.
+
+Instance isoToLens `{AsIso op} : AsLens op :=
+{ asLens S A := isoAsLens ∘ asIso }.
+
+Class AsPrism (op : Type -> Type -> Type) :=
+{ asPrism : forall {S A}, op S A -> Prism S A }.
+
+Instance lnToPrism : AsPrism Prism :=
+{ asPrism S A := id }.
+
+Instance isoToPrism `{AsIso op} : AsPrism op :=
+{ asPrism S A := isoAsPrism ∘ asIso }.
+
+Class AsGetter (op : Type -> Type -> Type) :=
+{ asGetter : forall {S A}, op S A -> Getter S A }.
+
+Instance gtToGetter : AsGetter Getter :=
+{ asGetter S A := id }.
+
+Instance lnToGetter `{AsLens op} : AsGetter op :=
+{ asGetter S A := lnAsGetter ∘ asLens }.
+
+Class AsTraversal1 (op : Type -> Type -> Type) :=
+{ asTraversal1 : forall {S A}, op S A -> Traversal1 S A }.
+
+Instance tr1ToTraversal1 : AsTraversal1 Traversal1 :=
+{ asTraversal1 S A := id }.
+
+Instance lnToTraversal1 `{AsLens op} : AsTraversal1 op :=
+{ asTraversal1 S A := lnAsTraversal1 ∘ asLens }.
+
+Class AsAffineTraversal (op : Type -> Type -> Type) :=
+{ asAffineTraversal : forall {S A}, op S A -> AffineTraversal S A }.
+
+Instance atrToAffineTraversal : AsAffineTraversal AffineTraversal :=
+{ asAffineTraversal S A := id }.
+
+Instance lnToAffineTraversal `{AsLens op} : AsAffineTraversal op :=
+{ asAffineTraversal S A := lnAsAffineTraversal ∘ asLens }.
+
+Instance prToAffineTraversal `{AsPrism op} : AsAffineTraversal op :=
+{ asAffineTraversal S A := prAsAffineTraversal ∘ asPrism }.
+
+Class AsFold1 (op : Type -> Type -> Type) :=
+{ asFold1 : forall {S A}, op S A -> Fold1 S A }.
+
+Instance fl1ToFold1 : AsFold1 Fold1 :=
+{ asFold1 S A := id }.
+
+Instance gtToFold1 `{AsGetter op} : AsFold1 op :=
+{ asFold1 S A := gtAsFold1 ∘ asGetter }.
+
+Instance tr1ToFold1 `{AsTraversal1 op} : AsFold1 op :=
+{ asFold1 S A := tr1AsFold1 ∘ asTraversal1 }.
+
+Class AsAffineFold (op : Type -> Type -> Type) :=
+{ asAffineFold : forall {S A}, op S A -> AffineFold S A }.
+
+Instance fl1ToAffineFold : AsAffineFold AffineFold :=
+{ asAffineFold S A := id }.
+
+Instance gtToAffineFold `{AsGetter op} : AsAffineFold op :=
+{ asAffineFold S A := gtAsAffineFold ∘ asGetter }.
+
+Instance atrToAffineFold `{AsAffineTraversal op} : AsAffineFold op :=
+{ asAffineFold S A := atrAsAffineFold ∘ asAffineTraversal }.
+
+Class AsTraversal (op : Type -> Type -> Type) :=
+{ asTraversal : forall {S A}, op S A -> Traversal S A }.
+
+Instance fl1ToTraversal : AsTraversal Traversal :=
+{ asTraversal S A := id }.
+
+Instance atrToTraversal `{AsAffineTraversal op} : AsTraversal op :=
+{ asTraversal S A := atrAsTraversal ∘ asAffineTraversal }.
+
+Instance tr1ToTraversal `{AsTraversal1 op} : AsTraversal op :=
+{ asTraversal S A := tr1AsTraversal ∘ asTraversal1 }.
+
+Class AsSetter (op : Type -> Type -> Type) :=
+{ asSetter : forall {S A}, op S A -> Setter S A }.
+
+Instance stToSetter : AsSetter Setter :=
+{ asSetter S A := id }.
+
+Instance trToSetter `{AsTraversal op} : AsSetter op :=
+{ asSetter S A := trAsSetter ∘ asTraversal }.
+
+Class AsFold (op : Type -> Type -> Type) :=
+{ asFold : forall {S A}, op S A -> Fold S A }.
+
+Instance flToFold : AsFold Fold :=
+{ asFold S A := id }.
+
+Instance fl1ToFold `{AsFold1 op} : AsFold op :=
+{ asFold S A := fl1AsFold ∘ asFold1 }.
+
+Instance trToFold `{AsTraversal op} : AsFold op :=
+{ asFold S A := trAsFold ∘ asTraversal }.
+
+Instance aflToFold `{AsAffineFold op} : AsFold op :=
+{ asFold S A := aflAsFold ∘ asAffineFold }.
+
+(* VERTICAL COMPOSITION *)
 
 Class VerCompose 
   (op1 : Type -> Type -> Type) 
@@ -487,15 +607,62 @@ Class VerCompose
 
 Notation "op1 › op2" := (verCompose op1 op2) (at level 50, left associativity).
 
-Instance trVerComLn : VerCompose Traversal Lens Traversal :=
-{ verCompose S A B (tr : Traversal S A) (ln : Lens A B) :=
-    trVerCompose tr (tr1AsTraversal (lnAsTraversal1 ln))
+Instance isoVerCom `{AsIso op1} `{AsIso op2} : VerCompose op1 op2 Iso :=
+{ verCompose S A B op1 op2 :=
+    isoVerCompose (asIso op1) (asIso op2)
 }.
 
-Instance lnVerComAfl : VerCompose Lens AffineFold AffineFold :=
-{ verCompose S A B (ln : Lens S A) (afl : AffineFold A B) :=
-    aflVerCompose (gtAsAffineFold (lnAsGetter ln)) afl
+Instance lnVerCom `{AsLens op1} `{AsLens op2} : VerCompose op1 op2 Lens :=
+{ verCompose S A B op1 op2 :=
+    lnVerCompose (asLens op1) (asLens op2)
 }.
+
+Instance prVerCom `{AsPrism op1} `{AsPrism op2} : VerCompose op1 op2 Prism :=
+{ verCompose S A B op1 op2 :=
+    prVerCompose (asPrism op1) (asPrism op2)
+}.
+
+Instance gtVerCom `{AsGetter op1} `{AsGetter op2} : VerCompose op1 op2 Getter :=
+{ verCompose S A B op1 op2 :=
+    gtVerCompose (asGetter op1) (asGetter op2)
+}.
+
+Instance tr1VerCom `{AsTraversal1 op1} `{AsTraversal1 op2} : VerCompose op1 op2 Traversal1 :=
+{ verCompose S A B op1 op2 :=
+    tr1VerCompose (asTraversal1 op1) (asTraversal1 op2)
+}.
+
+Instance atrVerCom `{AsAffineTraversal op1} `{AsAffineTraversal op2} : VerCompose op1 op2 AffineTraversal :=
+{ verCompose S A B op1 op2 :=
+    atrVerCompose (asAffineTraversal op1) (asAffineTraversal op2)
+}.
+
+Instance fl1VerCom `{AsFold1 op1} `{AsFold1 op2} : VerCompose op1 op2 Fold1 :=
+{ verCompose S A B op1 op2 :=
+    fl1VerCompose (asFold1 op1) (asFold1 op2)
+}.
+
+Instance aflVerCom `{AsAffineFold op1} `{AsAffineFold op2} : VerCompose op1 op2 AffineFold :=
+{ verCompose S A B op1 op2 :=
+    aflVerCompose (asAffineFold op1) (asAffineFold op2)
+}.
+
+Instance trVerCom `{AsTraversal op1} `{AsTraversal op2} : VerCompose op1 op2 Traversal :=
+{ verCompose S A B op1 op2 :=
+    trVerCompose (asTraversal op1) (asTraversal op2)
+}.
+
+Instance flVerCom `{AsFold op1} `{AsFold op2} : VerCompose op1 op2 Fold :=
+{ verCompose S A B op1 op2 :=
+    flVerCompose (asFold op1) (asFold op2)
+}.
+
+Instance stVerCom `{AsSetter op1} `{AsSetter op2} : VerCompose op1 op2 Setter :=
+{ verCompose S A B op1 op2 :=
+    stVerCompose (asSetter op1) (asSetter op2)
+}.
+
+(* HORIZONTAL COMPOSITION *)
 
 Class HorCompose
   (op1 : Type -> Type -> Type) 
@@ -503,7 +670,11 @@ Class HorCompose
   (res : Type -> Type -> Type) :=
 { horCompose : forall {S A B}, op1 S A -> op2 S B -> res S (prod A B) }.
 
-Notation "op1 ‡ op2" := (horCompose op1 op2) (at level 49, left associativity).
+Notation "op1 ┯ op2" := (horCompose op1 op2) (at level 49, left associativity).
+
+(* TODO: provide instances *)
+
+(* PRODUCT COMPOSITION *)
 
 Class ProdCompose
   (op1 : Type -> Type -> Type) 
@@ -513,32 +684,44 @@ Class ProdCompose
 
 Notation "op1 × op2" := (prodCompose op1 op2) (at level 48, left associativity).
 
-Instance lnProdCompLn : ProdCompose Lens Lens Lens :=
-{ prodCompose S A B (ln1 : Lens S A) (ln2 : Lens S B) := lnHorCompose ln1 ln2
+(* TODO: provide remaining instances *)
+
+Instance lnProdCompLn `{AsLens op1} `{AsLens op2} : ProdCompose op1 op2 Lens :=
+{ prodCompose S A B ln1 ln2 := lnHorCompose (asLens ln1) (asLens ln2)
 }.
 
-Class GetAllAble (op : Type -> Type -> Type) :=
-{ getAll : forall {S A}, op S A -> S -> list A }.
-
-Instance trGetAllAble : GetAllAble Traversal :=
-{ getAll S A tr s :=
-    match extract tr s with | existT _ _ (v, _) => to_list v end
+Instance aflProdCompLn `{AsAffineFold op1} `{AsAffineFold op2} : ProdCompose op1 op2 AffineFold :=
+{ prodCompose S A B afl1 afl2 := aflProCompose (asAffineFold afl1) (asAffineFold afl2)
 }.
 
-Definition getPeople : list Person -> list Person :=
-  getAll each.
+(* ACTIONS *)
 
-Definition nameLn : Lens Person string.
-Proof. Admitted.
+Definition getAll {S A} `{AsFold op} (fl : op S A) : S -> list A :=
+  foldMap (asFold fl) _ _ _ pure.
+
+(*******************)
+(* COUPLES EXAMPLE *)
+(*******************)
+
+Record Person := mkPerson
+{ name : string
+; age : nat
+}.
+
+Definition nameLn : Lens Person string :=
+  mkLens name (fun s => mkPerson s ∘ age).
 
 Definition ageLn : Lens Person nat.
 Proof. Admitted.
 
-Definition nameTr : Traversal (list Person) string :=
-  each › nameLn.
+Definition getPeople : list Person -> list Person :=
+  getAll each.
 
-Definition nameAndAgeLn : Lens Person (string * nat) :=
-  nameLn × ageLn.
+Definition getPeopleName : list Person -> list string :=
+  getAll (each › nameLn).
+
+Definition getPeopleNameAndAge : list Person -> list (string * nat) :=
+  getAll (each › nameLn × ageLn).
 
 Definition nameAndAgeTr : Traversal (list Person) (string * nat) :=
   each › (nameLn × ageLn).
@@ -546,9 +729,28 @@ Definition nameAndAgeTr : Traversal (list Person) (string * nat) :=
 Definition getPeopleAgeAndName : list Person -> list (string * nat) :=
   getAll (each › nameLn × ageLn).
 
-(* TODO *)
 Definition getPeopleGt30 : list Person -> list string :=
   getAll (each › nameLn × (ageLn › filtered' (Nat.ltb 30)) › fstLn).
+
+Definition data : list Person :=
+  mkPerson "Alex" 60 ::
+  mkPerson "Bert" 55 ::
+  mkPerson "Cora" 33 ::
+  mkPerson "Drew" 31 ::
+  mkPerson "Edna" 21 ::
+  mkPerson "Fred" 60 :: List.nil.
+
+Example test1 : getPeople data = data.
+Proof. auto. Qed.
+
+Example test2 : getPeopleName data = List.map name data.
+Proof. auto. Qed.
+
+Example test3 : getPeopleNameAndAge data = List.map (fun p => (name p, age pl)) data.
+Proof. 
+  simpl. 
+  auto. 
+Qed.
 
 (******************************)
 (* Finally, an optic language *)
