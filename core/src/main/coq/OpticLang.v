@@ -25,11 +25,37 @@ Arguments wrap [A].
 Definition unwrap {A} (w : listCart A) : list A :=
   match w with | wrap xs => xs end.
 
+Inductive boolOr : Type :=
+| wrapBool : bool -> boolOr.
+
+Definition unwrapBool (bo : boolOr) : bool :=
+  match bo with | wrapBool b => b end.
+
+Class Eq (A : Type) :=
+{ eqb : A -> A -> bool }.
+
+Notation "a1 == a2" := (eqb a1 a2) (at level 40, left associativity).
+
+Instance stringEq : Eq string :=
+{ eqb s t := if string_dec s t then true else false }.
+
 Class Semigroup (M : Type) :=
 { mappend : M -> M -> M }.
 
 Class Monoid (M : Type) `{Semigroup M} :=
 { mempty : M }.
+
+Instance boolSemigroup : Semigroup bool :=
+{ mappend m1 m2 := m1 && m2 }.
+
+Instance boolMonoid : Monoid bool :=
+{ mempty := true }.
+
+Instance boolOrSemigroup : Semigroup boolOr :=
+{ mappend m1 m2 := wrapBool (unwrapBool m1 || unwrapBool m2) }.
+
+Instance boolOrMonoid : Monoid boolOr :=
+{ mempty := wrapBool false }.
 
 Instance listSemigroup {A : Type} : Semigroup (list A) :=
 { mappend m1 m2 := m1 ++ m2 }.
@@ -715,6 +741,15 @@ Definition getAll {S A} `{AsFold op} (fl : op S A) : S -> list A :=
 Definition getHead {S A} `{AsFold op} (fl : op S A) : S -> option A :=
   fun s => List.hd_error (getAll fl s).
 
+Definition all {S A} `{AsFold op} (fl : op S A) (f : A -> bool) : S -> bool :=
+  foldMap (asFold fl) _ _ _ f. 
+
+Definition any {S A} `{AsFold op} (fl : op S A) (f : A -> bool) : S -> bool :=
+  unwrapBool ∘ foldMap (asFold fl) _ _ _ (wrapBool ∘ f).
+
+Definition contains {S A} `{AsFold op} `{Eq A} (fl : op S A) (a : A) : S -> bool :=
+  any fl (eqb a).
+
 (*******************)
 (* COUPLES EXAMPLE *)
 (*******************)
@@ -773,11 +808,8 @@ Definition nat_in_range (x y n : nat) : bool :=
 Definition rangeFl (x y : nat) : Fold (list Person) string :=
   each › nameLn × (ageLn › filtered (nat_in_range x y)) › fstLn.
 
-Definition eq_string (s t : string) : bool :=
-  if string_dec s t then true else false.
-
 Definition getAgeFl (s : string) : Fold (list Person) nat :=
-  each › (nameLn › filtered (eq_string s)) × ageLn › sndLn.
+  each › (nameLn › filtered (eqb s)) × ageLn › sndLn.
 
 Definition compose (s t : string) (xs : list Person) : list string :=
   option_fold 
@@ -832,6 +864,57 @@ Proof. auto. Qed.
 Example test9 : compose "Edna" "Bert" people = 
   (* XXX: almost there! It seems order is reversed somewhere... Therefore rev *)
   List.rev ("Edna" :: "Drew" :: "Cora" :: List.nil).
+Proof. auto. Qed.
+
+(* Department example *)
+
+Definition Task : Type := string.
+
+Record Employee := mkEmployee
+{ emp : string
+; tasks : list Task
+}.
+
+Record Department := mkDepartment
+{ dpt : string
+; employees : list Employee
+}.
+
+Definition NestedOrg := list Department.
+
+Definition empGt : Getter Employee string :=
+  mkGetter emp.
+
+Definition tasksGt : Getter Employee (list Task) :=
+  mkGetter tasks.
+
+Definition dptGt : Getter Department string :=
+  mkGetter dpt.
+
+Definition employeesGt : Getter Department (list Employee) :=
+  mkEmployees employees.
+
+Definition expertise (tsk : Task) : NestedOrg -> list string :=
+  getAll (each › 
+    filtered' (asGetter employeesLn) (all each (contains (tasksLn › each) tsk)) ›
+    dptLn).
+
+Definition alex' := mkEmployee "Alex" ("build" :: List.nil).
+Definition bert' := mkEmployee "Bert" ("build" :: List.nil).
+Definition cora' := mkEmployee "Cora" ("abstract" :: "build" :: "design" :: List.nil).
+Definition drew' := mkEmployee "Drew" ("abstract" :: "design" :: List.nil).
+Definition edna' := mkEmployee "Edna" ("abstract" :: "call" :: List.nil).
+Definition fred' := mkEmployee "Fred" ("call" :: List.nil).
+
+Definition product := mkDepartment "Product" (alex' :: bert' :: List.nil).
+Definition research := mkDepartment "Research" (cora' :: drew' :: edna' :: List.nil).
+Definition sales := mkDepartment "Sales" (fred' :: List.nil).
+Definition quality := mkDepartment "Quality" List.nil.
+
+Definition org : NestedOrg :=
+  product :: research :: sales :: quality :: List.nil.
+
+Example test10 : expertise "abstract" org = "Research" :: "Quality" :: List.nil.
 Proof. auto. Qed.
 
 (******************************)
