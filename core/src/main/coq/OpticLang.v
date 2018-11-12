@@ -892,12 +892,11 @@ Definition dptGt : Getter Department string :=
   mkGetter dpt.
 
 Definition employeesGt : Getter Department (list Employee) :=
-  mkEmployees employees.
+  mkGetter employees.
 
 Definition expertise (tsk : Task) : NestedOrg -> list string :=
   getAll (each › 
-    filtered' (asGetter employeesLn) (all each (contains (tasksLn › each) tsk)) ›
-    dptLn).
+    filtered' employeesGt (all each (contains (tasksGt › each) tsk)) › dptGt).
 
 Definition alex' := mkEmployee "Alex" ("build" :: List.nil).
 Definition bert' := mkEmployee "Bert" ("build" :: List.nil).
