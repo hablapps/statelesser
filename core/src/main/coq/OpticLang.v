@@ -5,6 +5,7 @@ Require Import Coq.Lists.List.
 Require Import Coq.Vectors.VectorDef.
 Require Import Coq.Arith.PeanoNat.
 Require Import Coq.Init.Logic.
+Require Import Coq.Bool.Bool.
 Require Import Coq.Logic.FunctionalExtensionality.
 
 Open Scope program_scope.
@@ -670,9 +671,14 @@ Class HorCompose
   (res : Type -> Type -> Type) :=
 { horCompose : forall {S A B}, op1 S A -> op2 S B -> res S (prod A B) }.
 
-Notation "op1 ┯ op2" := (horCompose op1 op2) (at level 49, left associativity).
+(* digraph: 2h *)
+Notation "op1 ⑂ op2" := (horCompose op1 op2) (at level 49, left associativity).
 
-(* TODO: provide instances *)
+(* TODO: provide remaining instances *)
+
+Instance flHorComp `{AsFold op1} `{AsFold op2} : HorCompose op1 op2 Fold :=
+{ horCompose S A B fl1 fl2 := flHorCompose (asFold fl1) (asFold fl2)
+}.
 
 (* PRODUCT COMPOSITION *)
 
@@ -686,11 +692,11 @@ Notation "op1 × op2" := (prodCompose op1 op2) (at level 48, left associativity)
 
 (* TODO: provide remaining instances *)
 
-Instance lnProdCompLn `{AsLens op1} `{AsLens op2} : ProdCompose op1 op2 Lens :=
+Instance lnProdComp `{AsLens op1} `{AsLens op2} : ProdCompose op1 op2 Lens :=
 { prodCompose S A B ln1 ln2 := lnHorCompose (asLens ln1) (asLens ln2)
 }.
 
-Instance aflProdCompLn `{AsAffineFold op1} `{AsAffineFold op2} : ProdCompose op1 op2 AffineFold :=
+Instance aflProdComp `{AsAffineFold op1} `{AsAffineFold op2} : ProdCompose op1 op2 AffineFold :=
 { prodCompose S A B afl1 afl2 := aflProCompose (asAffineFold afl1) (asAffineFold afl2)
 }.
 
@@ -699,20 +705,40 @@ Instance aflProdCompLn `{AsAffineFold op1} `{AsAffineFold op2} : ProdCompose op1
 Definition getAll {S A} `{AsFold op} (fl : op S A) : S -> list A :=
   foldMap (asFold fl) _ _ _ pure.
 
+Check List.hd_error.
+
+Definition getHead {S A} `{AsFold op} (fl : op S A) : S -> option A :=
+  fun s => List.hd_error (getAll fl s).
+
 (*******************)
 (* COUPLES EXAMPLE *)
 (*******************)
+
+(* Data layer *)
 
 Record Person := mkPerson
 { name : string
 ; age : nat
 }.
 
+Record Couple := mkCouple
+{ her : Person
+; him : Person
+}.
+
 Definition nameLn : Lens Person string :=
   mkLens name (fun s => mkPerson s ∘ age).
 
-Definition ageLn : Lens Person nat.
-Proof. Admitted.
+Definition ageLn : Lens Person nat :=
+  mkLens age (fun n p => mkPerson (name p) n).
+
+Definition herLn : Lens Couple Person :=
+  mkLens her (fun p => mkCouple p ∘ him).
+
+Definition himLn : Lens Couple Person :=
+  mkLens him (fun p c => mkCouple (her c) p).
+
+(* Logic *)
 
 Definition getPeople : list Person -> list Person :=
   getAll each.
@@ -723,34 +749,85 @@ Definition getPeopleName : list Person -> list string :=
 Definition getPeopleNameAndAge : list Person -> list (string * nat) :=
   getAll (each › nameLn × ageLn).
 
-Definition nameAndAgeTr : Traversal (list Person) (string * nat) :=
-  each › (nameLn × ageLn).
-
-Definition getPeopleAgeAndName : list Person -> list (string * nat) :=
-  getAll (each › nameLn × ageLn).
-
 Definition getPeopleGt30 : list Person -> list string :=
-  getAll (each › nameLn × (ageLn › filtered' (Nat.ltb 30)) › fstLn).
+  getAll (each › nameLn × (ageLn › filtered' (Nat.leb 30)) › fstLn).
 
-Definition data : list Person :=
-  mkPerson "Alex" 60 ::
-  mkPerson "Bert" 55 ::
-  mkPerson "Cora" 33 ::
-  mkPerson "Drew" 31 ::
-  mkPerson "Edna" 21 ::
-  mkPerson "Fred" 60 :: List.nil.
+Definition getPeopleGt30' : list Person -> list string :=
+  getAll (each › nameLn × ageLn › filtered (asGetter sndLn) (Nat.leb 30) › fstLn).
 
-Example test1 : getPeople data = data.
+Definition subGt : Getter (nat * nat) nat := 
+  mkGetter (fun ab => match ab with | (a, b) => a - b end).
+
+Definition difference : list Couple -> list (string * nat) :=
+  getAll (each › (herLn › nameLn) × 
+    ((herLn › ageLn) × (himLn › ageLn) › subGt › filtered' (Nat.ltb 0))).
+
+Definition nat_in_range (x y n : nat) : bool :=
+  Nat.leb x n && Nat.ltb n y.
+
+Definition rangeFl (x y : nat) : Fold (list Person) string :=
+  each › nameLn × (ageLn › filtered' (nat_in_range x y)) › fstLn.
+
+Definition eq_string (s t : string) : bool :=
+  if string_dec s t then true else false.
+
+Definition getAgeFl (s : string) : Fold (list Person) nat :=
+  each › (nameLn › filtered' (eq_string s)) × ageLn › sndLn.
+
+Definition compose (s t : string) (xs : list Person) : list string :=
+  option_fold 
+    (fun xy => match xy with | (x, y) => getAll (rangeFl x y) xs end) 
+    List.nil 
+    (getHead (getAgeFl s ⑂ getAgeFl t) xs).
+
+(* Test *)
+
+Open Scope string_scope.
+
+Definition alex := mkPerson "Alex" 60.
+Definition bert := mkPerson "Bert" 55.
+Definition cora := mkPerson "Cora" 33.
+Definition drew := mkPerson "Drew" 31.
+Definition edna := mkPerson "Edna" 21.
+Definition fred := mkPerson "Fred" 60.
+
+Definition people : list Person :=
+  alex :: bert :: cora :: drew :: edna :: fred :: List.nil.
+
+Definition couples : list Couple :=
+  mkCouple alex bert ::
+  mkCouple cora drew ::
+  mkCouple edna fred :: List.nil.
+
+Example test1 : getPeople people = people.
 Proof. auto. Qed.
 
-Example test2 : getPeopleName data = List.map name data.
+Example test2 : getPeopleName people = List.map name people.
 Proof. auto. Qed.
 
-Example test3 : getPeopleNameAndAge data = List.map (fun p => (name p, age pl)) data.
-Proof. 
-  simpl. 
-  auto. 
-Qed.
+Example test3 : getPeopleNameAndAge people = List.map (fun p => (name p, age p)) people.
+Proof. auto. Qed.
+
+Example test4 : 
+  getPeopleGt30 people = "Alex" :: "Bert" :: "Cora" :: "Drew" :: "Fred" :: List.nil.
+Proof. auto. Qed.
+
+Example test5 : getPeopleGt30 people = getPeopleGt30' people.
+Proof. auto. Qed.
+
+Example test6 : difference couples = ("Alex", 5) :: ("Cora", 2) :: List.nil.
+Proof. auto. Qed.
+
+Example test7 : getAll (rangeFl 30 40) people = "Cora" :: "Drew" :: List.nil.
+Proof. auto. Qed.
+
+Example test8 : getHead (getAgeFl "Alex") people = Some 60.
+Proof. auto. Qed.
+
+Example test9 : compose "Edna" "Bert" people = 
+  (* XXX: almost there! It seems order is reversed somewhere... Therefore rev *)
+  List.rev ("Edna" :: "Drew" :: "Cora" :: List.nil).
+Proof. auto. Qed.
 
 (******************************)
 (* Finally, an optic language *)
