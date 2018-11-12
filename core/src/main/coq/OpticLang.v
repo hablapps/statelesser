@@ -277,7 +277,9 @@ Definition aflVerCompose {S A B}
     (af1 : AffineFold S A) (af2 : AffineFold A B) : AffineFold S B :=
   mkAffineFold (fun s => afold af1 s >>= (fun a => afold af2 a)).
 
-Definition aflProCompose {S A B}
+(* Both product and horizontal are equivalent *)
+
+Definition aflHorCompose {S A B}
     (af1 : AffineFold S A) (af2 : AffineFold S B) : AffineFold S (A * B) :=
   mkAffineFold (fun s => tupled (afold af1 s) (afold af2 s)).
 
@@ -317,24 +319,29 @@ Definition idGt {S : Type} : Getter S S :=
 
 (* XXX: the gt parameter is not standard in optics but it's practical to deal
    with product types. *)
-Definition filtered {S A} (gt : Getter S A) (p : A -> bool) : AffineFold S S :=
+Definition filtered' {S A} (gt : Getter S A) (p : A -> bool) : AffineFold S S :=
   mkAffineFold (fun s => if p (view gt s) then Some s else None).
 
-Definition filtered' {S} (p : S -> bool) : AffineFold S S :=
-  filtered idGt p.
+Definition filtered {S} (p : S -> bool) : AffineFold S S :=
+  filtered' idGt p.
 
 (* TRAVERSAL1 *)
 
 Definition result1 T A (n : nat) : Type :=
   t A (S n) * (t A (S n) -> T).
 
-Record Traversal1 (S A : Type) :=
+Record Traversal1 (S A : Type) := mkTraversal1
 { extract1 : S -> sigT (result1 S A) }.
 
+Arguments mkTraversal1 [S A].
 Arguments extract1 [S A].
 
 Definition tr1VerCompose {S A B}
     (tr1 : Traversal1 S A) (tr2 : Traversal1 A B) : Traversal1 S B.
+Proof. Admitted.
+
+Definition tr1HorCompose {S A B}
+    (tr1 : Traversal1 S A) (tr2 : Traversal1 S B) : Traversal1 S (A * B).
 Proof. Admitted.
 
 Definition tr1AsFold1 {S A} (tr1 : Traversal1 S A) : Fold1 S A :=
@@ -407,9 +414,9 @@ Definition lnAsGetter {S A} (ln : Lens S A) : Getter S A :=
 Definition lnAsAffineTraversal {S A} (ln : Lens S A) : AffineTraversal S A :=
   mkAffineTraversal (Some ∘ get ln) (put ln). 
 
-(* TODO *)
-Definition lnAsTraversal1 {S A} (ln : Lens S A) : Traversal1 S A.
-Proof. Admitted.
+Definition lnAsTraversal1 {S A} (ln : Lens S A) : Traversal1 S A :=
+  mkTraversal1 (fun s => 
+    existT _ _ (cons _ (get ln s) _ (nil _), fun v => put ln (hd v) s)).
 
 Definition idLn {S : Type} : Lens S S :=
   mkLens id Basics.const.
@@ -436,7 +443,7 @@ Definition prVerCompose {S A B}
   mkPrism (fun s => peek pr1 s >>= peek pr2) (build pr1 ∘build pr2).
 
 (* XXX: can't compose prisms horizontally! Notice how building, though possible, 
- * makes no sense, because we would ignore one of the building methods.
+ * is lossy, because we would ignore one of the building methods.
  * 
  * Definition prHorCompose {S A B}
  *     (pr1 : Prism S A) (pr2 : Prism S B) : Prism S (A * B) :=
@@ -697,15 +704,13 @@ Instance lnProdComp `{AsLens op1} `{AsLens op2} : ProdCompose op1 op2 Lens :=
 }.
 
 Instance aflProdComp `{AsAffineFold op1} `{AsAffineFold op2} : ProdCompose op1 op2 AffineFold :=
-{ prodCompose S A B afl1 afl2 := aflProCompose (asAffineFold afl1) (asAffineFold afl2)
+{ prodCompose S A B afl1 afl2 := aflHorCompose (asAffineFold afl1) (asAffineFold afl2)
 }.
 
 (* ACTIONS *)
 
 Definition getAll {S A} `{AsFold op} (fl : op S A) : S -> list A :=
   foldMap (asFold fl) _ _ _ pure.
-
-Check List.hd_error.
 
 Definition getHead {S A} `{AsFold op} (fl : op S A) : S -> option A :=
   fun s => List.hd_error (getAll fl s).
@@ -750,29 +755,29 @@ Definition getPeopleNameAndAge : list Person -> list (string * nat) :=
   getAll (each › nameLn × ageLn).
 
 Definition getPeopleGt30 : list Person -> list string :=
-  getAll (each › nameLn × (ageLn › filtered' (Nat.leb 30)) › fstLn).
+  getAll (each › nameLn × (ageLn › filtered (Nat.leb 30)) › fstLn).
 
 Definition getPeopleGt30' : list Person -> list string :=
-  getAll (each › nameLn × ageLn › filtered (asGetter sndLn) (Nat.leb 30) › fstLn).
+  getAll (each › nameLn × ageLn › filtered' (asGetter sndLn) (Nat.leb 30) › fstLn).
 
 Definition subGt : Getter (nat * nat) nat := 
   mkGetter (fun ab => match ab with | (a, b) => a - b end).
 
 Definition difference : list Couple -> list (string * nat) :=
   getAll (each › (herLn › nameLn) × 
-    ((herLn › ageLn) × (himLn › ageLn) › subGt › filtered' (Nat.ltb 0))).
+    ((herLn › ageLn) × (himLn › ageLn) › subGt › filtered (Nat.ltb 0))).
 
 Definition nat_in_range (x y n : nat) : bool :=
   Nat.leb x n && Nat.ltb n y.
 
 Definition rangeFl (x y : nat) : Fold (list Person) string :=
-  each › nameLn × (ageLn › filtered' (nat_in_range x y)) › fstLn.
+  each › nameLn × (ageLn › filtered (nat_in_range x y)) › fstLn.
 
 Definition eq_string (s t : string) : bool :=
   if string_dec s t then true else false.
 
 Definition getAgeFl (s : string) : Fold (list Person) nat :=
-  each › (nameLn › filtered' (eq_string s)) × ageLn › sndLn.
+  each › (nameLn › filtered (eq_string s)) × ageLn › sndLn.
 
 Definition compose (s t : string) (xs : list Person) : list string :=
   option_fold 
