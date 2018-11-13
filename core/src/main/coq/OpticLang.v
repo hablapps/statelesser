@@ -733,6 +733,10 @@ Instance aflProdComp `{AsAffineFold op1} `{AsAffineFold op2} : ProdCompose op1 o
 { prodCompose S A B afl1 afl2 := aflHorCompose (asAffineFold afl1) (asAffineFold afl2)
 }.
 
+Instance flProdComp `{AsFold op1} `{AsFold op2} : ProdCompose op1 op2 Fold :=
+{ prodCompose S A B fl1 fl2 := flProCompose (asFold fl1) (asFold fl2)
+}.
+
 (* ACTIONS *)
 
 Definition getAll {S A} `{AsFold op} (fl : op S A) : S -> list A :=
@@ -882,21 +886,23 @@ Record Department := mkDepartment
 
 Definition NestedOrg := list Department.
 
-Definition empGt : Getter Employee string :=
-  mkGetter emp.
-
-Definition tasksGt : Getter Employee (list Task) :=
-  mkGetter tasks.
-
-Definition dptGt : Getter Department string :=
-  mkGetter dpt.
-
-Definition employeesGt : Getter Department (list Employee) :=
-  mkGetter employees.
+Definition empGt := mkGetter emp.
+Definition tasksGt := mkGetter tasks.
+Definition dptGt := mkGetter dpt.  
+Definition employeesGt := mkGetter employees.
 
 Definition expertise (tsk : Task) : NestedOrg -> list string :=
-  getAll (each › 
-    filtered' employeesGt (all each (contains (tasksGt › each) tsk)) › dptGt).
+  getAll (each › filtered' employeesGt (
+    all each (contains (tasksGt › each) tsk)) › dptGt).
+
+Definition employeeDepartment : NestedOrg -> list (string * string) :=
+  getAll (each › dptGt × (employeesGt › each › empGt)).
+
+(* Notice how this version is a cartesian product among all departments and all
+ * employees.
+ *)
+Definition employeeDepartment' : NestedOrg -> list (string * string) :=
+  getAll ((each › dptGt) × (each › employeesGt › each › empGt)).
 
 Definition alex' := mkEmployee "Alex" ("build" :: List.nil).
 Definition bert' := mkEmployee "Bert" ("build" :: List.nil).
@@ -914,6 +920,15 @@ Definition org : NestedOrg :=
   product :: research :: sales :: quality :: List.nil.
 
 Example test10 : expertise "abstract" org = "Research" :: "Quality" :: List.nil.
+Proof. auto. Qed.
+
+Example test11 : employeeDepartment org =
+  ("Product", "Alex") :: 
+    ("Product", "Bert") :: 
+    ("Research", "Cora") :: 
+    ("Research", "Drew") :: 
+    ("Research", "Edna") :: 
+    ("Sales", "Fred") :: List.nil.
 Proof. auto. Qed.
 
 (******************************)
