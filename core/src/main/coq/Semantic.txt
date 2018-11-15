@@ -108,3 +108,24 @@ J. each › name × age › filtered fst (=L) › filtered snd (>30) › fst
 10. each ~> {each} {}
 11. 10 › 9 ~> {each › name} {(each › name, (=L)), (each › age, (>30))} 
 
+
+
+K. each › (her › name) × ((her › age) × (him › age) › sub › filtered (>0))
+
+1. name ~> {name} {}
+2. her ~> {her} {}
+3. 2 › 1 ~> {her › name} {}
+4. filtered (>0) ~> {} {(>0)}
+5. sub ~> {sub} {}
+6. 5 › 4 ~> {sub} {(sub, (>0))}
+7. age ~> {age} {}
+8. 2 › 7 ~> {her › age} {}
+9. him ~> {him} {}
+10. 9 › 7 ~> {him › age} {}
+11. 8 × 10 ~> {her › age, him › age} {}
+12. 11 › 6 ~> {her › age - him › age} {(her › age - him › age, (>0))}
+13. 3 × 12 ~> {her › name, her › age - him › age} {(her › age - him › age, (>0))}
+14. each ~> {each} {}
+15. 14 › 13 ~> {each › her › name, each › (her › age - him › age)} 
+               {(each › (her › age - him › age), (>0))}
+
