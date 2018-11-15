@@ -1,0 +1,110 @@
+A. each
+
+1. each ~> {each} {}
+
+
+B. each › name
+
+1. name ~> {name} {}
+2. each ~> {each} {}
+3. 2 › 1 ~> {each › name} {}
+
+
+C. each › name × age
+
+1. name ~> {name} {}
+2. age ~> {age} {}
+3. 1 × 2 ~> {name, age} {}
+4. each ~> {each} {}
+5. 4 › 3 ~> {each › name, each › age} {}
+
+
+D. each › name × (age › filtered (>30))
+
+1. name ~> {name} {}
+2. age ~> {age} {}
+3. filtered (>30) ~> {} {(>30)}
+4. 2 › 3 ~> {age} {(age, (>30)}
+5. 1 × 4 ~> {name, age} {(age, (>30))}
+
+
+E. each › name × age › fst
+
+1. fst ~> {fst} {}
+2. name ~> {name} {}
+3. age ~> {age} {}
+4. 2 × 3 ~> {name, age} {}
+5. 4 › 1 ~> {name} {}
+6. each ~> {each} {}
+7. 6 › 5 ~> {each › name} {}
+
+
+F. each › name × (age › filtered (>30)) › fst
+
+1. fst ~> {fst} {}
+2. name ~> {name} {}
+3. filtered (>30) ~> {} {(>30)}
+4. age ~> {age} {}
+5. 4 › 3 ~> {age} {(age, (>30)}
+6. 2 × 5 ~> {name, age} {(age, (>30)}
+7. each ~> {each} {}
+8. 7 › 6 ~> {each › name, each › age} {(each › age, (>30))}
+
+
+G. each › (name › filtered (=J)) × (age › filtered (>30))
+
+1. filtered (>30) ~> {} {(>30)}
+2. age ~> {age} {}
+3. 2 › 1 ~> {age} {(age, (>30)}
+4. name ~> {name} {}
+5. filtered (=J) ~> {} {(=J)}
+6. 4 › 5 ~> {name} {(name, (=J))}
+7. 6 × 3 ~> {name, age} {(name, (=J)), (age, (>30))}
+8. each ~> {each} {}
+9. 8 › 7 ~> {each › name, each › age} {(each › name, (=J)), (each › age, (>30))}
+
+
+H. each › name × (age › filtered (>30)) › fst › filtered (=L)
+
+1. filtered (=L) ~> {} {(=L)}
+2. fst ~> {fst} {}
+3. name ~> {name} {}
+4. filtered (>30) ~> {} {(>30)}
+5. age ~> {age} {}
+6. 5 › 4 ~> {age} {(age, (>30))}
+7. 3 × 6 ~> {name, age} {(age, (>30)}
+8. 2 › 1 ~> {fst} {(fst, (=L)}
+9. 7 › 8 ~> {name} {(age, (>30)), (name, (=L))}
+10. each ~> {each} {}
+11. 10 › 9 ~> {each › name} {(each › age, (>30)), (each › name, (=L))}
+
+
+I. each › (name › filtered (=L)) × age › filtered snd (>30) › fst
+
+1. fst ~> {fst} {}
+2. filtered snd (>30) ~> {} {(snd, (>30))}
+3. filtered (=L) ~> {} {(=L)}
+4. name ~> {name} {}
+5. 4 › 3 ~> {name} {(name, (=L))}
+6. age ~> {age} {}
+7. 5 × 6 ~> {name, age} {(name, (=L))}
+8. 2 › 1 ~> {fst} {(snd, (>30))}
+9. 7 › 8 ~> {name} {(name, (=L)), (age, (>30))}
+10. each ~> {each} {}
+11. 10 › 9 ~> {each › name} {(each › name, (=L)), (each › age, (>30))}
+
+
+J. each › name × age › filtered fst (=L) › filtered snd (>30) › fst
+
+1. fst ~> {fst} {}
+2. filtered snd (>30) ~> {} {(snd, (>30))}
+3. 2 › 1 ~> {fst} {(snd, (>30))}
+4. filtered fst (=L) ~> {} {(fst, (=L))}
+5. 4 › 3 ~> {fst} {(fst, (=L)), (snd, (>30))}
+6. name ~> {name} {}
+7. age ~> {age} {}
+8. 6 × 7 ~> {name, age} {}
+9. 8 › 5 ~> {name} {(name, (=L)), (age, (>30))}
+10. each ~> {each} {}
+11. 10 › 9 ~> {each › name} {(each › name, (=L)), (each › age, (>30))} 
+

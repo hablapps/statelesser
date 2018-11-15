@@ -644,6 +644,9 @@ Definition getPeopleGt30 : list Person -> list string :=
 Definition getPeopleGt30' : list Person -> list string :=
   getAll (each › nameLn × ageLn › filtered' (asGetter sndLn) (Nat.leb 30) › fstLn).
 
+Definition getPeopleGt30'' : list Person -> list string :=
+  getAll (each › filtered' (asGetter ageLn) (Nat.leb 30) › nameLn).
+
 Definition subGt : Getter (nat * nat) nat := 
   mkGetter (fun ab => match ab with | (a, b) => a - b end).
 
@@ -656,6 +659,9 @@ Definition nat_in_range (x y n : nat) : bool :=
 
 Definition rangeFl (x y : nat) : Fold (list Person) string :=
   each › nameLn × (ageLn › filtered (nat_in_range x y)) › fstLn.
+
+Definition rangeFl' (x y : nat) : Fold (list Person) string :=
+  each › filtered' (asGetter ageLn) (nat_in_range x y) › nameLn.
 
 Definition getAgeFl (s : string) : Fold (list Person) nat :=
   each › (nameLn › filtered (eqb s)) × ageLn › sndLn.

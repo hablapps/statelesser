@@ -50,10 +50,6 @@ Class OpticLang (expr : Type -> Type) :=
     expr (Traversal S A) -> expr (Traversal S B) -> expr (Traversal S (A * B))
 ; trComposeVerti : forall {S A B : Type},
     expr (Traversal S A) -> expr (Traversal A B) -> expr (Traversal S B)
-; trComposeHorizL : forall {S A B : Type},
-    expr (Traversal S A) -> expr (Traversal S B) -> expr (Traversal S (A * option B))
-; trComposeHorizR : forall {S A B : Type},
-    expr (Traversal S A) -> expr (Traversal S B) -> expr (Traversal S (option A * B))
 ; unsafeFiltered : forall {S A : Type},
     expr (Getter S A) -> expr (A -> Prop) -> expr (Traversal S S)
 
