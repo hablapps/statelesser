@@ -654,6 +654,13 @@ Definition difference : list Couple -> list (string * nat) :=
   getAll (each › (herLn › nameLn) × 
     ((herLn › ageLn) × (himLn › ageLn) › subGt › filtered (Nat.ltb 0))).
 
+Definition difference' : list Couple -> list (string * nat) :=
+  let c := each in
+  let w := c › her in
+  let m := c › him in
+  let diff := (w › ageLn) × (m › ageLn) › subGt in
+  getAll (c › filtered' diff (Nat.ltb 0) › (w › nameLn) × diff).
+
 Definition nat_in_range (x y n : nat) : bool :=
   Nat.leb x n && Nat.ltb n y.
 
@@ -708,6 +715,9 @@ Example test5 : getPeopleGt30 people = getPeopleGt30' people.
 Proof. auto. Qed.
 
 Example test6 : difference couples = ("Alex", 5) :: ("Cora", 2) :: List.nil.
+Proof. auto. Qed.
+
+Example test6_2 : difference couples = difference' couples.
 Proof. auto. Qed.
 
 Example test7 : getAll (rangeFl 30 40) people = "Cora" :: "Drew" :: List.nil.
