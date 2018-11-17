@@ -101,8 +101,6 @@ object VerticalCompose extends VerticalCompose1 {
       def apply[S, A, B](l: L[S, A], r: R[A, B]): Out[S, B] = ???
     }
 
-
-
   trait Syntax {
 
     implicit class VerticalOps[L[_, _], S, A](l: L[S, A]) {
