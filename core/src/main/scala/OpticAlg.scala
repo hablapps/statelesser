@@ -1,131 +1,83 @@
 package org.hablapps.statelesser
 
-import monocle._
+trait OpticAlg[Expr[_]] {
 
-trait OpticAlg[Expr[_], Obs[_]] {
+  def flVert[S, A, B](
+    l: Expr[Fold[S, A]], 
+    r: Expr[Fold[A, B]]): Expr[Fold[S, B]]
 
-  def point[A](a: A): Expr[A]
+  def gtHori[S, A, B](
+    l: Expr[Getter[S, A]],
+    r: Expr[Getter[S, B]]): Expr[Getter[S, (A, B)]]
 
-  def lens[S, A](
-    ln: Lens[S, A], 
-    tab: String,
-    att: String): Expr[Lens[S, A]]
+  def getAll[S, A](fl: Expr[Fold[S, A]]): Expr[S => List[A]]
 
-  def traversal[S, A](
-    tr: Traversal[S, A], 
-    tab: String): Expr[Traversal[S, A]]
+  def lnAsGt[S, A](ln: Expr[Lens[S, A]]): Expr[Getter[S, A]]
 
-  def lensComposeLens[S, A, B](
-    ln1: Expr[Lens[S, A]], 
-    ln2: Expr[Lens[A, B]]): Expr[Lens[S, B]]
+  def gtAsFl1[S, A](gt: Expr[Getter[S, A]]): Expr[Fold1[S, A]]
 
-  def lensComposeTraversal[S, A, B](
-    ln: Expr[Lens[S, A]],
-    tr: Expr[Traversal[A, B]]): Expr[Traversal[S, B]]
-
-  def traversalComposeLens[S, A, B](
-    tr: Expr[Traversal[S, A]],
-    ln: Expr[Lens[A, B]]): Expr[Traversal[S, B]]
-
-  def traversalComposeTraversal[S, A, B](
-    tr1: Expr[Traversal[S, A]],
-    tr2: Expr[Traversal[A, B]]): Expr[Traversal[S, B]]
-
-  def lensHorizComposeLens[S, A, B](
-    ln1: Expr[Lens[S, A]],
-    ln2: Expr[Lens[S, B]]): Expr[Lens[S, (A, B)]]
-
-  def lensAsFold[S, A](
-    ln: Expr[Lens[S, A]]): Expr[Fold[S, A]]
-
-  def traversalAsFold[S, A](
-    tr: Expr[Traversal[S, A]]): Expr[Fold[S, A]]
-
-  def foldWithFilter[S, A, B](
-    fl: Expr[Fold[S, A]],
-    f: Expr[A => B]): Expr[Fold[S, B]]
-
-  def fun[A, B](f: Expr[A] => Expr[B]): Expr[A => B]
-
-  def app[A, B](f: Expr[A => B], a: Expr[A]): Expr[B]
-
-  def traversalGetAll[S, A](
-    tr: Expr[Traversal[S, A]]): Obs[S => List[A]]
+  def fl1AsFl[S, A](fl1: Expr[Fold1[S, A]]): Expr[Fold[S, A]]
 }
 
 object OpticAlg {
 
-  def apply[Expr[_], Obs[_]](
-    implicit alg: OpticAlg[Expr, Obs]): OpticAlg[Expr, Obs] = alg
+  trait Semantic  
 
   trait Syntax {
 
-    def point[Expr[_], Obs[_]: OpticAlg[Expr, ?[_]], A](a: A): Expr[A] =
-      OpticAlg[Expr, Obs].point(a)
+    implicit class FoldOps[Expr[_], S, A](
+        l: Expr[Fold[S, A]])(implicit 
+        O: OpticAlg[Expr]) {
+      def >[B](r: Expr[Fold[A, B]]): Expr[Fold[S, B]] = O.flVert(l, r)
+    }
 
-    def lens[Expr[_], Obs[_]: OpticAlg[Expr, ?[_]], S, A](
-        ln: Lens[S, A],
-        tab: String,
-        att: String): Expr[Lens[S, A]] =
-      OpticAlg[Expr, Obs].lens(ln, tab, att)
+    implicit class Fold1Ops[Expr[_], S, A](
+        l: Expr[Fold1[S, A]])(implicit
+        O: OpticAlg[Expr]) {
+      def asFold: Expr[Fold[S, A]] = O.fl1AsFl(l)
+    }
 
-    def traversal[Expr[_], Obs[_]: OpticAlg[Expr, ?[_]], S, A](
-        tr: Traversal[S, A],
-        tab: String): Expr[Traversal[S, A]] =
-      OpticAlg[Expr, Obs].traversal(tr, tab)
-
-    def lensComposeLens[Expr[_], Obs[_]: OpticAlg[Expr, ?[_]], S, A, B](
-        ln1: Expr[Lens[S, A]], 
-        ln2: Expr[Lens[A, B]]): Expr[Lens[S, B]] = 
-      OpticAlg[Expr, Obs].lensComposeLens(ln1, ln2)
-
-    def lensComposeTraversal[Expr[_], Obs[_]: OpticAlg[Expr, ?[_]], S, A, B](
-        ln: Expr[Lens[S, A]],
-        tr: Expr[Traversal[A, B]]): Expr[Traversal[S, B]] =
-      OpticAlg[Expr, Obs].lensComposeTraversal(ln, tr)
-
-    def traversalComposeLens[Expr[_], Obs[_]: OpticAlg[Expr, ?[_]], S, A, B](
-        tr: Expr[Traversal[S, A]],
-        ln: Expr[Lens[A, B]]): Expr[Traversal[S, B]] =
-      OpticAlg[Expr, Obs].traversalComposeLens(tr, ln)
-
-    def traversalComposeTraversal[Expr[_], Obs[_]: OpticAlg[Expr, ?[_]], S, A, B](
-        tr1: Expr[Traversal[S, A]],
-        tr2: Expr[Traversal[A, B]]): Expr[Traversal[S, B]] =
-      OpticAlg[Expr, Obs].traversalComposeTraversal(tr1, tr2)
-
-    def lensHorizComposeLens[Expr[_], Obs[_]: OpticAlg[Expr, ?[_]], S, A, B](
-        ln1: Expr[Lens[S, A]],
-        ln2: Expr[Lens[S, B]]): Expr[Lens[S, (A, B)]] =
-      OpticAlg[Expr, Obs].lensHorizComposeLens(ln1, ln2)
-
-    def lensAsFold[Expr[_], Obs[_]: OpticAlg[Expr, ?[_]], S, A](
-        ln: Expr[Lens[S, A]]): Expr[Fold[S, A]] =
-      OpticAlg[Expr, Obs].lensAsFold(ln)
-
-    def traversalAsFold[Expr[_], Obs[_]: OpticAlg[Expr, ?[_]], S, A](
-        tr: Expr[Traversal[S, A]]): Expr[Fold[S, A]] =
-      OpticAlg[Expr, Obs].traversalAsFold(tr)      
-
-    def foldWithFilter[Expr[_], Obs[_]: OpticAlg[Expr, ?[_]], S, A, B](
-        fl: Expr[Fold[S, A]],
-        f: Expr[A => B]): Expr[Fold[S, B]] =
-      OpticAlg[Expr, Obs].foldWithFilter(fl, f)
-
-    def traversalGetAll[Expr[_], Obs[_]: OpticAlg[Expr, ?[_]], S, A](
-        tr: Expr[Traversal[S, A]]): Obs[S => List[A]] =
-      OpticAlg[Expr, Obs].traversalGetAll(tr)
-
-    def fun[Expr[_], Obs[_]: OpticAlg[Expr, ?[_]], A, B](
-        f: Expr[A] => Expr[B]): Expr[A => B] =
-      OpticAlg[Expr, Obs].fun(f)
-
-    def app[Expr[_], Obs[_]: OpticAlg[Expr, ?[_]], A, B](
-        f: Expr[A => B], 
-        a: Expr[A]): Expr[B] =
-      OpticAlg[Expr, Obs].app(f, a)
+    implicit class GetterOps[Expr[_], S, A](
+        l: Expr[Getter[S, A]])(implicit
+        O: OpticAlg[Expr]) {
+      def asFold1: Expr[Fold1[S, A]] = O.gtAsFl1(l)
+      def *[B](r: Expr[Getter[S, B]]): Expr[Getter[S, (A, B)]] = O.gtHori(l, r)
+    }
   }
 
   object syntax extends Syntax
+}
+
+trait CoupleModel[Expr[_]] {
+
+  implicit val ev: OpticAlg[Expr]
+  
+  type Couple
+  type Couples = List[Couple]
+  type Person
+  type People = List[Person]
+
+  val couples: Expr[Fold[Couples, Couple]]
+  val her: Expr[Getter[Couple, Person]]
+  val him: Expr[Getter[Couple, Person]]
+  val people: Expr[Fold[People, Person]]
+  val name: Expr[Getter[Person, String]]
+  val age: Expr[Getter[Person, Int]]
+}
+
+trait CoupleLogic[Expr[_]] {
+  import OpticAlg.syntax._
+  
+  val model: CoupleModel[Expr]
+  import model._, ev._
+
+  def getPeople: Expr[People => List[Person]] =
+    getAll(people)
+
+  def getPeopleName: Expr[People => List[String]] =
+    getAll(people > name.asFold1.asFold)
+
+  def getPeopleNameAndAge: Expr[People => List[(String, Int)]] =
+    getAll(people > (name * age).asFold1.asFold)
 }
 

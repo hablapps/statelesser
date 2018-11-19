@@ -2,6 +2,8 @@ package org.hablapps.statelesser
 
 import scalaz._
 
+// Optics
+
 case class Iso[S, A](from : S => A, to : A => S)
 
 case class Lens[S, A](get : S => A, set : A => S => S)
@@ -102,9 +104,8 @@ object VerticalCompose extends VerticalCompose1 {
     }
 
   trait Syntax {
-
     implicit class VerticalOps[L[_, _], S, A](l: L[S, A]) {
-      def ~>[R[_, _], B](r: R[A, B])(implicit ev: VerticalCompose[L, R]) =
+      def >[R[_, _], B](r: R[A, B])(implicit ev: VerticalCompose[L, R]) =
         ev(l, r)
     }
   }
@@ -148,24 +149,104 @@ trait VerticalCompose4 {
     }
 }
 
+trait HorizontalCompose[L[_, _], R[_, _]] {
+  type Out[_, _]
+  def apply[S, A, B](l: L[S, A], r: R[S, B]): Out[S, (A, B)]
+}
+
+object HorizontalCompose extends HorizontalCompose1 {
+
+  implicit def isoCompose[L[_, _]: AsIso, R[_, _]: AsIso]: Aux[L, R, Iso] =
+    new HorizontalCompose[L, R] {
+      type Out[S, A] = Iso[S, A]
+      def apply[S, A, B](l: L[S, A], r: R[S, B]): Out[S, (A, B)] = ???
+    }
+
+  trait Syntax {
+    implicit class HorizontalOps[L[_, _], S, A](l: L[S, A]) {
+      def *[R[_, _], B](r: R[S, B])(implicit ev: HorizontalCompose[L, R]) =
+        ev(l, r)
+    }
+  }
+
+  object syntax extends Syntax
+}
+
+trait HorizontalCompose1 extends HorizontalCompose2 {
+  implicit def lnCompose[L[_, _]: AsLens, R[_, _]: AsLens]: Aux[L, R, Lens] =
+    new HorizontalCompose[L, R] {
+      type Out[S, A] = Lens[S, A]
+      def apply[S, A, B](l: L[S, A], r: R[S, B]): Out[S, (A, B)] = ???
+    }
+}
+
+trait HorizontalCompose2 extends HorizontalCompose3 {
+  implicit def gtCompose[L[_, _]: AsGetter, R[_, _]: AsGetter]: Aux[L, R, Getter] =
+    new HorizontalCompose[L, R] {
+      type Out[S, A] = Getter[S, A]
+      def apply[S, A, B](l: L[S, A], r: R[S, B]): Out[S, (A, B)] = ???
+    }
+}
+
+trait HorizontalCompose3 extends HorizontalCompose4 {
+  implicit def fl1Compose[L[_, _]: AsFold1, R[_, _]: AsFold1]: Aux[L, R, Fold1] =
+    new HorizontalCompose[L, R] {
+      type Out[S, A] = Fold1[S, A]
+      def apply[S, A, B](l: L[S, A], r: R[S, B]): Out[S, (A, B)] = ???
+    }
+}
+
+trait HorizontalCompose4 {
+  
+  type Aux[L[_, _], R[_, _], Out2[_, _]] = 
+    HorizontalCompose[L, R] { type Out[S, A] = Out2[S, A] }
+  
+  implicit def flCompose[L[_, _]: AsFold, R[_, _]: AsFold]: Aux[L, R, Fold] =
+    new HorizontalCompose[L, R] {
+      type Out[S, A] = Fold[S, A]
+      def apply[S, A, B](l: L[S, A], r: R[S, B]): Out[S, (A, B)] = ???
+    }
+}
+
 // Typeclass-based actions
 
 object Actions {
-  def getAll[Op[_, _] : AsFold, S, A](op: Op[S, A]): List[A] = ???
+
+  def get[Op[_, _]: AsGetter, S, A](op: Op[S, A]): S => A = ???
+  
+  def getAll[Op[_, _] : AsFold, S, A](op: Op[S, A]): S => List[A] = ???
 }
 
 object Example {
+
   import VerticalCompose.syntax._
-  import Actions.getAll
+  import HorizontalCompose.syntax._
+  import Actions._
 
-  case class University(math: Department) 
-  case class Department(dpt: String, head: Person)
-  case class Person(name: String, age: Int)
+  trait CoupleModel {
+    type Couple
+    type Person
+    type Couples = List[Couple]
+    type People = List[Person]
 
-  val mathGt: Getter[University, Department] = ???
-  val headLn: Lens[Department, Person] = ???
-  val nameLn: Lens[Person, String] = ???
+    val couples: Fold[Couples, Couple]
+    val her: Getter[Couple, Person]
+    val him: Getter[Couple, Person]
+    val people: Fold[People, Person]
+    val name: Getter[Person, String]
+    val age: Getter[Person, Int]
+  }
 
-  getAll(mathGt ~> headLn ~> nameLn)
+  trait CoupleLogic {
+
+    val model: CoupleModel
+    import model._
+
+    def getHerNames: Couples => List[String] =
+      getAll(couples > her > name)
+
+    def getHerNameAndAge: Couples => List[(String, Int)] =
+      getAll(couples > her > name * age)
+  }
 }
 
