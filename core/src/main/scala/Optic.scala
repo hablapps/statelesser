@@ -14,6 +14,8 @@ trait Fold1[S, A] {
   def foldMap[M : Semigroup](f : A => M): S => M
 }
 
+case class AffineFold[S, A](pre: S => Option[A])
+
 trait Fold[S, A] {
   def foldMap[M : Monoid](f : A => M): S => M
 }
