@@ -19,7 +19,7 @@ class DepartmentExampleTest extends FlatSpec with Matchers {
     sem.map(genSql) should contain theSameElementsAs List.fill(sem.length)(q)
 
   "Statelesser" should "query all employees in the organization" in {
-    matchSql("SELECT e.* FROM Department AS d INNER JOIN Employee AS e ON d.employees = e.id;", 
+    matchSql("SELECT e.emp FROM Department AS d INNER JOIN Employee AS e ON d.dpt = e.dpt;", 
       getOrgEmployees)
   }
 }

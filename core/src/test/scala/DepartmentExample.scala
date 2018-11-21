@@ -26,8 +26,8 @@ trait DepartmentExample[Expr[_]] {
   import ev._
   import OpticLang.syntax._
 
-  def getOrgEmployees: Expr[Org => List[Employee]] =
-    getAll(departments > employees)
+  def getOrgEmployees: Expr[Org => List[String]] =
+    getAll(departments > employees > emp.asFold1.asFold)
 }
 
 object DepartmentExample {
