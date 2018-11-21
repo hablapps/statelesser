@@ -42,7 +42,7 @@ lazy val monocle = (project in file("monocle"))
   )
 
 lazy val sql = (project in file("sql"))
-  .dependsOn(core)
+  .dependsOn(core % "test->test;compile->compile")
   .settings(
     commonSettings
   )

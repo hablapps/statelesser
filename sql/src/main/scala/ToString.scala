@@ -1,40 +1,9 @@
-package org.hablapps.statelesser
+package statelesser
+package sql
 
-object Sql {
+trait ToString {
 
-  type Table = String
-  type Var = String
-  type FieldName = String
-
-  case class SSelect(select: SqlSelect, from: SqlFrom, where: Option[SqlExp]) {
-    override def toString: String = sqlToString(this)
-  }
-
-  sealed abstract class SqlFrom
-  case class SFrom(ts: List[SqlTable]) extends SqlFrom
-
-  sealed abstract class SqlTable
-  case class STable(t: Table, v: Var, js: List[SqlJoin]) extends SqlTable
-
-  sealed abstract class SqlJoin
-  case class SJoin(t: Table, v: Var) extends SqlJoin
-  case class SEqJoin(t: Table, v: Var, cond: SqlEqJoinCond) extends SqlJoin
-
-  sealed abstract class SqlEqJoinCond
-  case class SOn(l: SProj, r: SProj) extends SqlEqJoinCond
-  case class SUsing(fn: FieldName) extends SqlEqJoinCond
-
-  sealed abstract class SqlSelect
-  case class SList(es: List[SField]) extends SqlSelect
-  case class SAll(e: String) extends SqlSelect
-
-  sealed abstract class SqlExp
-  case class SField(e: SqlExp, fn: FieldName) extends SqlExp
-  case class SProj(v: Var, fn: FieldName) extends SqlExp
-  case class SBinOp(op: String, l: SqlExp, r: SqlExp) extends SqlExp
-  case class SUnOp(op: String, e: SqlExp) extends SqlExp
-
-  private def sqlToString(sql: SSelect): String = {
+  def sqlToString(sql: SSelect): String = {
     val sel = selToString(sql.select)
     val frm = frmToString(sql.from)
     val whr = sql.where.fold("")(e => s" WHERE ${expToString(e)}")

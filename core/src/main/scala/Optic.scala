@@ -1,4 +1,4 @@
-package org.hablapps.statelesser
+package statelesser
 
 import scalaz._
 
