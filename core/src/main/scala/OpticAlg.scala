@@ -34,7 +34,12 @@ trait OpticAlg[Expr[_]] {
 
   def filtered[S](p: Expr[Getter[S, Boolean]]): Expr[AffineFold[S, S]]
 
+  // greater than, bad name!
   def gt(i: Int): Expr[Getter[Int, Boolean]]
+
+  def first[A, B]: Expr[Getter[(A, B), A]]
+
+  def second[A, B]: Expr[Getter[(A, B), B]]
 
   def getAll[S, A](fl: Expr[Fold[S, A]]): Expr[S => List[A]]
 
@@ -64,6 +69,40 @@ object OpticAlg {
       select: List[Tree] = List(),
       where: Set[Tree] = Set()) {
     
+    import Sql._
+
+    def toSql: SSelect = SSelect(selToSql, tabToSql, whrToSql)
+
+    private def selToSql: SqlSelect = select match {
+      case Var(e) :: Nil => SAll(e)
+      case xs => SList(xs.map(e => SField(treeToExpr(e), "")))
+    }
+
+    private def tabToSql: SqlFrom = SFrom(List(table.toList match {
+      case (Var(nme), GLabel(info)) :: xs => 
+        STable(info.src.nme, nme, xs.map(joinToSql))
+      case _ => throw new Error(s"No table was selected for FROM clause")
+    }))
+
+    private def joinToSql(vt: (OpticAlg.Var, Tree)): SqlJoin = vt match {
+      case (Var(n1), VL(Var(n2), GLabel(inf))) => SEqJoin(
+        s"Dummy_${inf.tgt.nme}", n1, SOn(SProj(n2, inf.nme), SProj(n1, "Dummy_Id")))
+      case _ => throw new Error(s"Don't know how to generate join for '$vt'")
+    }
+
+    private def whrToSql: Option[SqlExp] =
+      where.foldLeft(Option.empty[SqlExp]) {
+        case (None, t) => Some(treeToExpr(t))
+        case (Some(e), t) => Some(SBinOp("AND", e, treeToExpr(t)))
+      }
+
+    private def treeToExpr(t: Tree): SqlExp = t match {
+      case VL(Var(nme), GLabel(info)) => SProj(nme, info.nme)
+      case Op(op, l, r) => SBinOp(op, treeToExpr(l), treeToExpr(r))
+      case Unary(t, op) => SUnOp(op, treeToExpr(t))
+      case _ => throw new Error(s"Don't know how to translate '$t' into SQL")
+    }
+
     def hCompose(other: Semantic): Semantic = {
       val Semantic(t1, s1, w1) = this
       val Semantic(t2, s2, w2) = other
@@ -71,12 +110,24 @@ object OpticAlg {
     }
 
     def vCompose(other: Semantic): Semantic = {
-      val Semantic(t1, List(tr1), w1) = this
-      val Semantic(t2, s2, w2) = other
-      Semantic(
-        t1 ++ t2.mapValues(tr1.vCompose), 
-        if (s2.isEmpty) List(tr1) else s2.map(tr1.vCompose), 
-        w1 ++ w2.map(tr1.vCompose))
+      (this, other) match {
+        case (Semantic(t1, List(tr1), w1), Semantic(t2, s2, w2)) => Semantic(
+          t1 ++ t2.mapValues(tr1.vCompose), 
+          if (s2.isEmpty) List(tr1) else s2.map(tr1.vCompose), 
+          w1 ++ w2.map(tr1.vCompose))
+        case (Semantic(t1, List(tr1, tr2), w1), 
+              Semantic(t2, List(Unapplied(f)), w2)) => {
+          val tr3 = f(tr1)(tr2)
+          Semantic(
+            t1 ++ t2.mapValues(tr3.vCompose), 
+            List(tr3),
+            w1 ++ w2.map(tr3.vCompose))
+        }
+        case (Semantic(t1, List(tr1, tr2), w1), 
+              Semantic(t2, List(Unapplied(f), Unapplied(g)), w2)) => {
+          Semantic(t1, List(f(tr1)(tr2), g(tr1)(tr2)), w1 ++ w2)
+        }
+      }
     }
 
     def fstCompose(other: Semantic): Semantic = {
@@ -115,9 +166,11 @@ object OpticAlg {
   case class Op(op: String, l: Tree, r: Tree) extends Tree {
     override def toString = s"$l $op $r"
   }
-  case class Unary(t: Tree, op: String) extends Tree
+  case class Unary(t: Tree, op: String) extends Tree {
+    override def toString = s"$t $op"
+  }
+  case class Unapplied(f: Tree => Tree => Tree) extends Tree
   case class Pred(op: String) extends Tree
-  case class IntConst(v: Int) extends Tree
 
   implicit val semantic = new OpticAlg[Const[Semantic, ?]] {
 
@@ -148,7 +201,7 @@ object OpticAlg {
       Const(Semantic(Map(), List.empty, p.getConst.select.toSet))
 
     def gt(i: Int): Const[Semantic, Getter[Int, Boolean]] =
-      Const(Semantic(Map(), List(Pred(s"> $i"))))
+      Const(Semantic(Map(), List(Pred(s"(>$i)"))))
 
     def aflAsFl[S, A](afl: Const[Semantic, AffineFold[S, A]]) =
       Const(afl.getConst)
@@ -167,6 +220,12 @@ object OpticAlg {
         l: Const[Semantic, AffineFold[S, A]], 
         r: Const[Semantic, AffineFold[S, B]]) =
       Const(l.getConst fstCompose r.getConst)
+
+    def first[A, B] =
+      Const(Semantic(select = List(Unapplied(l => _ => l))))
+
+    def second[A, B] =
+      Const(Semantic(select = List(Unapplied(_ => r => r))))
 
     def gtAsAfl[S, A](gt: Const[Semantic, Getter[S, A]]) =
       Const(gt.getConst)
@@ -302,6 +361,21 @@ trait CoupleExample[Expr[_]] {
     getAll(couples > 
       ((her > name).asAffineFold <* 
         (((her > age) - (him > age)).asAffineFold > filtered (gt(0)))).asFold)
+
+  def differenceName2: Expr[Couples => List[String]] =
+    getAll(couples > 
+      ((her > name).asAffineFold * 
+        (((her > age) - (him > age)).asAffineFold > filtered (gt(0))) > 
+          first.asAffineFold).asFold)
+
+  def dummyNameAndAge: Expr[People => List[(String, Int)]] =
+    getAll(people > ((name.asAffineFold * ((name * age > 
+      first * second > 
+      second * first > 
+      second * first > 
+      second).asAffineFold 
+      > filtered (gt(30))
+      > filtered (gt(40))))).asFold)
 }
 
 object CoupleExample {
@@ -379,19 +453,21 @@ object CoupleExample {
 object Run extends App {
   import CoupleExample.semantic._
 
-  println(getPeople.getConst)
-  println(getPeopleName.getConst)
-  println(getPeopleNameAndAge.getConst)
-  println(getHerNames.getConst)
-  println(getHerNameAndAge.getConst)
-  println(getHerNameAndAge2.getConst)
-  println(getHerNameAndAge3.getConst)
-  println(getPeopleGt30.getConst)
-  println(getHerGt30.getConst)
-  println(getHerGt30_2.getConst)
-  println(getHerNameGt30.getConst)
-  println(getHerNameGt30_2.getConst)
-  println(difference.getConst)
-  println(differenceName.getConst)
+  println(getPeople.getConst.toSql)
+  println(getPeopleName.getConst.toSql)
+  println(getPeopleNameAndAge.getConst.toSql)
+  println(getHerNames.getConst.toSql)
+  println(getHerNameAndAge.getConst.toSql)
+  println(getHerNameAndAge2.getConst.toSql)
+  println(getHerNameAndAge3.getConst.toSql)
+  println(getPeopleGt30.getConst.toSql)
+  println(getHerGt30.getConst.toSql)
+  println(getHerGt30_2.getConst.toSql)
+  println(getHerNameGt30.getConst.toSql)
+  println(getHerNameGt30_2.getConst.toSql)
+  println(difference.getConst.toSql)
+  println(differenceName.getConst.toSql)
+  println(differenceName2.getConst.toSql)
+  println(dummyNameAndAge.getConst.toSql)
 }
 
