@@ -5,9 +5,9 @@ import scalaz.Const
 
 trait CoupleExample[Expr[_]] {
 
-  /* data layer */
-
   implicit val ev: OpticLang[Expr]
+
+  /* data layer */
   
   type Couple
   type Couples = List[Couple]

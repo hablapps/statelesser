@@ -78,8 +78,8 @@ class CoupleExampleTest extends FlatSpec with Matchers {
 
   it should "normalise a stupid query" in {
     matchSql(
-      "SELECT p.name, p.age FROM Person AS p WHERE (>30)(p.age) AND (>40)(p.age);"
-      , dummyNameAndAge)
+      "SELECT p.name, p.age FROM Person AS p WHERE (>30)(p.age) AND (>40)(p.age);", 
+      dummyNameAndAge)
   }
 }
 
