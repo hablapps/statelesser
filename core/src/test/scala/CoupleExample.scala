@@ -30,32 +30,32 @@ trait CoupleExample[Expr[_]] {
     getAll(people)
 
   def getPeopleName: Expr[People => List[String]] =
-    getAll(people > name.asFold1.asFold)
+    getAll(people > name.asFold)
 
   def getPeopleNameAndAge: Expr[People => List[(String, Int)]] =
-    getAll(people > (name * age).asFold1.asFold)
+    getAll(people > (name * age).asFold)
 
   def getHer: Expr[Couples => List[Person]] =
-    getAll(couples > her.asFold1.asFold)
+    getAll(couples > her.asFold)
 
   def getHerName: Expr[Couples => List[String]] =
-    getAll(couples > her.asFold1.asFold > name.asFold1.asFold)
+    getAll(couples > her.asFold > name.asFold)
 
   def getHerNameAndAge_1: Expr[Couples => List[(String, Int)]] =
-    getAll(couples > her.asFold1.asFold > (name * age).asFold1.asFold)
+    getAll(couples > her.asFold > (name * age).asFold)
 
   def getHerNameAndAge_2: Expr[Couples => List[(String, Int)]] =
-    getAll(couples > ((her > name) * (her > age)).asFold1.asFold)
+    getAll(couples > ((her > name) * (her > age)).asFold)
 
   def getHerNameAndAge_3: Expr[Couples => List[(String, Int)]] =
-    getAll(couples > (her > name * age).asFold1.asFold)
+    getAll(couples > (her > name * age).asFold)
 
   def getPeopleGt30: Expr[People => List[(String, Int)]] =
     getAll(people > (name.asAffineFold * 
       (age.asAffineFold > filtered (gt(30)))).asFold)
 
   def getHerGt30_1: Expr[Couples => List[(String, Int)]] =
-    getAll(couples > her.asFold1.asFold > (name.asAffineFold * 
+    getAll(couples > her.asFold > (name.asAffineFold * 
       (age.asAffineFold > filtered (gt(30)))).asFold)
 
   def getHerGt30_2: Expr[Couples => List[(String, Int)]] =
@@ -63,7 +63,7 @@ trait CoupleExample[Expr[_]] {
       ((her > age).asAffineFold > filtered (gt(30)))).asFold)
 
   def getHerNameGt30_1: Expr[Couples => List[String]] =
-    getAll(couples > her.asFold1.asFold > (name.asAffineFold <* 
+    getAll(couples > her.asFold > (name.asAffineFold <* 
       (age.asAffineFold > filtered (gt(30)))).asFold)
   
   def getHerNameGt30_2: Expr[Couples => List[String]] =
