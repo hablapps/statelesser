@@ -38,12 +38,15 @@ trait OpticLang[Expr[_]] {
 
   def filtered[S](p: Expr[Getter[S, Boolean]]): Expr[AffineFold[S, S]]
 
-  // greater than, bad name!
-  def gt(i: Int): Expr[Getter[Int, Boolean]]
+  def greaterThan: Expr[Getter[(Int, Int), Boolean]]
 
   def first[A, B]: Expr[Getter[(A, B), A]]
 
   def second[A, B]: Expr[Getter[(A, B), B]]
+
+  def like[S, A](a: A): Expr[Getter[S, A]]
+
+  def id[S]: Expr[Getter[S, S]]
 
   def getAll[S, A](fl: Expr[Fold[S, A]]): Expr[S => List[A]]
 
@@ -56,6 +59,11 @@ trait OpticLang[Expr[_]] {
   def aflAsFl[S, A](afl: Expr[AffineFold[S, A]]): Expr[Fold[S, A]]
 
   def fl1AsFl[S, A](fl1: Expr[Fold1[S, A]]): Expr[Fold[S, A]]
+
+  // derived methods
+
+  def gt(i: Int): Expr[Getter[Int, Boolean]] = 
+    gtVert(gtHori(id[Int], like[Int, Int](i)), greaterThan)
 }
 
 object OpticLang {
@@ -128,28 +136,19 @@ object OpticLang {
       case (_, v: Var) => v
       case (_, vl: VL) => vl
       case (x, Op(op, l, r)) => Op(op, x vCompose l, x vCompose r)
-      case (x, Unary(t, op)) => Unary(x vCompose t, op)
-      case (l, Pred(op)) => Unary(l, op)
-      case (l, r) => println(l); println(r); ???
+      case (l, v: Val) => v
+      case (l, u: Unapplied1) => u.f(l)
+      case (l, r) => throw new Error(s"Can't compose trees '$l' and '$r'")
     }
   }
-  case class GLabel(info: OpticInfo) extends Tree {
-    override def toString = info.toString
-  }
-  case class Var(nme: String) extends Tree {
-    override def toString = nme
-  }
-  case class VL(vr: Var, lbl: GLabel) extends Tree {
-    override def toString = s"$vr.$lbl"
-  }
-  case class Op(op: String, l: Tree, r: Tree) extends Tree {
-    override def toString = s"$l $op $r"
-  }
-  case class Unary(t: Tree, op: String) extends Tree {
-    override def toString = s"$t $op"
-  }
+  case class GLabel(info: OpticInfo) extends Tree
+  case class Var(nme: String) extends Tree
+  case class VL(vr: Var, lbl: GLabel) extends Tree
+  case class Op(op: String, l: Tree, r: Tree) extends Tree
+  case class Unary(t: Tree, op: String) extends Tree
   case class Unapplied(f: Tree => Tree => Tree) extends Tree
-  case class Pred(op: String) extends Tree
+  case class Unapplied1(f: Tree => Tree) extends Tree
+  case class Val(v: String) extends Tree 
 
   implicit val semantic = new OpticLang[Const[Semantic, ?]] {
 
@@ -181,8 +180,8 @@ object OpticLang {
     def filtered[S](p: Const[Semantic, Getter[S, Boolean]]) =
       Const(Semantic(Map(), List.empty, p.getConst.select.toSet))
 
-    def gt(i: Int): Const[Semantic, Getter[Int, Boolean]] =
-      Const(Semantic(Map(), List(Pred(s"(>$i)"))))
+    def greaterThan: Const[Semantic, Getter[(Int, Int), Boolean]] =
+      Const(Semantic(Map(), List(Unapplied(l => r => Op(">", l, r)))))
 
     def aflAsFl[S, A](afl: Const[Semantic, AffineFold[S, A]]) =
       Const(afl.getConst)
@@ -202,26 +201,23 @@ object OpticLang {
         r: Const[Semantic, AffineFold[S, B]]) =
       Const(l.getConst fstCompose r.getConst)
 
-    def first[A, B] =
-      Const(Semantic(select = List(Unapplied(l => _ => l))))
+    def first[A, B] = Const(Semantic(select = List(Unapplied(l => _ => l))))
 
-    def second[A, B] =
-      Const(Semantic(select = List(Unapplied(_ => r => r))))
+    def second[A, B] = Const(Semantic(select = List(Unapplied(_ => r => r))))
 
-    def gtAsAfl[S, A](gt: Const[Semantic, Getter[S, A]]) =
-      Const(gt.getConst)
+    def like[S, A](a: A) = Const(Semantic(select = List(Val(a.toString))))
 
-    def getAll[S, A](fl: Const[Semantic, Fold[S, A]]) =
-      Const(fl.getConst)
+    def id[S] = Const(Semantic(select = List(Unapplied1(identity))))
 
-    def lnAsGt[S, A](ln: Const[Semantic, Lens[S, A]]) =
-      Const(ln.getConst)
+    def gtAsAfl[S, A](gt: Const[Semantic, Getter[S, A]]) = Const(gt.getConst)
 
-    def gtAsFl1[S, A](gt: Const[Semantic, Getter[S, A]]) =
-      Const(gt.getConst)
+    def getAll[S, A](fl: Const[Semantic, Fold[S, A]]) = Const(fl.getConst)
 
-    def fl1AsFl[S, A](fl1: Const[Semantic, Fold1[S, A]]) =
-      Const(fl1.getConst)
+    def lnAsGt[S, A](ln: Const[Semantic, Lens[S, A]]) = Const(ln.getConst)
+
+    def gtAsFl1[S, A](gt: Const[Semantic, Getter[S, A]]) = Const(gt.getConst)
+
+    def fl1AsFl[S, A](fl1: Const[Semantic, Fold1[S, A]]) = Const(fl1.getConst)
   }
 
   trait Syntax {

@@ -43,6 +43,7 @@ trait ToString {
     case SProj(v, fn) => s"$v.$fn"
     case SBinOp(op, l, r) => s"${expToString(l)} $op ${expToString(r)}"
     case SUnOp(op, e) => s"$op(${expToString(e)})"
+    case SCons(v) => v
   }
 }
 

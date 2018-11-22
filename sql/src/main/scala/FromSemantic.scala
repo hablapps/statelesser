@@ -54,6 +54,7 @@ trait FromSemantic {
     case VL(Var(nme), GLabel(info)) => SProj(nme, info.nme)
     case Op(op, l, r) => SBinOp(op, treeToExpr(l), treeToExpr(r))
     case Unary(t, op) => SUnOp(op, treeToExpr(t))
+    case Val(x) => SCons(x)
     case _ => throw new Error(s"Don't know how to translate '$t' into SQL")
   }
 }

@@ -52,7 +52,7 @@ trait CoupleExample[Expr[_]] {
 
   def getPeopleGt30: Expr[People => List[(String, Int)]] =
     getAll(people > (name.asAffineFold * 
-      (age.asAffineFold > filtered (gt(30)))).asFold)
+      (age.asAffineFold > filtered (id[Int] * like(30) > greaterThan))).asFold)
 
   def getHerGt30_1: Expr[Couples => List[(String, Int)]] =
     getAll(couples > her.asFold > (name.asAffineFold * 
