@@ -52,35 +52,35 @@ class CoupleExampleTest extends FlatSpec with Matchers {
 
   it should "generate filters" in {
     matchSql(
-      "SELECT p.name, p.age FROM Person AS p WHERE p.age > 30;", 
+      "SELECT p.name, p.age FROM Person AS p WHERE (p.age > 30);", 
       getPeopleGt30)
   }
 
   it should "generate filters for nested fields" in {
     matchSql(
-      "SELECT w.name, w.age FROM Couple AS c INNER JOIN Person AS w ON c.her = w.name WHERE w.age > 30;",
+      "SELECT w.name, w.age FROM Couple AS c INNER JOIN Person AS w ON c.her = w.name WHERE (w.age > 30);",
       getHerGt30_1, getHerGt30_2)
   }
 
   it should "generate remove filtering fields from select" in {
     matchSql(
-      "SELECT w.name FROM Couple AS c INNER JOIN Person AS w ON c.her = w.name WHERE w.age > 30;",
+      "SELECT w.name FROM Couple AS c INNER JOIN Person AS w ON c.her = w.name WHERE (w.age > 30);",
       getHerNameGt30_1, getHerNameGt30_2)
   }
 
   it should "generate complex queries" in {
     matchSql(
-      "SELECT w.name, w.age - m.age FROM Couple AS c INNER JOIN Person AS w ON c.her = w.name INNER JOIN Person AS m ON c.him = m.name WHERE w.age - m.age > 0;",
+      "SELECT w.name, (w.age - m.age) FROM Couple AS c INNER JOIN Person AS w ON c.her = w.name INNER JOIN Person AS m ON c.him = m.name WHERE ((w.age - m.age) > 0);",
       difference)
 
     matchSql(
-      "SELECT w.name FROM Couple AS c INNER JOIN Person AS w ON c.her = w.name INNER JOIN Person AS m ON c.him = m.name WHERE w.age - m.age > 0;",
+      "SELECT w.name FROM Couple AS c INNER JOIN Person AS w ON c.her = w.name INNER JOIN Person AS m ON c.him = m.name WHERE ((w.age - m.age) > 0);",
       differenceName_1, differenceName_2)
   }
 
   it should "normalise a stupid query" in {
     matchSql(
-      "SELECT p.name, p.age FROM Person AS p WHERE p.age > 30 AND p.age > 40;", 
+      "SELECT p.name, p.age FROM Person AS p WHERE ((p.age > 30) AND (p.age > 40));", 
       dummyNameAndAge)
   }
 }

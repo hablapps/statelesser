@@ -41,7 +41,7 @@ trait ToString {
     case SField(e, "") => s"${expToString(e)}"
     case SField(e, fn) => s"${expToString(e)} AS $fn"
     case SProj(v, fn) => s"$v.$fn"
-    case SBinOp(op, l, r) => s"${expToString(l)} $op ${expToString(r)}"
+    case SBinOp(op, l, r) => s"(${expToString(l)} $op ${expToString(r)})"
     case SUnOp(op, e) => s"$op(${expToString(e)})"
     case SCons(v) => v
   }
