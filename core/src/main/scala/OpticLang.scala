@@ -8,6 +8,10 @@ trait OpticLang[Expr[_]] {
     l: Expr[Fold[S, A]], 
     r: Expr[Fold[A, B]]): Expr[Fold[S, B]]
 
+  def flHori[S, A, B](
+    l: Expr[Fold[S, A]], 
+    r: Expr[Fold[S, B]]): Expr[Fold[S, (A, B)]]
+
   def gtVert[S, A, B](
     l: Expr[Getter[S, A]], 
     r: Expr[Getter[A, B]]): Expr[Getter[S, B]]
@@ -151,21 +155,23 @@ object OpticLang {
 
     def flVert[S, A, B](
         l: Const[Semantic, Fold[S, A]], 
-        r: Const[Semantic, Fold[A, B]]) = {
+        r: Const[Semantic, Fold[A, B]]) =
       Const(l.getConst vCompose r.getConst)
-    }
+
+    def flHori[S, A ,B](
+        l: Const[Semantic, Fold[S, A]],
+        r: Const[Semantic, Fold[S, B]]) =
+      Const(l.getConst hCompose r.getConst)
 
     def gtVert[S, A, B](
         l: Const[Semantic, Getter[S, A]], 
-        r: Const[Semantic, Getter[A, B]]) = {
+        r: Const[Semantic, Getter[A, B]]) =
       Const(l.getConst vCompose r.getConst)
-    }
 
     def gtHori[S, A, B](
         l: Const[Semantic, Getter[S, A]],
-        r: Const[Semantic, Getter[S, B]]) = {
+        r: Const[Semantic, Getter[S, B]]) =
       Const(l.getConst hCompose r.getConst)
-    }
 
     def gtSub[S](
         l: Const[Semantic, Getter[S, Int]],
@@ -224,6 +230,7 @@ object OpticLang {
         l: Expr[Fold[S, A]])(implicit 
         O: OpticLang[Expr]) {
       def >[B](r: Expr[Fold[A, B]]): Expr[Fold[S, B]] = O.flVert(l, r)
+      def *[B](r: Expr[Fold[S, B]]): Expr[Fold[S, (A, B)]] = O.flHori(l, r)
     }
 
     implicit class Fold1Ops[Expr[_], S, A](
@@ -249,6 +256,7 @@ object OpticLang {
         O: OpticLang[Expr]) {
       def asFold1: Expr[Fold1[S, A]] = O.gtAsFl1(l)
       def asAffineFold: Expr[AffineFold[S, A]] = O.gtAsAfl(l)
+      def asFold: Expr[Fold[S, A]] = O.fl1AsFl(O.gtAsFl1(l))
       def >[B](r: Expr[Getter[A, B]]): Expr[Getter[S, B]] = O.gtVert(l, r)
       def *[B](r: Expr[Getter[S, B]]): Expr[Getter[S, (A, B)]] = O.gtHori(l, r)
     }
