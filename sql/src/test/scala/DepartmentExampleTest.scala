@@ -12,8 +12,10 @@ class DepartmentExampleTest extends FlatSpec with Matchers {
   import DepartmentExample.semantic._
   import SQL._
 
+  val keys = Map("Department" -> "dpt", "Employee" -> "emp")
+
   def genSql[A](sem: Const[Semantic, A]): String =
-    sqlToString(fromSemantic(sem.getConst))
+    sqlToString(fromSemantic(sem.getConst, keys))
 
   def matchSql[A](q: String, sem: Const[Semantic, A]*) =
     sem.map(genSql) should contain theSameElementsAs List.fill(sem.length)(q)
