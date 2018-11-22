@@ -44,6 +44,7 @@ object DepartmentExample {
     val departments = {
 
       val oi = OpticInfo(
+        KFold,
         "departments", 
         TypeInfo("Org", false), 
         TypeInfo("Department", true))
@@ -54,6 +55,7 @@ object DepartmentExample {
     val dpt = {
 
       val oi = OpticInfo(
+        KGetter,
         "dpt", 
         TypeInfo("Department", true), 
         TypeInfo("String", false))
@@ -64,6 +66,7 @@ object DepartmentExample {
     val employees = {
 
       val oi = OpticInfo(
+        KFold,
         "employees", 
         TypeInfo("Department", true), 
         TypeInfo("Employee", true))
@@ -74,6 +77,7 @@ object DepartmentExample {
     val emp = {
 
       val oi = OpticInfo(
+        KGetter,
         "emp", 
         TypeInfo("Employee", true), 
         TypeInfo("String", false))
@@ -84,6 +88,7 @@ object DepartmentExample {
     val tasks = {
 
       val oi = OpticInfo(
+        KFold,
         "tasks", 
         TypeInfo("Employee", true), 
         TypeInfo("Task", true))
@@ -94,6 +99,7 @@ object DepartmentExample {
     val tsk = {
 
       val oi = OpticInfo(
+        KGetter,
         "tsk", 
         TypeInfo("Task", true), 
         TypeInfo("String", false))

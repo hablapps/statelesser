@@ -109,6 +109,7 @@ object CoupleExample {
     val couples = {
 
       val oi = OpticInfo(
+        KFold,
         "couples", 
         TypeInfo("Couples", false), 
         TypeInfo("Couple", true))
@@ -119,6 +120,7 @@ object CoupleExample {
     val her = {
 
       val oi = OpticInfo(
+        KGetter,
         "her", 
         TypeInfo("Couple", false), 
         TypeInfo("Person", true))
@@ -128,7 +130,9 @@ object CoupleExample {
 
     val him = {
 
-      val oi = OpticInfo( "him", 
+      val oi = OpticInfo( 
+        KGetter,
+        "him", 
         TypeInfo("Couple", false), 
         TypeInfo("Person", true))
 
@@ -138,6 +142,7 @@ object CoupleExample {
     val people = {
 
       val oi = OpticInfo(
+        KFold,
         "people", 
         TypeInfo("People", false), 
         TypeInfo("Person", true))
@@ -148,6 +153,7 @@ object CoupleExample {
     val name = {
 
       val oi = OpticInfo(
+        KGetter,
         "name", 
         TypeInfo("Person", false), 
         TypeInfo("Person", true))
@@ -158,6 +164,7 @@ object CoupleExample {
     val age = {
 
       val oi = OpticInfo(
+        KGetter,
         "age", 
         TypeInfo("Person", false), 
         TypeInfo("Person", true))

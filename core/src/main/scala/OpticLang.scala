@@ -58,11 +58,20 @@ object OpticLang {
 
   type TypeNme = String
   type OpticNme = String
+  
+  sealed abstract class OpticKind
+  case object KLens extends OpticKind
+  case object KGetter extends OpticKind
+  case object KAffineFold extends OpticKind
+  case object KFold1 extends OpticKind
+  case object KFold extends OpticKind
 
   case class TypeInfo(nme: TypeNme, isPrimitive: Boolean = false)
-  case class OpticInfo(nme: OpticNme, src: TypeInfo, tgt: TypeInfo) {
-    override def toString = nme
-  }
+  case class OpticInfo(
+    kind: OpticKind, 
+    nme: OpticNme, 
+    src: TypeInfo, 
+    tgt: TypeInfo)
   
   case class Semantic(
       table: Map[Var, Tree] = Map(),
