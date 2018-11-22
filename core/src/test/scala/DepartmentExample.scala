@@ -14,7 +14,7 @@ trait DepartmentExample[Expr[_]] {
   type Employee
   type Task
 
-  val departments: Expr[Fold[Org, Department]]
+  val org: Expr[Fold[Org, Department]]
   val dpt: Expr[Getter[Department, String]]
   val employees: Expr[Fold[Department, Employee]]
   val emp: Expr[Getter[Employee, String]]
@@ -27,10 +27,20 @@ trait DepartmentExample[Expr[_]] {
   import OpticLang.syntax._
 
   def getOrgEmployees: Expr[Org => List[String]] =
-    getAll(departments > employees > emp.asFold)
+    getAll(org > employees > emp.asFold)
 
   def getOrgEmployeesAndDpt: Expr[Org => List[(String, String)]] = 
-    getAll(departments > (dpt.asFold * (employees > emp.asFold)))
+    getAll(org > (dpt.asFold * (employees > emp.asFold)))
+
+  def getAbstractEmployees: Expr[Org => List[String]] =
+    getAll(org > employees
+      > filtered (contains(tasks > tsk.asFold, "abstract")).asFold
+      > emp.asFold)
+
+  def expertise: Expr[Org => List[String]] =
+    getAll(org 
+      > filtered(all(employees, contains(tasks > tsk.asFold, "abstract"))).asFold 
+      > dpt.asFold)
 }
 
 object DepartmentExample {
@@ -44,11 +54,11 @@ object DepartmentExample {
     type Employee = Unit
     type Task = Unit
 
-    val departments = {
+    val org = {
 
       val oi = OpticInfo(
         KFold,
-        "departments", 
+        "org", 
         TypeInfo("Org", false), 
         TypeInfo("Department", true))
 

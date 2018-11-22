@@ -27,4 +27,5 @@ case class SProj(v: Var, fn: FieldName) extends SqlExp
 case class SBinOp(op: String, l: SqlExp, r: SqlExp) extends SqlExp
 case class SUnOp(op: String, e: SqlExp) extends SqlExp
 case class SCons(v: String) extends SqlExp
+case class SExists(sel: SSelect) extends SqlExp
 

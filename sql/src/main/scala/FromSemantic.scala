@@ -10,11 +10,16 @@ trait FromSemantic {
   def fromSemantic(
       sem: Semantic, 
       keys: Map[TypeNme, FieldName] = Map()): SSelect = 
-    SSelect(selToSql(sem.select), tabToSql(sem.table, keys), whrToSql(sem.where))
+    SSelect(
+      selToSql(sem.select, keys), 
+      tabToSql(sem.table, keys), 
+      whrToSql(sem.where, keys))
 
-  private def selToSql(sel: List[Tree]): SqlSelect = sel match {
+  private def selToSql(
+      sel: List[Tree],
+      keys: Map[TypeNme, FieldName]): SqlSelect = sel match {
     case Var(e) :: Nil => SAll(e)
-    case xs => SList(xs.map(e => SField(treeToExpr(e), "")))
+    case xs => SList(xs.map(e => SField(treeToExpr(e, keys), "")))
   }
 
   private def tabToSql(
@@ -44,17 +49,22 @@ trait FromSemantic {
     case _ => throw new Error(s"Don't know how to generate join for '$vt'")
   }
 
-  private def whrToSql(whr: Set[Tree]): Option[SqlExp] =
+  private def whrToSql(
+      whr: Set[Tree],
+      keys: Map[TypeNme, FieldName]): Option[SqlExp] =
     whr.foldLeft(Option.empty[SqlExp]) {
-      case (None, t) => Some(treeToExpr(t))
-      case (Some(e), t) => Some(SBinOp("AND", e, treeToExpr(t)))
+      case (None, t) => Some(treeToExpr(t, keys))
+      case (Some(e), t) => Some(SBinOp("AND", e, treeToExpr(t, keys)))
     }
 
-  private def treeToExpr(t: Tree): SqlExp = t match {
+  private def treeToExpr(
+      t: Tree, 
+      keys: Map[TypeNme, FieldName]): SqlExp = t match {
     case VL(Var(nme), GLabel(info)) => SProj(nme, info.nme)
-    case Op(op, l, r) => SBinOp(op, treeToExpr(l), treeToExpr(r))
-    case Unary(t, op) => SUnOp(op, treeToExpr(t))
+    case Op(op, l, r) => SBinOp(op, treeToExpr(l, keys), treeToExpr(r, keys))
+    case Unary(t, op) => SUnOp(op, treeToExpr(t, keys))
     case Val(x) => SCons(x)
+    case Sub(sem) => SExists(fromSemantic(sem, keys))
     case _ => throw new Error(s"Don't know how to translate '$t' into SQL")
   }
 }

@@ -44,6 +44,7 @@ trait ToString {
     case SBinOp(op, l, r) => s"(${expToString(l)} $op ${expToString(r)})"
     case SUnOp(op, e) => s"$op(${expToString(e)})"
     case SCons(v) => v
+    case SExists(ssel) => s"EXISTS(${sqlToString(ssel)})"
   }
 }
 

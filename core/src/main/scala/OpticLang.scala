@@ -40,6 +40,8 @@ trait OpticLang[Expr[_]] {
 
   def greaterThan: Expr[Getter[(Int, Int), Boolean]]
 
+  def equal[A]: Expr[Getter[(A, A), Boolean]]
+
   def first[A, B]: Expr[Getter[(A, B), A]]
 
   def second[A, B]: Expr[Getter[(A, B), B]]
@@ -47,6 +49,12 @@ trait OpticLang[Expr[_]] {
   def like[S, A](a: A): Expr[Getter[S, A]]
 
   def id[S]: Expr[Getter[S, S]]
+
+  def not: Expr[Getter[Boolean, Boolean]]
+
+  def exists[S, A](
+    fl: Expr[Fold[S, A]], 
+    p: Expr[Getter[A, Boolean]]): Expr[Getter[S, Boolean]]
 
   def getAll[S, A](fl: Expr[Fold[S, A]]): Expr[S => List[A]]
 
@@ -63,7 +71,16 @@ trait OpticLang[Expr[_]] {
   // derived methods
 
   def gt(i: Int): Expr[Getter[Int, Boolean]] = 
-    gtVert(gtHori(id[Int], like[Int, Int](i)), greaterThan)
+    gtVert(gtHori(id, like(i)), greaterThan)
+
+  def eq[A](a: A): Expr[Getter[A, Boolean]] =
+    gtVert(gtHori(id[A], like[A, A](a)), equal[A])
+
+  def contains[S, A](fl: Expr[Fold[S, A]], a: A): Expr[Getter[S, Boolean]] =
+    exists(fl, eq(a))
+
+  def all[S, A](fl: Expr[Fold[S, A]], p: Expr[Getter[A, Boolean]]) =
+    gtVert(exists(fl, gtVert(p, not)), not)
 }
 
 object OpticLang {
@@ -98,6 +115,11 @@ object OpticLang {
 
     def vCompose(other: Semantic): Semantic = {
       (this, other) match {
+        case (Semantic(t1, List(v1: Var), s1), Semantic(_, Nil, s2)) 
+            if s2.nonEmpty && s2.head.isInstanceOf[Sub] => {
+          val Sub(sem) = s2.head
+          Semantic(t1, List(v1), s1 + Sub(sem))
+        }
         case (Semantic(t1, List(tr1), w1), Semantic(t2, s2, w2)) => Semantic(
           t1 ++ t2.mapValues(tr1.vCompose), 
           if (s2.isEmpty) List(tr1) else s2.map(tr1.vCompose), 
@@ -138,6 +160,8 @@ object OpticLang {
       case (x, Op(op, l, r)) => Op(op, x vCompose l, x vCompose r)
       case (l, v: Val) => v
       case (l, u: Unapplied1) => u.f(l)
+      case (_, s: Sub) => s
+      case (_, u@Unary(Sub(_), _)) => u
       case (l, r) => throw new Error(s"Can't compose trees '$l' and '$r'")
     }
   }
@@ -148,7 +172,8 @@ object OpticLang {
   case class Unary(t: Tree, op: String) extends Tree
   case class Unapplied(f: Tree => Tree => Tree) extends Tree
   case class Unapplied1(f: Tree => Tree) extends Tree
-  case class Val(v: String) extends Tree 
+  case class Val(v: String) extends Tree
+  case class Sub(s: Semantic) extends Tree
 
   implicit val semantic = new OpticLang[Const[Semantic, ?]] {
 
@@ -183,6 +208,9 @@ object OpticLang {
     def greaterThan: Const[Semantic, Getter[(Int, Int), Boolean]] =
       Const(Semantic(Map(), List(Unapplied(l => r => Op(">", l, r)))))
 
+    def equal[A] =
+      Const(Semantic(Map(), List(Unapplied(l => r => Op("=", l, r)))))
+
     def aflAsFl[S, A](afl: Const[Semantic, AffineFold[S, A]]) =
       Const(afl.getConst)
 
@@ -208,6 +236,13 @@ object OpticLang {
     def like[S, A](a: A) = Const(Semantic(select = List(Val(a.toString))))
 
     def id[S] = Const(Semantic(select = List(Unapplied1(identity))))
+
+    def not = Const(Semantic(select = List(Unapplied1(t => Unary(t, "not")))))
+
+    def exists[S, A](
+        fl: Const[Semantic, Fold[S, A]], 
+        p: Const[Semantic, Getter[A, Boolean]]): Const[Semantic, Getter[S, Boolean]] =
+      Const(Semantic(select = List(Sub(fl.getConst vCompose filtered(p).getConst))))
 
     def gtAsAfl[S, A](gt: Const[Semantic, Getter[S, A]]) = Const(gt.getConst)
 
