@@ -12,8 +12,10 @@ class CoupleExampleTest extends FlatSpec with Matchers {
   import CoupleExample.semantic._
   import SQL._
 
+  val keys = Map("Person" -> "name")
+
   def genSql[A](sem: Const[Semantic, A]): String =
-    sqlToString(fromSemantic(sem.getConst))
+    sqlToString(fromSemantic(sem.getConst, keys))
 
   def matchSql[A](q: String, sem: Const[Semantic, A]*) =
     sem.map(genSql) should contain theSameElementsAs List.fill(sem.length)(q)
@@ -32,19 +34,19 @@ class CoupleExampleTest extends FlatSpec with Matchers {
 
   it should "generate wildcard nested selection" in {
     matchSql(
-      "SELECT w.* FROM Couple AS c INNER JOIN Person AS w ON c.her = w.id;", 
+      "SELECT w.* FROM Couple AS c INNER JOIN Person AS w ON c.her = w.name;", 
       getHer)
   }
 
   it should "generate nested specific selection" in {
     matchSql(
-      "SELECT w.name FROM Couple AS c INNER JOIN Person AS w ON c.her = w.id;",
+      "SELECT w.name FROM Couple AS c INNER JOIN Person AS w ON c.her = w.name;",
       getHerName)
   }
 
   it should "generate nested multi-selection" in {
     matchSql(
-      "SELECT w.name, w.age FROM Couple AS c INNER JOIN Person AS w ON c.her = w.id;",
+      "SELECT w.name, w.age FROM Couple AS c INNER JOIN Person AS w ON c.her = w.name;",
       getHerNameAndAge_1, getHerNameAndAge_2, getHerNameAndAge_3)
   }
 
@@ -56,23 +58,23 @@ class CoupleExampleTest extends FlatSpec with Matchers {
 
   it should "generate filters for nested fields" in {
     matchSql(
-      "SELECT w.name, w.age FROM Couple AS c INNER JOIN Person AS w ON c.her = w.id WHERE (>30)(w.age);",
+      "SELECT w.name, w.age FROM Couple AS c INNER JOIN Person AS w ON c.her = w.name WHERE (>30)(w.age);",
       getHerGt30_1, getHerGt30_2)
   }
 
   it should "generate remove filtering fields from select" in {
     matchSql(
-      "SELECT w.name FROM Couple AS c INNER JOIN Person AS w ON c.her = w.id WHERE (>30)(w.age);",
+      "SELECT w.name FROM Couple AS c INNER JOIN Person AS w ON c.her = w.name WHERE (>30)(w.age);",
       getHerNameGt30_1, getHerNameGt30_2)
   }
 
   it should "generate complex queries" in {
     matchSql(
-      "SELECT w.name, w.age - m.age FROM Couple AS c INNER JOIN Person AS w ON c.her = w.id INNER JOIN Person AS m ON c.him = m.id WHERE (>0)(w.age - m.age);",
+      "SELECT w.name, w.age - m.age FROM Couple AS c INNER JOIN Person AS w ON c.her = w.name INNER JOIN Person AS m ON c.him = m.name WHERE (>0)(w.age - m.age);",
       difference)
 
     matchSql(
-      "SELECT w.name FROM Couple AS c INNER JOIN Person AS w ON c.her = w.id INNER JOIN Person AS m ON c.him = m.id WHERE (>0)(w.age - m.age);",
+      "SELECT w.name FROM Couple AS c INNER JOIN Person AS w ON c.her = w.name INNER JOIN Person AS m ON c.him = m.name WHERE (>0)(w.age - m.age);",
       differenceName_1, differenceName_2)
   }
 
