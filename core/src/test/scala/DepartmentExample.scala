@@ -34,7 +34,7 @@ trait DepartmentExample[Expr[_]] {
 
   def getAbstractEmployees: Expr[Org => List[String]] =
     getAll(org > employees
-      > filtered (contains(tasks > tsk.asFold, "abstract")).asFold
+      > filtered(contains(tasks > tsk.asFold, "abstract")).asFold
       > emp.asFold)
 
   def expertise: Expr[Org => List[String]] =
