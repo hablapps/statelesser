@@ -1,15 +1,13 @@
-package org.hablapps.statelesser
-
-import scalaz.State
+package statelesser
 
 package object `sql` {
 
   type Table = String
 
-  type Column = String
+  type Var = String
 
-  type At[A] = State[Rel, A]
+  type FieldName = String
 
-  type Sql[A] = String
+  object SQL extends FromSemantic with ToString
 }
 

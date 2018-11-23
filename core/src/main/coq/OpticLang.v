@@ -5,103 +5,14 @@ Require Import Coq.Lists.List.
 Require Import Coq.Vectors.VectorDef.
 Require Import Coq.Arith.PeanoNat.
 Require Import Coq.Init.Logic.
+Require Import Coq.Bool.Bool.
 Require Import Coq.Logic.FunctionalExtensionality.
+Require Export Koky.
+Require Export Optic.
 
 Open Scope program_scope.
 
 Generalizable All Variables.
-
-(* koky *)
-
-Class Monoid (M : Type) :=
-{ mempty : M
-; mappend : M -> M -> M
-}.
-
-Instance listMonoid {A : Type} : Monoid (list A) :=
-
-{| mempty := List.nil
-;  mappend m1 m2 := m1 ++ m2
-|}.
-
-(****************)
-(* Plain optics *)
-(****************)
-
-Record Fold (S A : Type) := mkFold
-{ foldMap `{Monoid M} : (A -> M) -> S -> M }.
-
-Arguments mkFold [S A].
-Arguments foldMap [S A].
-
-Check foldMap.
-
-Definition flVertCompose {S A B} (fl1 : Fold S A) (fl2 : Fold A B) : Fold S B :=
-  mkFold (fun M _ f s => foldMap fl1 _ _ (foldMap fl2 _ _ f) s).
-
-Definition flProdCompose {S A B}
-    (fl1 : Fold S A) (fl2 : Fold S B) : Fold S (A * B) :=
-  mkFold (fun M _ f s => foldMap fl1 _ _ (fun a => 
-    foldMap fl2 _ _ (fun b => f (a, b)) s) s).
-
-Definition flHoriCompose {S A B}
-    (fl1 : Fold S A) (fl2 : Fold S B) : Fold S (prod A B) :=
-  mkFold (fun M _ f s => 
-    List.fold_right (mappend ∘ f) mempty (
-      List.combine (foldMap fl1 _ _ (fun a => List.cons a List.nil) s) 
-                   (foldMap fl2 _ _ (fun b => List.cons b List.nil) s))).
-
-Definition idFl {S : Type} : Fold S S :=
-  mkFold (fun M _ f s => f s).
-
-Definition result S A (n : nat) : Type := 
-  t A n * (t A n -> S).
-
-Record Traversal S A := mkTraversal
-{ extract : S -> sigT (result S A) }.
-
-Arguments mkTraversal [S A].
-
-Definition idTr {S : Type} : Traversal S S :=
-  mkTraversal (fun s => existT (result S S) 1 (cons S s 0 (nil S), hd)).
-
-Record Iso S A := mkIso
-{ to : S -> A
-; from : A -> S
-}.
-
-Arguments mkIso [S A].
-
-Definition idIso {S : Type} : Iso S S :=
-  mkIso id id.
-
-Record Lens S A := mkLens
-{ get : S -> A
-; set : S -> A -> S
-}.
-
-Arguments mkLens [S A].
-
-Definition idLn {S : Type} : Lens S S :=
-  mkLens id (fun _ s => s).
-
-Definition fstLn {A B : Type} : Lens (A * B) A :=
-  mkLens fst (fun ab a => (a, snd ab)).
-
-Definition sndLn {A B : Type} : Lens (A * B) B :=
-  mkLens snd (fun ab b => (fst ab, b)).
-
-
-Record Getter S A := mkGetter
-{ view : S -> A }.
-
-Arguments mkGetter [S A].
-
-Definition idGt {S : Type} : Getter S S :=
-  mkGetter id.
-
-Record AffineFold S A := mkAffineFold
-{ afold : S -> option A }.
 
 (******************************)
 (* Finally, an optic language *)
@@ -139,10 +50,6 @@ Class OpticLang (expr : Type -> Type) :=
     expr (Traversal S A) -> expr (Traversal S B) -> expr (Traversal S (A * B))
 ; trComposeVerti : forall {S A B : Type},
     expr (Traversal S A) -> expr (Traversal A B) -> expr (Traversal S B)
-; trComposeHorizL : forall {S A B : Type},
-    expr (Traversal S A) -> expr (Traversal S B) -> expr (Traversal S (A * option B))
-; trComposeHorizR : forall {S A B : Type},
-    expr (Traversal S A) -> expr (Traversal S B) -> expr (Traversal S (option A * B))
 ; unsafeFiltered : forall {S A : Type},
     expr (Getter S A) -> expr (A -> Prop) -> expr (Traversal S S)
 
@@ -218,7 +125,7 @@ Notation "fl1 *_fl fl2" := (flComposeHoriz fl1 fl2) (at level 40, left associati
 
 Notation "n1 <= n2" := (leqt n1 n2) (at level 70, no associativity).
 Notation "n1 < n2" := (lt n1 n2) (at level 70, no associativity).
-Notation "n1 == n2" := (eq n1 n2) (at level 70, no associativity).
+Notation "n1 === n2" := (eq n1 n2) (at level 70, no associativity).
 Notation "p /\ q" := (and p q) (at level 80, right associativity).
 
 Notation "a |*| b" := (product a b) (at level 40, left associativity).
@@ -334,7 +241,7 @@ Definition rangeFl `{OpticLang expr} (a b : expr nat) : expr (Fold (list Couple)
 
 Definition getAgeFl `{OpticLang expr} (s : expr string) : expr (Fold (list Couple) nat) :=
   trAsFold (bothTr +_tr lnAsTraversal (nameLn *_ln ageLn)) +_fl
-    aflAsFold (filtered firstGt (lam (fun n => n == s))) +_fl
+    aflAsFold (filtered firstGt (lam (fun n => n === s))) +_fl
     lnAsFold secondLn.
 
 (* Query [compose] *)
