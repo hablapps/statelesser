@@ -1,6 +1,6 @@
 package statelesser
 
-import scalaz._
+import scalaz._, Scalaz._
 
 trait OpticLang[Expr[_]] {
 
@@ -253,6 +253,157 @@ object OpticLang {
     def gtAsFl1[S, A](gt: Const[Semantic, Getter[S, A]]) = Const(gt.getConst)
 
     def fl1AsFl[S, A](fl1: Const[Semantic, Fold1[S, A]]) = Const(fl1.getConst)
+  }
+
+  sealed abstract class TTree
+
+  sealed abstract class TApply extends TTree
+  
+  case class TApplyUnary(f: TTree => TTree) extends TApply
+
+  case class TApplyBinary(f: TTree => TTree => TTree) 
+    extends TApply
+
+  sealed abstract class TExpression extends TTree
+
+  case class TLiteral(s: String) extends TExpression
+
+  case class TUnary(op: String, e: TExpression) extends TExpression
+
+  case class TBinary(op: String, l: TTree, r: TTree)
+    extends TExpression
+
+  sealed abstract class TVariable extends TExpression
+
+  case class TVar(nme: String) extends TVariable
+
+  case class TFree(nme: String, ext: TOptic) extends TVariable
+  
+  sealed abstract class TSelection extends TExpression
+  
+  case class TOptic(info: OpticInfo) extends TSelection
+
+  case class TProj(vr: TVariable, op: TOptic) extends TSelection
+
+  def treeVertCompose(l: TTree, r: TTree): TTree = (l, r) match {
+    case (_, lit: TLiteral) => lit
+    case (TApplyUnary(f), TApplyUnary(g)) => TApplyUnary(f compose g)
+    case (TApplyBinary(f), TApplyUnary(g)) => TApplyBinary(f compose g)
+    case (l: TExpression, TApplyUnary(f)) => f(l)
+    case (TBinary("horizontal", l, r), TApplyBinary(f)) => f(l)(r)
+  }
+
+  case class NewSemantic(
+    pointer: TTree,
+    symbols: List[(String, TSelection)],
+    filters: Set[(TTree, TExpression)])
+
+  def vertCompose(l: NewSemantic, r: NewSemantic): NewSemantic = {
+
+    val NewSemantic(p1, s1, f1) = l
+    val NewSemantic(p2, s2, f2) = r
+
+    val p3 = treeVertCompose(p1, p2)
+    
+    val s3 = (s1.reverse, s2) match {
+      case (xs, Nil) => xs
+      case (Nil, ys) => ys 
+      // XXX: move to `treeVertCompose`
+      case ((n, _) :: xs, (m, opt: TOptic) :: ys) => 
+        (s1 ++ ((m, TProj(TVar(n), opt)) :: ys))
+      case (_, _) => 
+        throw new Error(s"Invalid vertical composition of symbols: $s1 $s2")
+    }
+
+    val f3 = f1 ++ f2.map(_.leftMap(t => treeVertCompose(p1, t)))
+
+    NewSemantic(p3, s3, f3)
+  }
+
+  def horiCompose(l: NewSemantic, r: NewSemantic): NewSemantic =
+    NewSemantic(
+      TBinary("horizontal", l.pointer, r.pointer), 
+      l.symbols ++ r.symbols, 
+      l.filters ++ r.filters)
+
+  implicit val newSemantic = new OpticLang[Const[NewSemantic, ?]] {
+
+    def flVert[S, A, B](
+        l: Const[NewSemantic, Fold[S, A]], 
+        r: Const[NewSemantic, Fold[A, B]]) =
+      ???
+
+    def flHori[S, A ,B](
+        l: Const[NewSemantic, Fold[S, A]],
+        r: Const[NewSemantic, Fold[S, B]]) =
+      Const(horiCompose(l.getConst, r.getConst))
+
+    def gtVert[S, A, B](
+        l: Const[NewSemantic, Getter[S, A]], 
+        r: Const[NewSemantic, Getter[A, B]]) =
+      ???
+
+    def gtHori[S, A, B](
+        l: Const[NewSemantic, Getter[S, A]],
+        r: Const[NewSemantic, Getter[S, B]]) =
+      Const(horiCompose(l.getConst, r.getConst))
+
+    def gtSub[S](
+        l: Const[NewSemantic, Getter[S, Int]],
+        r: Const[NewSemantic, Getter[S, Int]]) =
+      ???
+
+    def filtered[S](p: Const[NewSemantic, Getter[S, Boolean]]) =
+      ???
+
+    def greaterThan: Const[NewSemantic, Getter[(Int, Int), Boolean]] =
+      ???
+
+    def equal[A] =
+      ???
+
+    def aflAsFl[S, A](afl: Const[NewSemantic, AffineFold[S, A]]) =
+      ???
+
+    def aflHori[S, A, B](
+        l: Const[NewSemantic, AffineFold[S, A]], 
+        r: Const[NewSemantic, AffineFold[S, B]]) =
+      Const(horiCompose(l.getConst, r.getConst))
+
+    def aflVert[S, A, B](
+        l: Const[NewSemantic, AffineFold[S, A]], 
+        r: Const[NewSemantic, AffineFold[A, B]]) =
+      ???
+
+    def aflFirst[S, A, B](
+        l: Const[NewSemantic, AffineFold[S, A]], 
+        r: Const[NewSemantic, AffineFold[S, B]]) =
+      ???
+
+    def first[A, B] = ???
+
+    def second[A, B] = ???
+
+    def like[S, A](a: A) = ???
+
+    def id[S] = ???
+
+    def not = ???
+
+    def exists[S, A](
+        fl: Const[NewSemantic, Fold[S, A]], 
+        p: Const[NewSemantic, Getter[A, Boolean]]): Const[NewSemantic, Getter[S, Boolean]] =
+      ???
+
+    def gtAsAfl[S, A](gt: Const[NewSemantic, Getter[S, A]]) = ???
+
+    def getAll[S, A](fl: Const[NewSemantic, Fold[S, A]]) = ???
+
+    def lnAsGt[S, A](ln: Const[NewSemantic, Lens[S, A]]) = ???
+
+    def gtAsFl1[S, A](gt: Const[NewSemantic, Getter[S, A]]) = ???
+
+    def fl1AsFl[S, A](fl1: Const[NewSemantic, Fold1[S, A]]) = ???
   }
 
   trait Syntax {

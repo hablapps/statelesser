@@ -29,7 +29,9 @@ class CoupleExampleTest extends FlatSpec with Matchers {
   }
 
   it should "generate multi-selection" in {
-    matchSql("SELECT p.name, p.age FROM Person AS p;", getPeopleNameAndAge)
+    matchSql(
+      "SELECT p.name, p.age FROM Person AS p;", 
+      getPeopleNameAndAge_1, getPeopleNameAndAge_2)
   }
 
   it should "generate wildcard nested selection" in {

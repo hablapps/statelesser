@@ -20,6 +20,7 @@ trait CoupleExample[Expr[_]] {
   val people: Expr[Fold[People, Person]]
   val name: Expr[Getter[Person, String]]
   val age: Expr[Getter[Person, Int]]
+  val weight: Expr[Getter[Person, Int]]
 
   /* logic */
 
@@ -32,8 +33,11 @@ trait CoupleExample[Expr[_]] {
   def getPeopleName: Expr[People => List[String]] =
     getAll(people > name.asFold)
 
-  def getPeopleNameAndAge: Expr[People => List[(String, Int)]] =
+  def getPeopleNameAndAge_1: Expr[People => List[(String, Int)]] =
     getAll(people > (name * age).asFold)
+
+  def getPeopleNameAndAge_2: Expr[People => List[(String, Int)]] =
+    getAll(people > (((name * age) * weight) > first).asFold)
 
   def getHer: Expr[Couples => List[Person]] =
     getAll(couples > her.asFold)
@@ -166,6 +170,17 @@ object CoupleExample {
       val oi = OpticInfo(
         KGetter,
         "age", 
+        TypeInfo("Person", false), 
+        TypeInfo("Person", true))
+
+      Const(Semantic(Map(), List(GLabel(oi))))
+    }
+
+    val weight = {
+
+      val oi = OpticInfo(
+        KGetter,
+        "weight", 
         TypeInfo("Person", false), 
         TypeInfo("Person", true))
 
