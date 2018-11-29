@@ -289,8 +289,11 @@ object OpticLang {
     case (_, lit: TLiteral) => lit
     case (TApplyUnary(f), TApplyUnary(g)) => TApplyUnary(f compose g)
     case (TApplyBinary(f), TApplyUnary(g)) => TApplyBinary(f compose g)
+    case (TApplyUnary(f), r: TExpression) => 
+      TApplyUnary(t => treeVertCompose(f(t), r))
     case (l: TExpression, TApplyUnary(f)) => f(l)
     case (TBinary("horizontal", l, r), TApplyBinary(f)) => f(l)(r)
+    case (vr: TVar, opt: TOptic) => TProj(vr, opt)
   }
 
   case class NewSemantic(
