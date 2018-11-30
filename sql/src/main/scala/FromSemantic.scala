@@ -1,56 +1,61 @@
 package statelesser
 package sql
 
+import scalaz._, Scalaz._
+
 import OpticLang._
 
 trait FromSemantic {
-
-  import OpticLang.Var
 
   def fromSemantic(
       sem: Semantic, 
       keys: Map[TypeNme, FieldName] = Map()): SSelect = 
     SSelect(
-      selToSql(sem.select, keys), 
-      tabToSql(sem.table, keys), 
-      whrToSql(sem.where, keys))
+      selToSql(sem.pointer, keys), 
+      tabToSql(sem.symbols, keys), 
+      whrToSql(sem.filters, keys))
+
+  private def flatProduct(x: TTree): List[TTree] = x match {
+    case TBinary("horizontal", l, r) => List(flatProduct(l), flatProduct(r)).join
+    case _ => List(x)
+  }
 
   private def selToSql(
-      sel: List[Tree],
+      sel: TTree,
       keys: Map[TypeNme, FieldName]): SqlSelect = sel match {
-    case Var(e) :: Nil => SAll(e)
-    case xs => SList(xs.map(e => SField(treeToExpr(e, keys), "")))
+    case TVar(e) => SAll(e)
+    case t => SList(flatProduct(t).map(e => SField(treeToExpr(e, keys), "")))
   }
 
   private def tabToSql(
-      tab: Map[Var, Tree], 
+      tab: List[(String, TTree)], 
       keys: Map[TypeNme, FieldName]): SqlFrom = 
     SFrom(List(tab.toList match {
-      case (Var(nme), GLabel(info)) :: xs => 
+      case (nme, TOptic(info)) :: xs => 
         STable(info.tgt.nme, nme, xs.map(joinToSql(_, keys)))
       case _ => throw new Error(s"No table was selected for FROM clause")
     }))
 
   private def condToSql(
-      v1: Var, n1: FieldName, 
-      v2: Var, n2: FieldName): SqlEqJoinCond =
-    if (n1 == n2) SUsing(n1) else SOn(SProj(v1.nme, n1), SProj(v2.nme, n2))
+      v1: String, n1: FieldName, 
+      v2: String, n2: FieldName): SqlEqJoinCond =
+    if (n1 == n2) SUsing(n1) else SOn(SProj(v1, n1), SProj(v2, n2))
 
   private def joinToSql(
-      vt: (OpticLang.Var, Tree),
+      vt: (String, TTree),
       keys: Map[TypeNme, FieldName]): SqlJoin = vt match {
-    case (v1, VL(v2, GLabel(inf@OpticInfo(KGetter | KLens, _, _, _)))) => {
-      val cond = condToSql(v2, inf.nme, v1, keys(inf.tgt.nme)) // XXX: unsafe
-      SEqJoin(s"${inf.tgt.nme}", v1.nme, cond)
+    case (v1, TProj(v2: TVar, TOptic(inf@OpticInfo(KGetter | KLens, _, _, _)))) => {
+      val cond = condToSql(v2.nme, inf.nme, v1, keys(inf.tgt.nme))
+      SEqJoin(s"${inf.tgt.nme}", v1, cond)
     }
-    case (Var(n1), VL(_, GLabel(inf))) => {
-      SEqJoin(s"${inf.tgt.nme}", n1, SUsing(keys(inf.src.nme))) // XXX: unsafe
+    case (n1, TProj(_, TOptic(inf))) => {
+      SEqJoin(s"${inf.tgt.nme}", n1, SUsing(keys(inf.src.nme)))
     }
     case _ => throw new Error(s"Don't know how to generate join for '$vt'")
   }
 
   private def whrToSql(
-      whr: Set[Tree],
+      whr: Set[TTree],
       keys: Map[TypeNme, FieldName]): Option[SqlExp] =
     whr.foldLeft(Option.empty[SqlExp]) {
       case (None, t) => Some(treeToExpr(t, keys))
@@ -58,13 +63,14 @@ trait FromSemantic {
     }
 
   private def treeToExpr(
-      t: Tree, 
+      t: TTree, 
       keys: Map[TypeNme, FieldName]): SqlExp = t match {
-    case VL(Var(nme), GLabel(info)) => SProj(nme, info.nme)
-    case Op(op, l, r) => SBinOp(op, treeToExpr(l, keys), treeToExpr(r, keys))
-    case Unary(t, op) => SUnOp(op, treeToExpr(t, keys))
-    case Val(x) => SCons(x)
-    case Sub(sem) => SExists(fromSemantic(sem, keys))
+    case TOptic(info) => SProj("", info.nme)
+    case TProj(TVar(nme), TOptic(info)) => SProj(nme, info.nme)
+    case TBinary(op, l, r) => 
+      SBinOp(op, treeToExpr(l, keys), treeToExpr(r, keys))
+    case TUnary(op, t) => SUnOp(op, treeToExpr(t, keys))
+    case TLiteral(x) => SCons(x)
     case _ => throw new Error(s"Don't know how to translate '$t' into SQL")
   }
 }

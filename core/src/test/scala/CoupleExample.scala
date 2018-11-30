@@ -118,7 +118,7 @@ object CoupleExample {
         TypeInfo("Couples", false), 
         TypeInfo("Couple", true))
 
-      Const(Semantic(Map(Var("c") -> GLabel(oi)), List(Var("c"))))
+      Const(Semantic(TVar("c"), List("c" -> TOptic(oi))))
     }
 
     val her = {
@@ -129,7 +129,7 @@ object CoupleExample {
         TypeInfo("Couple", false), 
         TypeInfo("Person", true))
 
-      Const(Semantic(Map(Var("w") -> GLabel(oi)), List(Var("w"))))
+      Const(Semantic(TVar("w"), List("w" -> TOptic(oi))))
     }
 
     val him = {
@@ -140,7 +140,7 @@ object CoupleExample {
         TypeInfo("Couple", false), 
         TypeInfo("Person", true))
 
-      Const(Semantic(Map(Var("m") -> GLabel(oi)), List(Var("m"))))
+      Const(Semantic(TVar("m"), List("m" -> TOptic(oi))))
     }
 
     val people = {
@@ -151,7 +151,7 @@ object CoupleExample {
         TypeInfo("People", false), 
         TypeInfo("Person", true))
 
-      Const(Semantic(Map(Var("p") -> GLabel(oi)), List(Var("p"))))
+      Const(Semantic(TVar("p"), List("p" -> TOptic(oi))))
     }
 
     val name = {
@@ -162,7 +162,7 @@ object CoupleExample {
         TypeInfo("Person", false), 
         TypeInfo("Person", true))
 
-      Const(Semantic(Map(), List(GLabel(oi))))
+      Const(Semantic(TOptic(oi)))
     }
 
     val age = {
@@ -173,7 +173,7 @@ object CoupleExample {
         TypeInfo("Person", false), 
         TypeInfo("Person", true))
 
-      Const(Semantic(Map(), List(GLabel(oi))))
+      Const(Semantic(TOptic(oi)))
     }
 
     val weight = {
@@ -184,7 +184,7 @@ object CoupleExample {
         TypeInfo("Person", false), 
         TypeInfo("Person", true))
 
-      Const(Semantic(Map(), List(GLabel(oi))))
+      Const(Semantic(TOptic(oi)))
     }
   }
 }
