@@ -257,6 +257,8 @@ object OpticLang {
 
   sealed abstract class TTree
 
+  case class TNested(sem: NewSemantic) extends TTree
+
   sealed abstract class TApply extends TTree
   
   case class TApplyUnary(f: TTree => TTree) extends TApply
@@ -268,7 +270,7 @@ object OpticLang {
 
   case class TLiteral(s: String) extends TExpression
 
-  case class TUnary(op: String, e: TExpression) extends TExpression
+  case class TUnary(op: String, e: TTree) extends TExpression
 
   case class TBinary(op: String, l: TTree, r: TTree)
     extends TExpression
@@ -277,8 +279,6 @@ object OpticLang {
 
   case class TVar(nme: String) extends TVariable
 
-  case class TFree(nme: String, ext: TOptic) extends TVariable
-  
   sealed abstract class TSelection extends TExpression
   
   case class TOptic(info: OpticInfo) extends TSelection
@@ -287,13 +287,22 @@ object OpticLang {
 
   def treeVertCompose(l: TTree, r: TTree): TTree = (l, r) match {
     case (_, lit: TLiteral) => lit
-    case (TApplyUnary(f), TApplyUnary(g)) => TApplyUnary(f compose g)
-    case (TApplyBinary(f), TApplyUnary(g)) => TApplyBinary(f compose g)
+    case (TApplyUnary(f), TApplyUnary(g)) => TApplyUnary(g compose f)
+    case (TApplyBinary(f), TApplyUnary(g)) => 
+      TApplyBinary(t1 => t2 => g(f(t1)(t2)))
     case (TApplyUnary(f), r: TExpression) => 
       TApplyUnary(t => treeVertCompose(f(t), r))
     case (l: TExpression, TApplyUnary(f)) => f(l)
+    case (TApplyBinary(f), r: TExpression) => 
+      TApplyBinary(t1 => t2 => treeVertCompose(f(t1)(t2), r))
     case (TBinary("horizontal", l, r), TApplyBinary(f)) => f(l)(r)
-    case (vr: TVar, opt: TOptic) => TProj(vr, opt)
+    case (_, r: TVar) => r
+    case (_, r: TProj) => r
+    case (l: TVar, r: TOptic) => TProj(l, r)
+    case (l: TExpression, TUnary(op, e)) => TUnary(op, treeVertCompose(l, e))
+    case (l: TExpression, TBinary(op, e1, e2)) => 
+      TBinary(op, treeVertCompose(l, e1), treeVertCompose(l, e2))
+    case _ => throw new Error(s"Invalid vertical tree composition: `$l` & `$r`")
   }
 
   case class NewSemantic(
@@ -311,7 +320,6 @@ object OpticLang {
     val s3 = (s1.reverse, s2) match {
       case (xs, Nil) => xs
       case (Nil, ys) => ys 
-      // XXX: move to `treeVertCompose`
       case ((n, _) :: xs, (m, opt: TOptic) :: ys) => 
         (s1 ++ ((m, TProj(TVar(n), opt)) :: ys))
       case (_, _) => 
