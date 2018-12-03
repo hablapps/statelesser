@@ -156,14 +156,16 @@ object OpticLang {
 
     val p3 = treeVertCompose(p1, p2)
     
-    val s3 = (s1.reverse, s2) match {
-      case (xs, Nil) => xs
-      case (Nil, ys) => ys 
-      case ((n, _) :: xs, (m, opt: TOptic) :: ys) => 
-        (s1 ++ ((m, TProj(TVar(n), opt)) :: ys))
+    val s3 = ((s1.reverse, s2) match {
+      case (xs, Nil) => xs.reverse
+      case (Nil, ys) => ys
+      case ((n, _) :: xs, ys) => s1 ++ ys.map { 
+        case (k, opt: TOptic) => (k, TProj(TVar(n), opt))
+        case x => x
+      }
       case (_, _) => 
         throw new Error(s"Invalid vertical composition of symbols: $s1 $s2")
-    }
+    }).distinct
 
     val f3 = f1 ++ f2.map(t => treeVertCompose(p1, t))
 

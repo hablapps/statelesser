@@ -29,11 +29,11 @@ trait FromSemantic {
 
   private def tabToSql(
       tab: List[(String, TTree)], 
-      keys: Map[TypeNme, FieldName]): SqlFrom = 
+      keys: Map[TypeNme, FieldName]): SqlFrom =
     SFrom(List(tab.toList match {
       case (nme, TOptic(info)) :: xs => 
         STable(info.tgt.nme, nme, xs.map(joinToSql(_, keys)))
-      case _ => throw new Error(s"No table was selected for FROM clause")
+      case _ => throw new Error(s"No table was selected for FROM clause: $tab")
     }))
 
   private def condToSql(
