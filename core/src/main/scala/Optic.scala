@@ -10,6 +10,21 @@ case class Lens[S, A](get : S => A, set : A => S => S)
 
 case class Getter[S, A](get : S => A)
 
+object Getter {
+
+  def first[A, B]: Getter[(A, B), A] = Getter(_._1)
+
+  def second[A, B]: Getter[(A, B), B] = Getter(_._2)
+
+  def like[S, A](a: A): Getter[S, A] = Getter(_ => a)
+
+  def id[S]: Getter[S, S] = Getter(identity)
+
+  def sub: Getter[(Int, Int), Int] = Getter { case (x, y) => x - y }
+
+  def not: Getter[Boolean, Boolean] = Getter(!(_))
+}
+
 trait Fold1[S, A] {
   def foldMap[M : Semigroup](f : A => M): S => M
 }

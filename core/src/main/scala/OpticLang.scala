@@ -1,6 +1,6 @@
 package statelesser
 
-import scalaz._
+import scalaz._, Scalaz._
 
 trait OpticLang[Expr[_]] {
 
@@ -74,6 +74,93 @@ trait OpticLang[Expr[_]] {
 }
 
 object OpticLang {
+
+  def apply[E[_]](implicit ev: OpticLang[E]): OpticLang[E] = ev
+
+  implicit val prettyPrinter = new OpticLang[Const[String, ?]] {
+
+    def flVert[S, A, B](
+        l: Const[String, Fold[S, A]], 
+        r: Const[String, Fold[A, B]]): Const[String, Fold[S, B]] =
+      Const(s"${l.getConst} > ${r.getConst}")
+
+    def flHori[S, A, B](
+        l: Const[String, Fold[S, A]], 
+        r: Const[String, Fold[S, B]]): Const[String, Fold[S, (A, B)]] =
+      Const(s"${l.getConst} * ${r.getConst}")
+
+    def gtVert[S, A, B](
+        l: Const[String, Getter[S, A]], 
+        r: Const[String, Getter[A, B]]): Const[String, Getter[S, B]] =
+      Const(s"${l.getConst} > ${r.getConst}")
+
+    def gtHori[S, A, B](
+        l: Const[String, Getter[S, A]],
+        r: Const[String, Getter[S, B]]): Const[String, Getter[S, (A, B)]] =
+      Const(s"${l.getConst} * ${r.getConst}")
+
+    def aflVert[S, A, B](
+        l: Const[String, AffineFold[S, A]], 
+        r: Const[String, AffineFold[A, B]]): Const[String, AffineFold[S, B]] =
+      Const(s"${l.getConst} > ${r.getConst}")
+
+    def aflHori[S, A, B](
+        l: Const[String, AffineFold[S, A]],
+        r: Const[String, AffineFold[S, B]]): Const[String, AffineFold[S, (A, B)]] =
+      Const(s"${l.getConst} * ${r.getConst}")
+
+    def filtered[S](
+        p: Const[String, Getter[S, Boolean]]): Const[String, AffineFold[S, S]] =
+      Const(s"filtered(${p.getConst})")
+
+    def sub: Const[String, Getter[(Int, Int), Int]] =
+      Const("sub")
+
+    def greaterThan: Const[String, Getter[(Int, Int), Boolean]] =
+      Const("greaterThan")
+
+    def equal[A]: Const[String, Getter[(A, A), Boolean]] =
+      Const("equal")
+
+    def first[A, B]: Const[String, Getter[(A, B), A]] =
+      Const("first")
+
+    def second[A, B]: Const[String, Getter[(A, B), B]] =
+      Const("second")
+
+    def like[S, A](a: A): Const[String, Getter[S, A]] =
+      Const("like")
+
+    def id[S]: Const[String, Getter[S, S]] =
+      Const("id")
+
+    def not: Const[String, Getter[Boolean, Boolean]] =
+      Const("not")
+
+    def getAll[S, A](
+        fl: Const[String, Fold[S, A]]): Const[String, S => List[A]] =
+      Const(s"getAll(${fl.getConst})")
+
+    def lnAsGt[S, A](
+        ln: Const[String, Lens[S, A]]): Const[String, Getter[S, A]] =
+      Const(s"${ln.getConst}.asGetter")
+
+    def gtAsFl1[S, A](
+        gt: Const[String, Getter[S, A]]): Const[String, Fold1[S, A]] =
+      Const(s"${gt.getConst}.asFold1")
+
+    def gtAsAfl[S, A](
+        gt: Const[String, Getter[S, A]]): Const[String, AffineFold[S, A]] =
+      Const(s"${gt.getConst}.asAffineFold")
+
+    def aflAsFl[S, A](
+        afl: Const[String, AffineFold[S, A]]): Const[String, Fold[S, A]] =
+      Const(s"${afl.getConst}.asAffineFold")
+
+    def fl1AsFl[S, A](
+        fl1: Const[String, Fold1[S, A]]): Const[String, Fold[S, A]] =
+      Const(s"${fl1.getConst}.asFold")
+  }
 
   type TypeNme = String
   type OpticNme = String
@@ -200,7 +287,6 @@ object OpticLang {
         r: Const[Semantic, Getter[S, B]]) =
       Const(horiCompose(l.getConst, r.getConst))
 
-
     def filtered[S](p: Const[Semantic, Getter[S, Boolean]]) =
       Const(Semantic(filters = Set(p.getConst.pointer)))
 
@@ -255,6 +341,85 @@ object OpticLang {
 
     def fl1AsFl[S, A](fl1: Const[Semantic, Fold1[S, A]]) =
       Const(fl1.getConst)
+  }
+
+  sealed abstract class TSemantic[E[_], A]
+  case class TGetter[E[_], S, A](
+    gt: Getter[S, A] \/ E[Getter[S, A]]) extends TSemantic[E, Getter[S, A]]
+
+  implicit def tsemantic[E[_]: OpticLang] = new OpticLang[TSemantic[E, ?]] {
+
+    def flVert[S, A, B](
+      l: TSemantic[E, Fold[S, A]], 
+      r: TSemantic[E, Fold[A, B]]): TSemantic[E, Fold[S, B]] = ???
+
+    def flHori[S, A, B](
+      l: TSemantic[E, Fold[S, A]], 
+      r: TSemantic[E, Fold[S, B]]): TSemantic[E, Fold[S, (A, B)]] = ???
+
+    def gtVert[S, A, B](
+        l: TSemantic[E, Getter[S, A]], 
+        r: TSemantic[E, Getter[A, B]]): TSemantic[E, Getter[S, B]] = 
+      (l, r) match {
+        case (TGetter(-\/(gt)), x) if gt == Getter.id => 
+          x.asInstanceOf[TSemantic[E, Getter[S, B]]]
+        case (x, TGetter(-\/(gt))) if gt == Getter.id =>
+          x.asInstanceOf[TSemantic[E, Getter[S, B]]]
+      }
+
+    def gtHori[S, A, B](
+        l: TSemantic[E, Getter[S, A]],
+        r: TSemantic[E, Getter[S, B]]): TSemantic[E, Getter[S, (A, B)]] = {
+      (l, r) match {
+        case (TGetter(-\/(gt1)), TGetter(-\/(gt2))) 
+            if gt1 == Getter.first && gt2 == Getter.second => 
+          TGetter(Getter.id[S].asInstanceOf[Getter[S, (A, B)]].left)
+      }
+    }
+
+    def aflVert[S, A, B](
+      l: TSemantic[E, AffineFold[S, A]], 
+      r: TSemantic[E, AffineFold[A, B]]): TSemantic[E, AffineFold[S, B]] = ???
+
+    def aflHori[S, A, B](
+      l: TSemantic[E, AffineFold[S, A]],
+      r: TSemantic[E, AffineFold[S, B]]): TSemantic[E, AffineFold[S, (A, B)]] = ???
+
+    def filtered[S](p: TSemantic[E, Getter[S, Boolean]]): TSemantic[E, AffineFold[S, S]] = ???
+
+    def sub: TSemantic[E, Getter[(Int, Int), Int]] =
+      TGetter(Getter.sub.left)
+
+    def greaterThan: TSemantic[E, Getter[(Int, Int), Boolean]] = ???
+
+    def equal[A]: TSemantic[E, Getter[(A, A), Boolean]] = ???
+
+    def first[A, B]: TSemantic[E, Getter[(A, B), A]] =
+      TGetter(Getter.first.left)
+
+    def second[A, B]: TSemantic[E, Getter[(A, B), B]] =
+      TGetter(Getter.second.left)
+
+    def like[S, A](a: A): TSemantic[E, Getter[S, A]] =
+      TGetter(Getter.like(a).left)
+
+    def id[S]: TSemantic[E, Getter[S, S]] =
+      TGetter(Getter.id.left)
+
+    def not: TSemantic[E, Getter[Boolean, Boolean]] =
+      TGetter(Getter.not.left)
+
+    def getAll[S, A](fl: TSemantic[E, Fold[S, A]]): TSemantic[E, S => List[A]] = ???
+
+    def lnAsGt[S, A](ln: TSemantic[E, Lens[S, A]]): TSemantic[E, Getter[S, A]] = ???
+
+    def gtAsFl1[S, A](gt: TSemantic[E, Getter[S, A]]): TSemantic[E, Fold1[S, A]] = ???
+
+    def gtAsAfl[S, A](gt: TSemantic[E, Getter[S, A]]): TSemantic[E, AffineFold[S, A]] = ???
+
+    def aflAsFl[S, A](afl: TSemantic[E, AffineFold[S, A]]): TSemantic[E, Fold[S, A]] = ???
+
+    def fl1AsFl[S, A](fl1: TSemantic[E, Fold1[S, A]]): TSemantic[E, Fold[S, A]] = ???
   }
 
   trait Syntax {

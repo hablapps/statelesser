@@ -30,8 +30,20 @@ trait CoupleExample[Expr[_]] {
   def getPeople: Expr[People => List[Person]] =
     getAll(people)
 
-  def getPeopleName: Expr[People => List[String]] =
+  def getPeopleName_1: Expr[People => List[String]] =
     getAll(people > name.asFold)
+
+  def getPeopleName_2: Expr[People => List[String]] =
+    getAll(people > ((name * age) > first).asFold)
+
+  def getPeopleName_3: Expr[People => List[String]] =
+    getAll(people > (((name * age) * weight > first) > first).asFold)
+
+  def getPeopleName_4: Expr[People => List[String]] =
+    getAll(people > (((name * age) * weight > (first > first))).asFold)
+
+  def getPeopleName_5: Expr[People => List[String]] =
+    getAll(people > (name * age > (first > id)).asFold)
 
   def getPeopleNameAndAge_1: Expr[People => List[(String, Int)]] =
     getAll(people > (name * age).asFold)
