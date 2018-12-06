@@ -5,7 +5,7 @@ import scalaz._
 
 import org.scalatest._
 
-import ProductFirst.{pfOpticLang, Unk, run => runPF}
+import ProductFirst.{pfOpticLang, Unk}
 
 class ProductFirstTest extends FlatSpec with Matchers {
 
@@ -14,7 +14,8 @@ class ProductFirstTest extends FlatSpec with Matchers {
     type Couple = Unit
     type Person = Unit
 
-    val ev = pfOpticLang(pfOpticLang[Const[String, ?]])
+    val ev1 = pfOpticLang[Const[String, ?]]
+    val ev = pfOpticLang(ev1)
 
     val couples = Unk(Unk(Const("couples")))
     val her = Unk(Unk(Const("her")))
@@ -25,24 +26,24 @@ class ProductFirstTest extends FlatSpec with Matchers {
     val weight = Unk(Unk(Const("weight")))
   }
 
-  import pretty._
+  import pretty._, ev1.{run => run1}, ev.{run => run0}
 
   val exp = "getAll(people > name.asFold1.asFold)"
 
   "Product-first optimization" should "remove simple first from query" in {
-    runPF(runPF(getPeopleName_2)).getConst shouldBe exp
+    run1(run0(getPeopleName_2)).getConst shouldBe exp
   }
 
   it should "remove several firsts from query" in {
-    runPF(runPF(getPeopleName_3)).getConst shouldBe exp
+    run1(run0(getPeopleName_3)).getConst shouldBe exp
   }
 
   it should "remove a chain of composed firsts" in {
-    runPF(runPF(getPeopleName_4)).getConst shouldBe exp
+    run1(run0(getPeopleName_4)).getConst shouldBe exp
   }
 
   it should "remove a first which contains a continuation" in {
-    runPF(runPF(getPeopleName_5)).getConst shouldBe exp
+    run1(run0(getPeopleName_5)).getConst shouldBe exp
   }
 }
 

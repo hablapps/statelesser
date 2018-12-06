@@ -77,6 +77,85 @@ object OpticLang {
 
   def apply[E[_]](implicit ev: OpticLang[E]): OpticLang[E] = ev
 
+  trait AnnotatedOpticLang[Ann[_[_], _], E[_]] 
+      extends OpticLang[Ann[E, ?]] with Annotated[OpticLang, Ann, E] {
+
+    def flVert[S, A, B](
+        l: Ann[E, Fold[S, A]], 
+        r: Ann[E, Fold[A, B]]): Ann[E, Fold[S, B]] =
+      inject(alg.flVert(run(l), run(r)))
+
+    def flHori[S, A, B](
+        l: Ann[E, Fold[S, A]], 
+        r: Ann[E, Fold[S, B]]): Ann[E, Fold[S, (A, B)]] =
+      inject(alg.flHori(run(l), run(r)))
+
+    def gtVert[S, A, B](
+        l: Ann[E, Getter[S, A]], 
+        r: Ann[E, Getter[A, B]]): Ann[E, Getter[S, B]] =
+      inject(alg.gtVert(run(l), run(r)))
+
+    def gtHori[S, A, B](
+        l: Ann[E, Getter[S, A]],
+        r: Ann[E, Getter[S, B]]): Ann[E, Getter[S, (A, B)]] =
+      inject(alg.gtHori(run(l), run(r)))
+
+    def aflVert[S, A, B](
+        l: Ann[E, AffineFold[S, A]], 
+        r: Ann[E, AffineFold[A, B]]): Ann[E, AffineFold[S, B]] =
+      inject(alg.aflVert(run(l), run(r)))
+
+    def aflHori[S, A, B](
+        l: Ann[E, AffineFold[S, A]],
+        r: Ann[E, AffineFold[S, B]]): Ann[E, AffineFold[S, (A, B)]] =
+      inject(alg.aflHori(run(l), run(r)))
+
+    def filtered[S](p: Ann[E, Getter[S, Boolean]]): Ann[E, AffineFold[S, S]] =
+      inject(alg.filtered(run(p)))
+
+    def sub: Ann[E, Getter[(Int, Int), Int]] =
+      inject(alg.sub)
+
+    def greaterThan: Ann[E, Getter[(Int, Int), Boolean]] =
+      inject(alg.greaterThan)
+
+    def equal[A]: Ann[E, Getter[(A, A), Boolean]] =
+      inject(alg.equal)
+
+    def first[A, B]: Ann[E, Getter[(A, B), A]] =
+      inject(alg.first)
+
+    def second[A, B]: Ann[E, Getter[(A, B), B]] =
+      inject(alg.second)
+
+    def like[S, A](a: A): Ann[E, Getter[S, A]] =
+      inject(alg.like(a))
+
+    def id[S]: Ann[E, Getter[S, S]] =
+      inject(alg.id)
+
+    def not: Ann[E, Getter[Boolean, Boolean]] =
+      inject(alg.not)
+
+    def getAll[S, A](fl: Ann[E, Fold[S, A]]): Ann[E, S => List[A]] =
+      inject(alg.getAll(run(fl)))
+
+    def lnAsGt[S, A](ln: Ann[E, Lens[S, A]]): Ann[E, Getter[S, A]] =
+      inject(alg.lnAsGt(run(ln)))
+
+    def gtAsFl1[S, A](gt: Ann[E, Getter[S, A]]): Ann[E, Fold1[S, A]] =
+      inject(alg.gtAsFl1(run(gt)))
+
+    def gtAsAfl[S, A](gt: Ann[E, Getter[S, A]]): Ann[E, AffineFold[S, A]] =
+      inject(alg.gtAsAfl(run(gt)))
+
+    def aflAsFl[S, A](afl: Ann[E, AffineFold[S, A]]): Ann[E, Fold[S, A]] =
+      inject(alg.aflAsFl(run(afl)))
+
+    def fl1AsFl[S, A](fl1: Ann[E, Fold1[S, A]]): Ann[E, Fold[S, A]] =
+      inject(alg.fl1AsFl(run(fl1)))
+  }
+
   implicit val prettyPrinter = new OpticLang[Const[String, ?]] {
 
     def flVert[S, A, B](
