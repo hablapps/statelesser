@@ -26,33 +26,32 @@ object ProductFirst {
   def landing1[E[_]: OpticLang, A, B, C](
       d: E[Getter[(A, B), A]],
       e: ProductFirst[E, Getter[A, C]]): FirstAndNext[E, A, B, C] = 
-    FirstAndNext[E, A, B, C](OpticLang[E].first, pfOpticLang.run(e))
+    FirstAndNext[E, A, B, C](OpticLang[E].first, optimization.run(e))
     
   def landing2[E[_]: OpticLang, A, B, C, D](
       d: E[Getter[(A, B), A]],
       e: E[Getter[A, C]],
       p: ProductFirst[E, Getter[C, D]]): FirstAndNext[E, A, B, D] =
-    FirstAndNext[E, A, B, D](d, OpticLang[E].gtVert(e, pfOpticLang.run(p)))
+    FirstAndNext[E, A, B, D](d, OpticLang[E].gtVert(e, optimization.run(p)))
 
   def landing3[E[_]: OpticLang, S, A, B](
       e1: E[Getter[S, A]], 
       e2: E[Getter[A, B]]): Unk[E, Getter[S, B]] =
     Unk(OpticLang[E].gtVert(e1, e2))
 
-  implicit def pfOpticLang[E[_]](implicit ev: OpticLang[E]) = 
+  implicit def optimization[E[_]](implicit ev: OpticLang[E]) = 
       new AnnotatedOpticLang[ProductFirst, E] {
 
     val alg = ev
 
     def inject[A](e: E[A]) = Unk(e)
 
-    def run[A](ann: ProductFirst[E, A]) =
-      ann match {
-        case Unk(e) => e
-        case Product(l, r) => alg.gtHori(l, r)
-        case First(_) => alg.first
-        case FirstAndNext(_, e) => alg.gtVert(alg.first, e)
-      }
+    def run[A](ann: ProductFirst[E, A]) = ann match {
+      case Unk(e) => e
+      case Product(l, r) => alg.gtHori(l, r)
+      case First(_) => alg.first
+      case FirstAndNext(_, e) => alg.gtVert(alg.first, e)
+    }
 
     override def gtVert[S, A, B](
         l: ProductFirst[E, Getter[S, A]], 
