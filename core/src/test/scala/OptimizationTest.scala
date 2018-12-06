@@ -116,5 +116,9 @@ class OptimizationTest extends FlatSpec with Matchers {
   it should "remove a first which contains a continuation" in {
     run(getPeopleName_5) shouldBe exp
   }
+
+  it should "reduce a quite dummy query" in {
+    run(getPeopleName_6) shouldBe exp
+  }
 }
 

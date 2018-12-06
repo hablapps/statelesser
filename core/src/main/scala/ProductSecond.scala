@@ -59,8 +59,8 @@ object ProductSecond {
       (l, r) match {
         case (Second(d), e) => landing1(d, e)
         case (SecondAndNext(d, e1), e2) => landing2(d, e1, e2)
-        case (Product(e, _), Second(_)) => Unk(e)
-        case (Product(e1, _), SecondAndNext(_, e2)) => landing3(e1, e2)
+        case (Product(_, e), Second(_)) => Unk(e)
+        case (Product(_, e1), SecondAndNext(_, e2)) => landing3(e1, e2)
         case _ => Unk(OpticLang[E].gtVert(run(l), run(r)))
       }
 

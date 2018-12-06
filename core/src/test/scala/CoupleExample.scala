@@ -45,6 +45,16 @@ trait CoupleExample[Expr[_]] {
   def getPeopleName_5: Expr[People => List[String]] =
     getAll(people > (name * (age * weight) > (first > id)).asFold)
 
+  def getPeopleName_6: Expr[People => List[String]] =
+    getAll(people >
+      (name * weight * age * name * weight >
+      id >
+      second * first >
+      second * first >
+      first * id >
+      first >
+      second).asFold)
+
   def getPeopleNameAndAge_1: Expr[People => List[(String, Int)]] =
     getAll(people > (name * age).asFold)
 
