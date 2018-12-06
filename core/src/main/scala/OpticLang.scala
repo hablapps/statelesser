@@ -40,7 +40,11 @@ trait OpticLang[Expr[_]] {
 
   def second[A, B]: Expr[Getter[(A, B), B]]
 
-  def like[S, A](a: A): Expr[Getter[S, A]]
+  def likeInt[S](i: Int): Expr[Getter[S, Int]]
+
+  def likeBool[S](b: Boolean): Expr[Getter[S, Boolean]]
+
+  def likeStr[S](s: String): Expr[Getter[S, String]]
 
   def id[S]: Expr[Getter[S, S]]
 
@@ -61,10 +65,10 @@ trait OpticLang[Expr[_]] {
   // derived methods
 
   def gt(i: Int): Expr[Getter[Int, Boolean]] = 
-    gtVert(gtHori(id, like(i)), greaterThan)
+    gtVert(gtHori(id, likeInt(i)), greaterThan)
 
-  def eq[A](a: A): Expr[Getter[A, Boolean]] =
-    gtVert(gtHori(id[A], like[A, A](a)), equal[A])
+  // def eq(i: Int): Expr[Getter[Int, Boolean]] =
+  //   gtVert(gtHori(id, like(i)), equal[A])
 
   // def contains[S, A](fl: Expr[Fold[S, A]], a: A): Expr[Getter[S, Boolean]] =
   //   exists(fl, eq(a))
@@ -128,8 +132,14 @@ object OpticLang {
     def second[A, B]: Ann[E, Getter[(A, B), B]] =
       inject(alg.second)
 
-    def like[S, A](a: A): Ann[E, Getter[S, A]] =
-      inject(alg.like(a))
+    def likeInt[S](i: Int): Ann[E, Getter[S, Int]] =
+      inject(alg.likeInt(i))
+
+    def likeBool[S](b: Boolean): Ann[E, Getter[S, Boolean]] =
+      inject(alg.likeBool(b))
+
+    def likeStr[S](s: String): Ann[E, Getter[S, String]] =
+      inject(alg.likeStr(s))
 
     def id[S]: Ann[E, Getter[S, S]] =
       inject(alg.id)
@@ -176,7 +186,7 @@ object OpticLang {
     def gtHori[S, A, B](
         l: Const[String, Getter[S, A]],
         r: Const[String, Getter[S, B]]): Const[String, Getter[S, (A, B)]] =
-      Const(s"${l.getConst} * ${r.getConst}")
+      Const(s"(${l.getConst} * ${r.getConst})")
 
     def aflVert[S, A, B](
         l: Const[String, AffineFold[S, A]], 
@@ -207,8 +217,14 @@ object OpticLang {
     def second[A, B]: Const[String, Getter[(A, B), B]] =
       Const("second")
 
-    def like[S, A](a: A): Const[String, Getter[S, A]] =
-      Const("like")
+    def likeInt[S](i: Int): Const[String, Getter[S, Int]] =
+      Const(s"likeInt(${i.toString})")
+
+    def likeBool[S](b: Boolean): Const[String, Getter[S, Boolean]] =
+      Const(s"likeBool(${b.toString})")
+    
+    def likeStr[S](s: String): Const[String, Getter[S, String]] =
+      Const(s"""likeStr("$s")""")
 
     def id[S]: Const[String, Getter[S, S]] =
       Const("id")
@@ -397,8 +413,14 @@ object OpticLang {
     def second[A, B] =
       Const(Semantic(pointer = TApplyBinary(_ => r => r)))
 
-    def like[S, A](a: A) =
-      Const(Semantic(pointer = TLiteral(a.toString)))
+    def likeInt[S](i: Int) =
+      Const(Semantic(pointer = TLiteral(i.toString)))
+
+    def likeBool[S](b: Boolean) =
+      Const(Semantic(pointer = TLiteral(b.toString)))
+    
+    def likeStr[S](s: String) =
+      Const(Semantic(pointer = TLiteral(s""""$s"""")))
 
     def id[S] =
       Const(Semantic(pointer = TApplyUnary(identity)))
@@ -479,8 +501,14 @@ object OpticLang {
     def second[A, B]: TSemantic[E, Getter[(A, B), B]] =
       TGetter(Getter.second.left)
 
-    def like[S, A](a: A): TSemantic[E, Getter[S, A]] =
-      TGetter(Getter.like(a).left)
+    def likeInt[S](i: Int): TSemantic[E, Getter[S, Int]] =
+      TGetter(Getter.like(i).left)
+
+    def likeBool[S](b: Boolean): TSemantic[E, Getter[S, Boolean]] =
+      TGetter(Getter.like(b).left)
+
+    def likeStr[S](s: String): TSemantic[E, Getter[S, String]] =
+      TGetter(Getter.like(s).left)
 
     def id[S]: TSemantic[E, Getter[S, S]] =
       TGetter(Getter.id.left)
