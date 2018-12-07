@@ -30,8 +30,51 @@ trait CoupleExample[Expr[_]] {
   def getPeople: Expr[People => List[Person]] =
     getAll(people)
 
-  def getPeopleName: Expr[People => List[String]] =
+  def getPeopleName_1: Expr[People => List[String]] =
     getAll(people > name.asFold)
+
+  def getPeopleName_2: Expr[People => List[String]] =
+    getAll(people > ((name * age) > first).asFold)
+
+  def getPeopleName_3: Expr[People => List[String]] =
+    getAll(people > (((name * age) * weight > first) > first).asFold)
+
+  def getPeopleName_4: Expr[People => List[String]] =
+    getAll(people > (((name * age) * weight > (first > first))).asFold)
+
+  def getPeopleName_5: Expr[People => List[String]] =
+    getAll(people > (name * (age * weight) > (first > id)).asFold)
+
+  def getPeopleName_6: Expr[People => List[String]] =
+    getAll(people >
+      (name * weight * age * name * weight >
+      id >
+      second * first >
+      second * first >
+      first * id >
+      first >
+      second).asFold)
+
+  def getPeopleNameAnd3_1: Expr[People => List[(String, Int)]] =
+    getAll(people > (name * likeInt(3)).asFold)
+
+  def getPeopleNameAnd3_2: Expr[People => List[(String, Int)]] =
+    getAll(people >
+      (name * weight * age * name * weight >
+      id >
+      first * likeInt(3) >
+      (first[(((String, Int), Int), String), Int] > second) * second >
+      id).asFold)
+
+  def getPeopleNameAnd3_3: Expr[People => List[(String, Int)]] =
+    getAll(people >
+      ((name * (likeInt(3) * likeInt(0))) >
+      first * (second > sub)).asFold)
+
+  def getPeopleNameAnd3_4: Expr[People => List[(String, Int)]] =
+    getAll(people >
+      ((name * (likeInt(4) * likeInt(1))) >
+      first * (second > sub)).asFold)
 
   def getPeopleNameAndAge_1: Expr[People => List[(String, Int)]] =
     getAll(people > (name * age).asFold)
