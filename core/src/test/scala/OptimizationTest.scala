@@ -14,75 +14,64 @@ class OptimizationTest extends FlatSpec with Matchers {
     ProductProduct[
     ProductProduct[
     ProductProduct[
-    ProductProduct[
-    ClearId[
     ClearId[
     ClearId[
     ClearId[
     ProductFirst[
     ProductFirst[
     ProductFirst[
-    ProductFirst[
-    ProductSecond[
     ProductSecond[
     ProductSecond[
     ProductSecond[ 
     VerticalLike[
     VerticalLike[
     VerticalLike[
-    VerticalLike[
+    IntEval[
     Const[String, ?], 
-    ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], A]
+    ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], A]
 
-  val ev19 = VerticalLike.optimization[Const[String, ?]]
+  val ev20 = IntEval.optimization[Const[String, ?]]
+  val ev19 = VerticalLike.optimization(ev20)
   val ev18 = VerticalLike.optimization(ev19)
   val ev17 = VerticalLike.optimization(ev18)
-  val ev16 = VerticalLike.optimization(ev17)
-  val ev15 = ProductSecond.optimization(ev16)
+  val ev15 = ProductSecond.optimization(ev17)
   val ev14 = ProductSecond.optimization(ev15)
   val ev13 = ProductSecond.optimization(ev14)
-  val ev12 = ProductSecond.optimization(ev13)
-  val ev11 = ProductFirst.optimization(ev12)
+  val ev11 = ProductFirst.optimization(ev13)
   val ev10 = ProductFirst.optimization(ev11)
   val ev09 = ProductFirst.optimization(ev10)
-  val ev08 = ProductFirst.optimization(ev09)
-  val ev07 = ClearId.optimization(ev08)
+  val ev07 = ClearId.optimization(ev09)
   val ev06 = ClearId.optimization(ev07)
   val ev05 = ClearId.optimization(ev06)
-  val ev04 = ClearId.optimization(ev05)
-  val ev03 = ProductProduct.optimization(ev04)
+  val ev03 = ProductProduct.optimization(ev05)
   val ev02 = ProductProduct.optimization(ev03)
   val ev01 = ProductProduct.optimization(ev02)
-  val ev00 = ProductProduct.optimization(ev01)
 
   private def wrap[A](s: String): Stack[A] =
     ProductProduct.Unk(
     ProductProduct.Unk(
     ProductProduct.Unk(
-    ProductProduct.Unk(
-    ClearId.Unk(
     ClearId.Unk(
     ClearId.Unk(
     ClearId.Unk(
     ProductFirst.Unk(
     ProductFirst.Unk(
     ProductFirst.Unk(
-    ProductFirst.Unk(
-    ProductSecond.Unk(
     ProductSecond.Unk(
     ProductSecond.Unk(
     ProductSecond.Unk(
     VerticalLike.Unk(  
     VerticalLike.Unk(  
-    VerticalLike.Unk(  
-    VerticalLike.Unk(Const[String, A](s))
-    )))))))))))))))))))
+    VerticalLike.Unk(
+    IntEval.Unk(
+    Const[String, A](s))
+    )))))))))))))))
 
   val pretty = new CoupleExample[Stack] {
     type Couple = Unit
     type Person = Unit
 
-    val ev = ev00
+    val ev = ev01
 
     val couples = wrap("couples")
     val her = wrap("her")
@@ -98,26 +87,22 @@ class OptimizationTest extends FlatSpec with Matchers {
   val exp = "getAll(people > name.asFold1.asFold)"
 
   def run[A](p: Stack[A]): String =
+    ev20.run(
     ev19.run(
     ev18.run(
     ev17.run(
-    ev16.run(
     ev15.run(
     ev14.run(
     ev13.run(
-    ev12.run(
     ev11.run(
     ev10.run(
     ev09.run(
-    ev08.run(
     ev07.run(
     ev06.run(
     ev05.run(
-    ev04.run(
     ev03.run(
     ev02.run(
-    ev01.run(
-    ev.run(p)))))))))))))))))))).getConst
+    ev.run(p)))))))))))))))).getConst
 
   "Test optimization stack" should "remove simple first from query" in {
     run(getPeopleName_2) shouldBe exp
@@ -147,6 +132,14 @@ class OptimizationTest extends FlatSpec with Matchers {
 
   it should "reduce a quite dummy query with likes" in {
     run(getPeopleNameAnd3_2) shouldBe exp2
+  }
+
+  it should "reduce a substraction with 0 on the right" in {
+    run(getPeopleNameAnd3_3) shouldBe exp2
+  }
+
+  it should "reduce a substraction by evaluating likes" in {
+    run(getPeopleNameAnd3_4) shouldBe exp2
   }
 }
 
