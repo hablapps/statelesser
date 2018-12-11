@@ -445,8 +445,26 @@ object OpticLang {
   }
 
   sealed abstract class TSemantic[E[_], A]
-  case class TGetter[E[_], S, A](
-    gt: Getter[S, A] \/ E[Getter[S, A]]) extends TSemantic[E, Getter[S, A]]
+
+  case class First[E[_], A, B](d: E[Getter[(A, B), A]]) 
+    extends TSemantic[E, Getter[(A, B), A]]
+    
+  case class Second[E[_], A, B](d: E[Getter[(A, B), B]]) 
+    extends TSemantic[E, Getter[(A, B), B]]
+
+  case class Id[E[_], S](d: E[Getter[S, S]]) 
+    extends TSemantic[E, Getter[S, S]]
+
+  case class Product[E[_], S, A, B](
+      d: E[Getter[S, (A, B)]],
+      l: TSemantic[E, Getter[S, A]], 
+      r: TSemantic[E, Getter[S, B]])
+    extends TSemantic[E, Getter[S, (A, B)]]
+
+  case class Vert[E[_], S, A, B](
+      l: TSemantic[E, Getter[S, A]], 
+      r: TSemantic[E, Getter[A, B]])
+    extends TSemantic[E, Getter[S, B]]
 
   implicit def tsemantic[E[_]: OpticLang] = new OpticLang[TSemantic[E, ?]] {
 
@@ -460,23 +478,12 @@ object OpticLang {
 
     def gtVert[S, A, B](
         l: TSemantic[E, Getter[S, A]], 
-        r: TSemantic[E, Getter[A, B]]): TSemantic[E, Getter[S, B]] = 
-      (l, r) match {
-        case (TGetter(-\/(gt)), x) if gt == Getter.id => 
-          x.asInstanceOf[TSemantic[E, Getter[S, B]]]
-        case (x, TGetter(-\/(gt))) if gt == Getter.id =>
-          x.asInstanceOf[TSemantic[E, Getter[S, B]]]
-      }
+        r: TSemantic[E, Getter[A, B]]) = ???
 
     def gtHori[S, A, B](
         l: TSemantic[E, Getter[S, A]],
-        r: TSemantic[E, Getter[S, B]]): TSemantic[E, Getter[S, (A, B)]] = {
-      (l, r) match {
-        case (TGetter(-\/(gt1)), TGetter(-\/(gt2))) 
-            if gt1 == Getter.first && gt2 == Getter.second => 
-          TGetter(Getter.id[S].asInstanceOf[Getter[S, (A, B)]].left)
-      }
-    }
+        r: TSemantic[E, Getter[S, B]]): TSemantic[E, Getter[S, (A, B)]] =
+      Product(???, l, r)
 
     def aflVert[S, A, B](
       l: TSemantic[E, AffineFold[S, A]], 
@@ -488,33 +495,32 @@ object OpticLang {
 
     def filtered[S](p: TSemantic[E, Getter[S, Boolean]]): TSemantic[E, AffineFold[S, S]] = ???
 
-    def sub: TSemantic[E, Getter[(Int, Int), Int]] =
-      TGetter(Getter.sub.left)
+    def sub: TSemantic[E, Getter[(Int, Int), Int]] = ???
 
     def greaterThan: TSemantic[E, Getter[(Int, Int), Boolean]] = ???
 
     def equal[A]: TSemantic[E, Getter[(A, A), Boolean]] = ???
 
     def first[A, B]: TSemantic[E, Getter[(A, B), A]] =
-      TGetter(Getter.first.left)
+      First(OpticLang[E].first)
 
     def second[A, B]: TSemantic[E, Getter[(A, B), B]] =
-      TGetter(Getter.second.left)
+      Second(OpticLang[E].second)
 
     def likeInt[S](i: Int): TSemantic[E, Getter[S, Int]] =
-      TGetter(Getter.like(i).left)
+      ???
 
     def likeBool[S](b: Boolean): TSemantic[E, Getter[S, Boolean]] =
-      TGetter(Getter.like(b).left)
+      ???
 
     def likeStr[S](s: String): TSemantic[E, Getter[S, String]] =
-      TGetter(Getter.like(s).left)
+      ???
 
     def id[S]: TSemantic[E, Getter[S, S]] =
-      TGetter(Getter.id.left)
+      Id(OpticLang[E].id)
 
     def not: TSemantic[E, Getter[Boolean, Boolean]] =
-      TGetter(Getter.not.left)
+      ???
 
     def getAll[S, A](fl: TSemantic[E, Fold[S, A]]): TSemantic[E, S => List[A]] = ???
 

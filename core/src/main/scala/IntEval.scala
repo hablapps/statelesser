@@ -23,11 +23,6 @@ object IntEval {
       d: E[Getter[(Int, Int), Int]])
     extends IntEval[E, Getter[(Int, Int), Int]]
 
-  case class SubAndNext[E[_], A](
-      d: E[Getter[(Int, Int), Int]],
-      e: E[Getter[Int, A]])
-    extends IntEval[E, Getter[(Int, Int), A]]
-
   case class LikeInt[E[_], S](
       d: E[Getter[S, Int]],
       i: Int)
@@ -46,17 +41,6 @@ object IntEval {
     ProductLike(gtHori(likeInt(x), likeInt(y)), x, y)
   }
 
-  def landing3[E[_]: OpticLang, A](
-      d: E[Getter[(Int, Int), Int]],
-      e: IntEval[E, Getter[Int, A]]): SubAndNext[E, A] = 
-    SubAndNext(OpticLang[E].sub, optimization.run(e))
-
-  def landing4[E[_]: OpticLang, A, B](
-      d: E[Getter[(Int, Int), Int]],
-      e: E[Getter[Int, A]],
-      p: IntEval[E, Getter[A, B]]): SubAndNext[E, B] =
-    SubAndNext(d, OpticLang[E].gtVert(e, optimization.run(p)))
-
   implicit def optimization[E[_]](implicit ev: OpticLang[E]) =
       new AnnotatedOpticLang[IntEval, E] {
     
@@ -69,21 +53,14 @@ object IntEval {
       case Product0(l, r) => alg.gtHori(l, r)
       case ProductLike(_, l, r) => alg.gtHori(l, r)
       case Sub(_) => alg.sub
-      case SubAndNext(_, e) => alg.gtVert(alg.sub, e)
       case LikeInt(_, i) => alg.likeInt(i)
     }
 
     override def gtVert[S, A, B](
         l: IntEval[E, Getter[S, A]],
         r: IntEval[E, Getter[A, B]]) = (l, r) match {
-      case (Sub(d), e) => landing3(d, e)
-      case (SubAndNext(d, e1), e2) => landing4(d, e1, e2)
       case (Product0(e, _), Sub(_)) => inject(e)
       case (ProductLike(_, x, y), Sub(_)) => inject(alg.likeInt(x - y))
-      case (Product0(e1, _), SubAndNext(_, e2)) =>
-        inject(alg.gtVert(e1, e2))
-      case (ProductLike(_, x, y), SubAndNext(_, e)) =>
-        inject(alg.gtVert(alg.likeInt(x-y), e))
       case _ => inject(alg.gtVert(run(l), run(r)))
     }
 

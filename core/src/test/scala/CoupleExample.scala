@@ -117,6 +117,10 @@ trait CoupleExample[Expr[_]] {
     getAll(couples > ((her > name).asAffineFold <* 
       ((her > age).asAffineFold > filtered (gt(30)))).asFold)
 
+  def differenceAll: Expr[Couples => List[(String, Int)]] =
+    getAll(couples >
+      ((her > name) * ((her > age) * (him > age) > sub)).asFold)
+
   def difference: Expr[Couples => List[(String, Int)]] =
     getAll(couples > 
       ((her > name).asAffineFold * 

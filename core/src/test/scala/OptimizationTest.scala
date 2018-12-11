@@ -14,6 +14,9 @@ class OptimizationTest extends FlatSpec with Matchers {
     ProductProduct[
     ProductProduct[
     ProductProduct[
+    VertLeftAssoc[
+    VertLeftAssoc[
+    VertLeftAssoc[
     ClearId[
     ClearId[
     ClearId[
@@ -28,7 +31,7 @@ class OptimizationTest extends FlatSpec with Matchers {
     VerticalLike[
     IntEval[
     Const[String, ?], 
-    ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], A]
+    ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], A]
 
   val ev20 = IntEval.optimization[Const[String, ?]]
   val ev19 = VerticalLike.optimization(ev20)
@@ -43,14 +46,20 @@ class OptimizationTest extends FlatSpec with Matchers {
   val ev07 = ClearId.optimization(ev09)
   val ev06 = ClearId.optimization(ev07)
   val ev05 = ClearId.optimization(ev06)
-  val ev03 = ProductProduct.optimization(ev05)
-  val ev02 = ProductProduct.optimization(ev03)
+  val ev04 = VertLeftAssoc.optimization(ev05)
+  val ev03 = VertLeftAssoc.optimization(ev04)
+  val ev02 = VertLeftAssoc.optimization(ev03)
   val ev01 = ProductProduct.optimization(ev02)
+  val ev00 = ProductProduct.optimization(ev01)
+  val ev_f = ProductProduct.optimization(ev00)
 
   private def wrap[A](s: String): Stack[A] =
     ProductProduct.Unk(
     ProductProduct.Unk(
     ProductProduct.Unk(
+    VertLeftAssoc.Unk(
+    VertLeftAssoc.Unk(
+    VertLeftAssoc.Unk(
     ClearId.Unk(
     ClearId.Unk(
     ClearId.Unk(
@@ -65,13 +74,13 @@ class OptimizationTest extends FlatSpec with Matchers {
     VerticalLike.Unk(
     IntEval.Unk(
     Const[String, A](s))
-    )))))))))))))))
+    ))))))))))))))))))
 
   val pretty = new CoupleExample[Stack] {
     type Couple = Unit
     type Person = Unit
 
-    val ev = ev01
+    val ev = ev_f
 
     val couples = wrap("couples")
     val her = wrap("her")
@@ -100,9 +109,12 @@ class OptimizationTest extends FlatSpec with Matchers {
     ev07.run(
     ev06.run(
     ev05.run(
+    ev04.run(
     ev03.run(
     ev02.run(
-    ev.run(p)))))))))))))))).getConst
+    ev01.run(
+    ev00.run(
+    ev.run(p))))))))))))))))))).getConst
 
   "Test optimization stack" should "remove simple first from query" in {
     run(getPeopleName_2) shouldBe exp

@@ -36,7 +36,7 @@ object ProductProduct {
     override def gtHori[S, A, B](
         l: ProductProduct[E, Getter[S, A]],
         r: ProductProduct[E, Getter[S, B]]): ProductProduct[E, Getter[S, (A, B)]] =
-      Product[E, S, A, B](run(l), run(r))
+      Product(run(l), run(r))
   }
 }
 
