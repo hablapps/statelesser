@@ -444,27 +444,41 @@ object OpticLang {
       Const(fl1.getConst)
   }
 
-  sealed abstract class TSemantic[E[_], A]
+  sealed abstract class TSemantic[E[_], A] 
 
-  case class First[E[_], A, B](d: E[Getter[(A, B), A]]) 
-    extends TSemantic[E, Getter[(A, B), A]]
-    
-  case class Second[E[_], A, B](d: E[Getter[(A, B), B]]) 
-    extends TSemantic[E, Getter[(A, B), B]]
+  type Table = Map[String, Any]
 
-  case class Id[E[_], S](d: E[Getter[S, S]]) 
-    extends TSemantic[E, Getter[S, S]]
+  case class TGetter[E[_], S, A](
+    vars: Table = Map.empty[String, Any],
+    expr: TExpr[E, S, A]) extends TSemantic[E, Getter[S, A]]
+
+  sealed abstract class TExpr[E[_], S, A]
 
   case class Product[E[_], S, A, B](
-      d: E[Getter[S, (A, B)]],
-      l: TSemantic[E, Getter[S, A]], 
-      r: TSemantic[E, Getter[S, B]])
-    extends TSemantic[E, Getter[S, (A, B)]]
+      l: TExpr[E, S, A],
+      r: TExpr[E, S, B])
+    extends TExpr[E, S, (A, B)]
 
-  case class Vert[E[_], S, A, B](
-      l: TSemantic[E, Getter[S, A]], 
-      r: TSemantic[E, Getter[A, B]])
-    extends TSemantic[E, Getter[S, B]]
+  case class Vertical[E[_], S, A, B](
+      u: TExpr[E, S, A],
+      d: TExpr[E, A, B])
+    extends TExpr[E, S, B]
+
+  case class Var[E[_], S, A](name: String) extends TExpr[E, S, A]
+
+  case class Wrap[E[_], S, A](e: E[Getter[S, A]]) extends TExpr[E, S, A]
+
+  case class First[E[_], A, B](dummy: E[Getter[(A, B), A]]) 
+    extends TExpr[E, (A, B), A]
+
+  implicit class TableOps[E[_]](map: Table) {
+
+    def getV[S, A](v: Var[E, S, A]): E[Getter[S, A]] = 
+      map(v.name).asInstanceOf[E[Getter[S, A]]]
+
+    def deleteV[S, A](v: Var[E, S, A]): Table =
+      map - v.name
+  }
 
   implicit def tsemantic[E[_]: OpticLang] = new OpticLang[TSemantic[E, ?]] {
 
@@ -478,12 +492,31 @@ object OpticLang {
 
     def gtVert[S, A, B](
         l: TSemantic[E, Getter[S, A]], 
-        r: TSemantic[E, Getter[A, B]]) = ???
+        r: TSemantic[E, Getter[A, B]]) = {
+      val TGetter(vars1, expr1) = l
+      val TGetter(vars2, expr2) = r
+      (expr1, expr2) match {
+        case (x@Var(_), y@Var(s)) => {
+          val e = OpticLang[E].gtVert(vars1.getV(x), vars2.getV(y))
+          TGetter((vars1.deleteV(x) ++ vars2.deleteV(y)) + (s -> e), Var(s))
+        }
+        case (Vertical(prev, x@Var(_)), y@Var(s)) => {
+          val e = OpticLang[E].gtVert(vars1.getV(x), vars2.getV(y))
+          TGetter(
+            (vars1.deleteV(x) ++ vars2.deleteV(y)) + (s -> e), 
+            Vertical(prev, Var(s)))
+        }
+        case _ => TGetter(vars1 ++ vars2, Vertical(expr1, expr2))
+      }
+    }
 
     def gtHori[S, A, B](
         l: TSemantic[E, Getter[S, A]],
-        r: TSemantic[E, Getter[S, B]]): TSemantic[E, Getter[S, (A, B)]] =
-      Product(???, l, r)
+        r: TSemantic[E, Getter[S, B]]): TSemantic[E, Getter[S, (A, B)]] = {
+      val TGetter(vars1, expr1) = l
+      val TGetter(vars2, expr2) = r
+      TGetter(vars1 ++ vars2, Product(expr1, expr2))
+    }
 
     def aflVert[S, A, B](
       l: TSemantic[E, AffineFold[S, A]], 
@@ -495,17 +528,17 @@ object OpticLang {
 
     def filtered[S](p: TSemantic[E, Getter[S, Boolean]]): TSemantic[E, AffineFold[S, S]] = ???
 
-    def sub: TSemantic[E, Getter[(Int, Int), Int]] = ???
+    def sub: TSemantic[E, Getter[(Int, Int), Int]] =
+      TGetter(expr = Wrap(OpticLang[E].sub))
 
     def greaterThan: TSemantic[E, Getter[(Int, Int), Boolean]] = ???
 
     def equal[A]: TSemantic[E, Getter[(A, A), Boolean]] = ???
 
-    def first[A, B]: TSemantic[E, Getter[(A, B), A]] =
-      First(OpticLang[E].first)
+    def first[A, B]: TSemantic[E, Getter[(A, B), A]] = ???
 
     def second[A, B]: TSemantic[E, Getter[(A, B), B]] =
-      Second(OpticLang[E].second)
+      ???
 
     def likeInt[S](i: Int): TSemantic[E, Getter[S, Int]] =
       ???
@@ -517,7 +550,7 @@ object OpticLang {
       ???
 
     def id[S]: TSemantic[E, Getter[S, S]] =
-      Id(OpticLang[E].id)
+      ???
 
     def not: TSemantic[E, Getter[Boolean, Boolean]] =
       ???
