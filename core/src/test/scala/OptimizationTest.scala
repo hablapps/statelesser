@@ -46,8 +46,8 @@ class OptimizationTest extends FlatSpec with Matchers {
   val ev00 = ProductProduct.optimization(ev01)
   val ev_f = ProductProduct.optimization(ev00)
 
-  private def wrap[S, A](
-      sem: TSemantic[Const[String, ?], Getter[S, A]]): Stack[Getter[S, A]] =
+  private def wrap[O[_, _], S, A](
+      sem: TSemantic[Const[String, ?], O[S, A]]): Stack[O[S, A]] =
     ProductProduct.Unk(
     ProductProduct.Unk(
     ProductProduct.Unk(
@@ -65,11 +65,14 @@ class OptimizationTest extends FlatSpec with Matchers {
     IntEval.Unk(sem)
     ))))))))))))))
 
-  private def wrapPlain[S, A](s: String): Stack[Getter[S, A]] =
+  private def wrapPlainG[S, A](s: String): Stack[Getter[S, A]] =
     wrap(TGetter(expr = Wrap(Const(s))))
 
-  private def wrapTable[S, A](v: String, s: String): Stack[Getter[S, A]] =
-    wrap(TGetter(Set(v -> Const(s)), Var(v)))
+  private def wrapTableG[S, A](v: String, s: String): Stack[Getter[S, A]] =
+    wrap(TGetter(Set(v -> Wrap[Const[String, ?], Getter, S, A](Const(s))), Var(v)))
+
+  private def wrapTableF[S, A](v: String, s: String): Stack[Fold[S, A]] =
+    wrap(TFold(Set(v -> Wrap[Const[String, ?], Fold, S, A](Const(s))), Var(v)))
 
   val pretty = new CoupleExample[Stack] {
     type Couple = Unit
@@ -77,15 +80,15 @@ class OptimizationTest extends FlatSpec with Matchers {
 
     val ev = ev_f
 
-    def couples = ??? // wrapTable("c", "couples")
-    val her = wrapTable("w", "her")
-    val him = wrapTable("m", "him")
-    def people = ??? // wrapTable("p", "people")
-    val name = wrapPlain("name")
-    val age = wrapPlain("age")
-    val weight = wrapPlain("weight")
-    val address = wrapTable("a", "address")
-    val street = wrapPlain("street")
+    def couples = wrapTableF("c", "couples")
+    val her = wrapTableG("w", "her")
+    val him = wrapTableG("m", "him")
+    def people = wrapTableF("p", "people")
+    val name = wrapPlainG("name")
+    val age = wrapPlainG("age")
+    val weight = wrapPlainG("weight")
+    val address = wrapTableG("a", "address")
+    val street = wrapPlainG("street")
   }
 
   import pretty._

@@ -39,17 +39,18 @@ trait CoupleExample[Expr[_]] {
   def getPeopleName_2: Expr[People => List[String]] =
     getAll(people > ((name * age) > first).asFold)
 
-  def peopleName_1: Expr[Getter[Person, String]] = 
-    name * age * weight > first > first
+  def peopleName_1: Expr[Fold[People, String]] = 
+    people > (name * age * weight > first > first).asFold
 
-  def peopleName_2: Expr[Getter[Person, String]] =
-    name * weight * age * name * weight >
-    id >
-    second * first >
-    second * first >
-    first * id >
-    first >
-    second
+  def peopleName_2: Expr[Fold[People, String]] =
+    people > (
+      name * weight * age * name * weight >
+      id >
+      second * first >
+      second * first >
+      first * id >
+      first >
+      second).asFold
 
   def getPeopleName_3: Expr[People => List[String]] =
     getAll(people > (((name * age) * weight > first) > first).asFold)
@@ -100,15 +101,12 @@ trait CoupleExample[Expr[_]] {
   def getHer: Expr[Couples => List[Person]] =
     getAll(couples > her.asFold)
 
-  def herNameAndStreet: Expr[Getter[Couple, (String, String)]] =
-    her > name * (address > street)
+  def herNameAndStreet: Expr[Fold[Couples, (String, String)]] =
+    couples > (her > name * (address > street)).asFold
 
-  def herAndHimStreet_1: Expr[Getter[Couple, (String, String)]] =
-    her * him > (first > address > street) * (second > address > street)
-
-  def herAndHimStreet_2: Expr[Getter[Couple, (String, String)]] =
-    ((her * him > first) > (address > street)) * 
-      ((her * him > second) > (address > street))
+  def herAndHimStreet_1: Expr[Fold[Couples, (String, String)]] =
+    couples > (
+      her * him > (first > address > street) * (second > address > street)).asFold
 
   def getHerName: Expr[Couples => List[String]] =
     getAll(couples > her.asFold > name.asFold)

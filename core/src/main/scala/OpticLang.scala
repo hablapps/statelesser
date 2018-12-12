@@ -251,7 +251,7 @@ object OpticLang {
 
     def aflAsFl[S, A](
         afl: Const[String, AffineFold[S, A]]): Const[String, Fold[S, A]] =
-      Const(s"${afl.getConst}.asAffineFold")
+      Const(s"${afl.getConst}.asFold")
 
     def fl1AsFl[S, A](
         fl1: Const[String, Fold1[S, A]]): Const[String, Fold[S, A]] =
@@ -445,106 +445,124 @@ object OpticLang {
       Const(fl1.getConst)
   }
 
-  sealed abstract class TSemantic[E[_], A] 
-
-  type Table = Set[(String, Any)]
-
-  type Rewrite = (String, String)
-
-  private def unifyRewritings(t1: Table, t2: Table): List[Rewrite \/ Rewrite] = 
+  private def unifyRewritings[E[_], O[_, _]](
+      t1: Table[E, O], t2: Table[E, O]): List[Rewrite \/ Rewrite] = 
     (t1 ++ t2).groupBy(_._2).values.filter(_.length > 1)
       .foldLeft(List.empty[Rewrite \/ Rewrite])(
         (acc, s) => acc ++ List(\/-(s.last._1 -> s.head._1)))
 
-  private def diffRewritings(t1: Table, t2: Table): List[Rewrite \/ Rewrite] = 
+  private def diffRewritings[E[_], O[_, _]](
+      t1: Table[E, O], t2: Table[E, O]): List[Rewrite \/ Rewrite] = 
     (t1 ++ t2).groupBy(_._1).values.filter(_.length > 1)
       .foldLeft(List.empty[Rewrite \/ Rewrite])(
         (acc, s) => acc ++ List(
           -\/(s.head._1 -> (s.head._1 ++ "1")), 
           \/-(s.last._1 -> (s.last._1 ++ "2"))))
 
-  private def getRewritings(t1: Table, t2: Table): List[Rewrite \/ Rewrite] =
+  private def getRewritings[E[_], O[_, _]](
+      t1: Table[E, O], t2: Table[E, O]): List[Rewrite \/ Rewrite] =
     unifyRewritings(t1, t2) ++ diffRewritings(t1, t2)
   
-  private def rewriteExpr[E[_], S, A](
-      e: TExpr[E, S, A], rw: Rewrite): TExpr[E, S, A] = e match {
+  private def rewriteExpr[E[_], O[_, _], S, A](
+      e: TExpr[E, O, S, A], rw: Rewrite): TExpr[E, O, S, A] = e match {
     case Product(l, r, is) => Product(rewriteExpr(l, rw), rewriteExpr(r, rw), is)
     case Vertical(u, d) => Vertical(rewriteExpr(u, rw), rewriteExpr(d, rw))
     case Var(x) if x == rw._1 => Var(rw._2)
     case _ => e
   }
 
-  private def rewriteTable(t: Table, rw: Rewrite): Table =
+  private def rewriteTable[E[_], O[_, _]](
+      t: Table[E, O], rw: Rewrite): Table[E, O] =
     t.map { 
       case (v, e) if v == rw._1 => (rw._2, e)
       case x => x
     }
 
+  sealed abstract class TSemantic[E[_], A] 
+
+  type Row[E[_], O[_, _]] = (String, TExpr[E, O, _, _])
+
+  type Table[E[_], O[_, _]] = Set[Row[E, O]]
+
+  type Rewrite = (String, String)
+
   case class TGetter[E[_], S, A](
-    vars: Table = Set.empty[(String, Any)],
-    expr: TExpr[E, S, A]) extends TSemantic[E, Getter[S, A]]
+    vars: Table[E, Getter] = Set.empty[Row[E, Getter]],
+    expr: TExpr[E, Getter, S, A]) extends TSemantic[E, Getter[S, A]]
 
-  sealed abstract class TExpr[E[_], S, A]
+  case class TAffineFold[E[_], S, A](
+    vars: Table[E, AffineFold] = Set.empty[Row[E, AffineFold]],
+    expr: TExpr[E, AffineFold, S, A]) extends TSemantic[E, AffineFold[S, A]]
 
-  case class Product[E[_], S, A, B, C](
-      l: TExpr[E, S, A],
-      r: TExpr[E, S, B],
+  case class TFold[E[_], S, A](
+    vars: Table[E, Fold] = Set.empty[Row[E, Fold]],
+    expr: TExpr[E, Fold, S, A]) extends TSemantic[E, Fold[S, A]]
+
+  trait OpticMap[E[_], O[_, _], O2[_, _]] {
+    def apply[S, A](e: E[O[S, A]]): E[O2[S, A]]
+  }
+
+  sealed abstract class TExpr[E[_], O[_, _], S, A] {
+    def mapO[O2[_, _]](f: OpticMap[E, O, O2]): TExpr[E, O2, S, A] = this match {
+      case Product(l, r, is) => Product(l.mapO(f), r.mapO(f), is)
+      case Vertical(u, d) => Vertical(u.mapO(f), d.mapO(f))
+      case Var(name) => Var(name)
+      case Wrap(e) => Wrap(f(e))
+    }
+  }
+
+  case class Product[E[_], O[_, _], S, A, B, C](
+      l: TExpr[E, O, S, A],
+      r: TExpr[E, O, S, B],
       is: (A, B) === C)
-    extends TExpr[E, S, C]
+    extends TExpr[E, O, S, C]
 
-  case class Vertical[E[_], S, A, B](
-      u: TExpr[E, S, A],
-      d: TExpr[E, A, B])
-    extends TExpr[E, S, B]
+  case class Vertical[E[_], O[_, _], S, A, B](
+      u: TExpr[E, O, S, A],
+      d: TExpr[E, O, A, B])
+    extends TExpr[E, O, S, B]
 
-  case class Var[E[_], S, A](name: String) extends TExpr[E, S, A]
+  case class Var[E[_], O[_, _], S, A](name: String) extends TExpr[E, O, S, A]
 
-  case class Wrap[E[_], S, A](e: E[Getter[S, A]]) extends TExpr[E, S, A]
+  case class Wrap[E[_], O[_, _], S, A](e: E[O[S, A]]) extends TExpr[E, O, S, A]
 
-  implicit class TableOps[E[_]](table: Table) {
+  implicit class TableOps[E[_], O[_, _]](table: Table[E, O]) {
 
-    def getV[S, A](v: Var[E, S, A]): E[Getter[S, A]] = 
-      table.toMap.apply(v.name).asInstanceOf[E[Getter[S, A]]]
+    def getV[S, A](v: Var[E, O, S, A]): TExpr[E, O, S, A] = 
+      table.toMap.apply(v.name).asInstanceOf[TExpr[E, O, S, A]]
 
-    def deleteV[S, A](v: Var[E, S, A]): Table =
+    def deleteV[S, A](v: Var[E, O, S, A]): Table[E, O] =
       (table.toMap - v.name).toSet
+
+    def mapO[O2[_, _]](f: OpticMap[E, O, O2]): Table[E, O2] =
+      table.map { case (s, e) => (s, e.mapO(f)) }
   }
 
   implicit def tsemantic[E[_]: OpticLang] = new OpticLang[TSemantic[E, ?]] {
 
-    def flVert[S, A, B](
-      l: TSemantic[E, Fold[S, A]], 
-      r: TSemantic[E, Fold[A, B]]): TSemantic[E, Fold[S, B]] = ???
-
-    def flHori[S, A, B](
-      l: TSemantic[E, Fold[S, A]], 
-      r: TSemantic[E, Fold[S, B]]): TSemantic[E, Fold[S, (A, B)]] = ???
-
-    def gtVert[S, A, B](
-        l: TSemantic[E, Getter[S, A]], 
-        r: TSemantic[E, Getter[A, B]]) = {
-      val TGetter(vars1, expr1) = l
-      val TGetter(vars2, expr2) = r
+    private def vertical[O[_, _], S, A, B](
+        vars1: Table[E, O],
+        vars2: Table[E, O],
+        expr1: TExpr[E, O, S, A],
+        expr2: TExpr[E, O, A, B]): (Table[E, O], TExpr[E, O, S, B]) = {
       (expr1, expr2) match {
         case (x@Var(_), y@Var(s)) => {
-          val e = OpticLang[E].gtVert(vars1.getV(x), vars2.getV(y))
-          TGetter((vars1.deleteV(x) ++ vars2.deleteV(y)) + (s -> e), Var(s))
+          val e = Vertical(x, vars2.getV(y))
+          ((vars1.deleteV(x) ++ vars2.deleteV(y)) + (s -> e), Var(s))
         }
         case (Vertical(prev, x@Var(_)), y@Var(s)) => {
-          val e = OpticLang[E].gtVert(vars1.getV(x), vars2.getV(y))
-          TGetter(
-            (vars1.deleteV(x) ++ vars2.deleteV(y)) + (s -> e), 
-            Vertical(prev, Var(s)))
+          val e = Vertical(x, vars2.getV(y))
+          ((vars1.deleteV(x) ++ vars2.deleteV(y)) + (s -> e), Vertical(prev, Var(s)))
         }
-        case _ => TGetter(vars1 ++ vars2, Vertical(expr1, expr2))
+        case _ => (vars1 ++ vars2, Vertical(expr1, expr2))
       }
     }
 
-    def gtHori[S, A, B](
-        l: TSemantic[E, Getter[S, A]],
-        r: TSemantic[E, Getter[S, B]]): TSemantic[E, Getter[S, (A, B)]] = {
-      val TGetter(vars1, expr1) = l
-      val TGetter(vars2, expr2) = r
+    private def horizontal[O[_, _], S, A, B](
+        vars1: Table[E, O],
+        vars2: Table[E, O],
+        expr1: TExpr[E, O, S, A],
+        expr2: TExpr[E, O, S, B]): (Table[E, O], TExpr[E, O, S, (A, B)]) = {
       val rws = getRewritings(vars1, vars2)
       val (vars3, vars4, expr3, expr4) = 
         rws.foldLeft((vars1, vars2, expr1, expr2)) {
@@ -553,16 +571,63 @@ object OpticLang {
           case ((vl, vr, el, er), \/-(rw)) =>
             (vl, rewriteTable(vr, rw), el, rewriteExpr(er, rw))
         }
-      TGetter(vars3 ++ vars4, Product(expr3, expr4, Leibniz.refl))
+      (vars3 ++ vars4, Product(expr3, expr4, Leibniz.refl))
+    }
+
+    def flVert[S, A, B](
+        l: TSemantic[E, Fold[S, A]], 
+        r: TSemantic[E, Fold[A, B]]) = {
+      val TFold(vars1, expr1) = l
+      val TFold(vars2, expr2) = r
+      val (vars3, expr3) = vertical(vars1, vars2, expr1, expr2)
+      TFold(vars3, expr3)
+    }
+
+    def flHori[S, A, B](
+        l: TSemantic[E, Fold[S, A]], 
+        r: TSemantic[E, Fold[S, B]]) = {
+      val TFold(vars1, expr1) = l
+      val TFold(vars2, expr2) = r
+      val (vars3, expr3) = horizontal(vars1, vars2, expr1, expr2)
+      TFold(vars3, expr3)
+    }
+
+    def gtVert[S, A, B](
+        l: TSemantic[E, Getter[S, A]], 
+        r: TSemantic[E, Getter[A, B]]) = {
+      val TGetter(vars1, expr1) = l
+      val TGetter(vars2, expr2) = r
+      val (vars3, expr3) = vertical(vars1, vars2, expr1, expr2)
+      TGetter(vars3, expr3)
+    }
+
+    def gtHori[S, A, B](
+        l: TSemantic[E, Getter[S, A]],
+        r: TSemantic[E, Getter[S, B]]) = {
+      val TGetter(vars1, expr1) = l
+      val TGetter(vars2, expr2) = r
+      val (vars3, expr3) = horizontal(vars1, vars2, expr1, expr2)
+      TGetter(vars3, expr3)
     }
 
     def aflVert[S, A, B](
-      l: TSemantic[E, AffineFold[S, A]], 
-      r: TSemantic[E, AffineFold[A, B]]): TSemantic[E, AffineFold[S, B]] = ???
+        l: TSemantic[E, AffineFold[S, A]], 
+        r: TSemantic[E, AffineFold[A, B]]) = {
+      val TAffineFold(vars1, expr1) = l
+      val TAffineFold(vars2, expr2) = r
+      val (vars3, expr3) = vertical(vars1, vars2, expr1, expr2)
+      TAffineFold(vars3, expr3)
+    }
 
     def aflHori[S, A, B](
-      l: TSemantic[E, AffineFold[S, A]],
-      r: TSemantic[E, AffineFold[S, B]]): TSemantic[E, AffineFold[S, (A, B)]] = ???
+        l: TSemantic[E, AffineFold[S, A]],
+        r: TSemantic[E, AffineFold[S, B]]) = {
+      val TAffineFold(vars1, expr1) = l
+      val TAffineFold(vars2, expr2) = r
+      val (vars3, expr3) = horizontal(vars1, vars2, expr1, expr2)
+      TAffineFold(vars3, expr3)
+    }
+
 
     def filtered[S](p: TSemantic[E, Getter[S, Boolean]]): TSemantic[E, AffineFold[S, S]] = ???
 
@@ -600,9 +665,21 @@ object OpticLang {
 
     def gtAsFl1[S, A](gt: TSemantic[E, Getter[S, A]]): TSemantic[E, Fold1[S, A]] = ???
 
-    def gtAsAfl[S, A](gt: TSemantic[E, Getter[S, A]]): TSemantic[E, AffineFold[S, A]] = ???
+    def gtAsAfl[S, A](gt: TSemantic[E, Getter[S, A]]) = {
+      val TGetter(vars, expr) = gt
+      val f = new OpticMap[E, Getter, AffineFold] {
+        def apply[X, Y](gt: E[Getter[X, Y]]) = OpticLang[E].gtAsAfl(gt)
+      }
+      TAffineFold(vars.mapO(f), expr.mapO(f))
+    }
 
-    def aflAsFl[S, A](afl: TSemantic[E, AffineFold[S, A]]): TSemantic[E, Fold[S, A]] = ???
+    def aflAsFl[S, A](afl: TSemantic[E, AffineFold[S, A]]) = {
+      val TAffineFold(vars, expr) = afl
+      val f = new OpticMap[E, AffineFold, Fold] {
+        def apply[X, Y](afl: E[AffineFold[X, Y]]) = OpticLang[E].aflAsFl(afl)
+      }
+      TFold(vars.mapO(f), expr.mapO(f))
+    }
 
     def fl1AsFl[S, A](fl1: TSemantic[E, Fold1[S, A]]): TSemantic[E, Fold[S, A]] = ???
   }
@@ -641,7 +718,7 @@ object OpticLang {
         O: OpticLang[Expr]) {
       def asFold1: Expr[Fold1[S, A]] = O.gtAsFl1(l)
       def asAffineFold: Expr[AffineFold[S, A]] = O.gtAsAfl(l)
-      def asFold: Expr[Fold[S, A]] = O.fl1AsFl(O.gtAsFl1(l))
+      def asFold: Expr[Fold[S, A]] = O.aflAsFl(O.gtAsAfl(l))
       def >[B](r: Expr[Getter[A, B]]): Expr[Getter[S, B]] = O.gtVert(l, r)
       def *[B](r: Expr[Getter[S, B]]): Expr[Getter[S, (A, B)]] = O.gtHori(l, r)
     }
