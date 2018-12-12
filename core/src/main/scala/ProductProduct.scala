@@ -28,7 +28,7 @@ object ProductProduct {
         l: ProductProduct[E, Getter[S, A]],
         r: ProductProduct[E, Getter[A, B]]): ProductProduct[E, Getter[S, B]] =
       (l, r) match {
-        case (e, Product(l, r)) => 
+        case (e, Product(l, r)) =>
           inject(alg.gtHori(alg.gtVert(run(e), l), alg.gtVert(run(e), r)))
         case _ => inject(alg.gtVert(run(l), run(r)))
       }

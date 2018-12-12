@@ -13,14 +13,17 @@ trait CoupleExample[Expr[_]] {
   type Couples = List[Couple]
   type Person
   type People = List[Person]
+  type Address
 
-  val couples: Expr[Fold[Couples, Couple]]
-  val her: Expr[Getter[Couple, Person]]
-  val him: Expr[Getter[Couple, Person]]
-  val people: Expr[Fold[People, Person]]
-  val name: Expr[Getter[Person, String]]
-  val age: Expr[Getter[Person, Int]]
-  val weight: Expr[Getter[Person, Int]]
+  def couples: Expr[Fold[Couples, Couple]]
+  def her: Expr[Getter[Couple, Person]]
+  def him: Expr[Getter[Couple, Person]]
+  def people: Expr[Fold[People, Person]]
+  def name: Expr[Getter[Person, String]]
+  def age: Expr[Getter[Person, Int]]
+  def weight: Expr[Getter[Person, Int]]
+  def address: Expr[Getter[Person, Address]]
+  def street: Expr[Getter[Address, String]]
 
   /* logic */
 
@@ -35,6 +38,18 @@ trait CoupleExample[Expr[_]] {
 
   def getPeopleName_2: Expr[People => List[String]] =
     getAll(people > ((name * age) > first).asFold)
+
+  def peopleName_1: Expr[Getter[Person, String]] = 
+    name * age * weight > first > first
+
+  def peopleName_2: Expr[Getter[Person, String]] =
+    name * weight * age * name * weight >
+    id >
+    second * first >
+    second * first >
+    first * id >
+    first >
+    second
 
   def getPeopleName_3: Expr[People => List[String]] =
     getAll(people > (((name * age) * weight > first) > first).asFold)
@@ -84,6 +99,16 @@ trait CoupleExample[Expr[_]] {
 
   def getHer: Expr[Couples => List[Person]] =
     getAll(couples > her.asFold)
+
+  def herNameAndStreet: Expr[Getter[Couple, (String, String)]] =
+    her > name * (address > street)
+
+  def herAndHimStreet_1: Expr[Getter[Couple, (String, String)]] =
+    her * him > (first > address > street) * (second > address > street)
+
+  def herAndHimStreet_2: Expr[Getter[Couple, (String, String)]] =
+    ((her * him > first) > (address > street)) * 
+      ((her * him > second) > (address > street))
 
   def getHerName: Expr[Couples => List[String]] =
     getAll(couples > her.asFold > name.asFold)
@@ -173,7 +198,7 @@ object CoupleExample {
       val oi = OpticInfo(
         KGetter,
         "her", 
-        TypeInfo("Couple", false), 
+        TypeInfo("Couple", true), 
         TypeInfo("Person", true))
 
       Const(Semantic(TVar("w"), List("w" -> TOptic(oi))))
@@ -184,10 +209,21 @@ object CoupleExample {
       val oi = OpticInfo( 
         KGetter,
         "him", 
-        TypeInfo("Couple", false), 
+        TypeInfo("Couple", true), 
         TypeInfo("Person", true))
 
       Const(Semantic(TVar("m"), List("m" -> TOptic(oi))))
+    }
+
+    val address = {
+
+      val oi = OpticInfo( 
+        KGetter,
+        "address", 
+        TypeInfo("Person", true), 
+        TypeInfo("Address", true))
+
+      Const(Semantic(TVar("a"), List("a" -> TOptic(oi))))
     }
 
     val people = {
@@ -207,7 +243,7 @@ object CoupleExample {
         KGetter,
         "name", 
         TypeInfo("Person", false), 
-        TypeInfo("Person", true))
+        TypeInfo("String", true))
 
       Const(Semantic(TOptic(oi)))
     }
@@ -218,7 +254,7 @@ object CoupleExample {
         KGetter,
         "age", 
         TypeInfo("Person", false), 
-        TypeInfo("Person", true))
+        TypeInfo("Int", true))
 
       Const(Semantic(TOptic(oi)))
     }
@@ -229,7 +265,18 @@ object CoupleExample {
         KGetter,
         "weight", 
         TypeInfo("Person", false), 
-        TypeInfo("Person", true))
+        TypeInfo("Int", true))
+
+      Const(Semantic(TOptic(oi)))
+    }
+
+    val street = {
+
+      val oi = OpticInfo(
+        KGetter,
+        "street", 
+        TypeInfo("Address", true), 
+        TypeInfo("String", false))
 
       Const(Semantic(TOptic(oi)))
     }

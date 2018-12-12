@@ -1,6 +1,7 @@
 package statelesser
 
 import scalaz._, Scalaz._
+import Leibniz._
 
 trait OpticLang[Expr[_]] {
 
@@ -446,18 +447,50 @@ object OpticLang {
 
   sealed abstract class TSemantic[E[_], A] 
 
-  type Table = Map[String, Any]
+  type Table = Set[(String, Any)]
+
+  type Rewrite = (String, String)
+
+  private def unifyRewritings(t1: Table, t2: Table): List[Rewrite \/ Rewrite] = 
+    (t1 ++ t2).groupBy(_._2).values.filter(_.length > 1)
+      .foldLeft(List.empty[Rewrite \/ Rewrite])(
+        (acc, s) => acc ++ List(\/-(s.last._1 -> s.head._1)))
+
+  private def diffRewritings(t1: Table, t2: Table): List[Rewrite \/ Rewrite] = 
+    (t1 ++ t2).groupBy(_._1).values.filter(_.length > 1)
+      .foldLeft(List.empty[Rewrite \/ Rewrite])(
+        (acc, s) => acc ++ List(
+          -\/(s.head._1 -> (s.head._1 ++ "1")), 
+          \/-(s.last._1 -> (s.last._1 ++ "2"))))
+
+  private def getRewritings(t1: Table, t2: Table): List[Rewrite \/ Rewrite] =
+    unifyRewritings(t1, t2) ++ diffRewritings(t1, t2)
+  
+  private def rewriteExpr[E[_], S, A](
+      e: TExpr[E, S, A], rw: Rewrite): TExpr[E, S, A] = e match {
+    case Product(l, r, is) => Product(rewriteExpr(l, rw), rewriteExpr(r, rw), is)
+    case Vertical(u, d) => Vertical(rewriteExpr(u, rw), rewriteExpr(d, rw))
+    case Var(x) if x == rw._1 => Var(rw._2)
+    case _ => e
+  }
+
+  private def rewriteTable(t: Table, rw: Rewrite): Table =
+    t.map { 
+      case (v, e) if v == rw._1 => (rw._2, e)
+      case x => x
+    }
 
   case class TGetter[E[_], S, A](
-    vars: Table = Map.empty[String, Any],
+    vars: Table = Set.empty[(String, Any)],
     expr: TExpr[E, S, A]) extends TSemantic[E, Getter[S, A]]
 
   sealed abstract class TExpr[E[_], S, A]
 
-  case class Product[E[_], S, A, B](
+  case class Product[E[_], S, A, B, C](
       l: TExpr[E, S, A],
-      r: TExpr[E, S, B])
-    extends TExpr[E, S, (A, B)]
+      r: TExpr[E, S, B],
+      is: (A, B) === C)
+    extends TExpr[E, S, C]
 
   case class Vertical[E[_], S, A, B](
       u: TExpr[E, S, A],
@@ -468,16 +501,13 @@ object OpticLang {
 
   case class Wrap[E[_], S, A](e: E[Getter[S, A]]) extends TExpr[E, S, A]
 
-  case class First[E[_], A, B](dummy: E[Getter[(A, B), A]]) 
-    extends TExpr[E, (A, B), A]
-
-  implicit class TableOps[E[_]](map: Table) {
+  implicit class TableOps[E[_]](table: Table) {
 
     def getV[S, A](v: Var[E, S, A]): E[Getter[S, A]] = 
-      map(v.name).asInstanceOf[E[Getter[S, A]]]
+      table.toMap.apply(v.name).asInstanceOf[E[Getter[S, A]]]
 
     def deleteV[S, A](v: Var[E, S, A]): Table =
-      map - v.name
+      (table.toMap - v.name).toSet
   }
 
   implicit def tsemantic[E[_]: OpticLang] = new OpticLang[TSemantic[E, ?]] {
@@ -515,7 +545,15 @@ object OpticLang {
         r: TSemantic[E, Getter[S, B]]): TSemantic[E, Getter[S, (A, B)]] = {
       val TGetter(vars1, expr1) = l
       val TGetter(vars2, expr2) = r
-      TGetter(vars1 ++ vars2, Product(expr1, expr2))
+      val rws = getRewritings(vars1, vars2)
+      val (vars3, vars4, expr3, expr4) = 
+        rws.foldLeft((vars1, vars2, expr1, expr2)) {
+          case ((vl, vr, el, er), -\/(rw)) => 
+            (rewriteTable(vl, rw), vr, rewriteExpr(el, rw), er)
+          case ((vl, vr, el, er), \/-(rw)) =>
+            (vl, rewriteTable(vr, rw), el, rewriteExpr(er, rw))
+        }
+      TGetter(vars3 ++ vars4, Product(expr3, expr4, Leibniz.refl))
     }
 
     def aflVert[S, A, B](
@@ -535,10 +573,11 @@ object OpticLang {
 
     def equal[A]: TSemantic[E, Getter[(A, A), Boolean]] = ???
 
-    def first[A, B]: TSemantic[E, Getter[(A, B), A]] = ???
+    def first[A, B]: TSemantic[E, Getter[(A, B), A]] =
+      TGetter(expr = Wrap(OpticLang[E].first))
 
     def second[A, B]: TSemantic[E, Getter[(A, B), B]] =
-      ???
+      TGetter(expr = Wrap(OpticLang[E].second))
 
     def likeInt[S](i: Int): TSemantic[E, Getter[S, Int]] =
       ???

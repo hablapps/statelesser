@@ -27,10 +27,8 @@ object VertLeftAssoc {
     override def gtVert[S, A, B](
         l: VertLeftAssoc[E, Getter[S, A]],
         r: VertLeftAssoc[E, Getter[A, B]]) = (l, r) match {
-      case (Unk(e1), Unk(e2)) => Vertical(e1, e2)
-      case (ann, Vertical(e1, e2)) => 
-        inject(alg.gtVert(alg.gtVert(run(ann), e1), e2))
-      case _ => inject(alg.gtVert(run(l), run(r)))
+      case (ann, Vertical(e1, e2)) => Vertical(alg.gtVert(run(ann), e1), e2)
+      case _ => Vertical(run(l), run(r))
     }
   }
 }
