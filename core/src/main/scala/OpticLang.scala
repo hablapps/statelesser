@@ -344,6 +344,7 @@ object OpticLang {
       case Wrap(e, inf) => Wrap(f(e), inf)
       case Unary(op) => Unary(op)
       case Binary(op) => Binary(op)
+      case Sub(is) => Sub(is)
       case LikeInt(i, is) => LikeInt(i, is)
       case LikeBool(b, is) => LikeBool(b, is)
     }
@@ -371,7 +372,11 @@ object OpticLang {
 
   case class Unary[E[_], O[_, _], S, A](name: String) extends TExpr[E, O, S, A]
 
-  case class Binary[E[_], O[_, _], S, A](name: String) extends TExpr[E, O, S, A]
+  case class Binary[E[_], O[_, _], S, A](name: String) 
+    extends TExpr[E, O, S, A]
+
+  case class Sub[E[_], O[_, _], S, A](is: A === Int) 
+    extends TExpr[E, O, S, A]
 
   case class LikeInt[E[_], O[_, _], S, A](i: Int, is: A === Int) 
     extends TExpr[E, O, S, A]
@@ -426,6 +431,10 @@ object OpticLang {
           (vars1, e.asInstanceOf[TExpr[E, O, S, B]])
         case (_, LikeInt(i, is)) => (vars2, LikeInt(i, is))
         case (_, LikeBool(b, is)) => (vars2, LikeBool(b, is))
+        case (Product(l, LikeInt(0, _), _, lt, _), Sub(_)) => 
+          (lt, l.asInstanceOf[TExpr[E, O, S, B]])
+        case (Product(LikeInt(x, _), LikeInt(y, _), _, _, _), Sub(is)) =>
+          (vars1 ++ vars2, LikeInt(x - y, is))
         case _ => (vars1 ++ vars2, Vertical(expr1, expr2, vars1, vars2))
       }
 
@@ -502,7 +511,7 @@ object OpticLang {
     def filtered[S](p: TSemantic[E, Getter[S, Boolean]]): TSemantic[E, AffineFold[S, S]] = ???
 
     def sub: TSemantic[E, Getter[(Int, Int), Int]] =
-      TGetter(expr = Binary("sub"))
+      TGetter(expr = Sub(implicitly))
 
     def greaterThan: TSemantic[E, Getter[(Int, Int), Boolean]] = ???
 

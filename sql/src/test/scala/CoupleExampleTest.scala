@@ -15,7 +15,7 @@ class CoupleExampleTest extends FlatSpec with Matchers {
   val keys = Map("Person" -> "name")
 
   def genSql[S, A](sem: TSemantic[Const[String, ?], Fold[S, A]]): String = {
-    println(sem)
+    // println(sem)
     sqlToString(fromSemantic(sem, keys))
   }
 

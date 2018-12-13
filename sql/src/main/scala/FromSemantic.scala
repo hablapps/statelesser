@@ -63,10 +63,6 @@ trait FromSemantic {
   //     case (Some(e), t) => Some(SBinOp("AND", e, treeToExpr(t, keys)))
   //   }
 
-  private def mapOp(s: String): String = s match {
-    case "sub" => "-"
-    case _ => s
-  }
 
   private def treeToExpr[E[_]](
       t: TExpr[E, Fold, _, _],
@@ -74,8 +70,10 @@ trait FromSemantic {
     case Wrap(_, info) => SProj("", info.nme)
     case Vertical(Var(nme), Wrap(_, info), _, _) => SProj(nme, info.nme)
     case Vertical(Product(l, r, _, _, _), Binary(op), _, _) => 
-      SBinOp(mapOp(op), treeToExpr(l, keys), treeToExpr(r, keys))
-    case Vertical(e, Unary(op), _, _) => SUnOp(mapOp(op), treeToExpr(e, keys))
+      SBinOp(op, treeToExpr(l, keys), treeToExpr(r, keys))
+    case Vertical(Product(l, r, _, _, _), Sub(_), _, _) => 
+      SBinOp("-", treeToExpr(l, keys), treeToExpr(r, keys))
+    case Vertical(e, Unary(op), _, _) => SUnOp(op, treeToExpr(e, keys))
     case LikeInt(i, _) => SCons(i.toString)
     case LikeBool(b, _) => SCons(b.toString)
     case _ => throw new Error(s"Don't know how to translate '$t' into SQL")
