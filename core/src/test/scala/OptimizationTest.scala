@@ -8,23 +8,23 @@ import CoupleExample._, instance._
 class OptimizationTest extends FlatSpec with Matchers {
 
   "Test optimization stack" should "remove simple first from query" in {
-    runStack(peopleName_1) shouldBe ""
+    peopleName_1 shouldBe ""
   }
 
   it should "normalise a dummy query" in {
-    runStack(peopleName_2) shouldBe ""
+    peopleName_2 shouldBe ""
   }
 
   it should "produce variables" in {
-    runStack(herNameAndStreet) shouldBe ""
+    herNameAndStreet shouldBe ""
   }
 
   it should "produce variables again" in {
-    runStack(herAndHimStreet_1) shouldBe ""
+    herAndHimStreet_1 shouldBe ""
   }
 
   it should "produce something" in {
-    runStack(getPeopleNameAndAge_1) shouldBe ""
+    getPeopleNameAndAge_1 shouldBe ""
   }
 
   // "Test optimization stack" should "remove simple first from query" in {

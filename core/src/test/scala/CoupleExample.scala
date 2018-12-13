@@ -174,101 +174,24 @@ trait CoupleExample[Expr[_]] {
 
 object CoupleExample {
 
-  type Stack[A] = 
-    DistAs[
-    DistAs[
-    ProductProduct[
-    ProductProduct[
-    ProductProduct[
-    VertLeftAssoc[
-    VertLeftAssoc[
-    VertLeftAssoc[
-    VertLeftAssoc[
-    VertLeftAssoc[
-    ClearId[
-    ProductFirst[
-    ProductFirst[
-    ProductSecond[
-    ProductSecond[
-    VerticalLike[
-    IntEval[
-    TSemantic[Const[String, ?], 
-    ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], A]
-
-  val ev20 = IntEval.optimization[TSemantic[Const[String, ?], ?]]
-  val ev18 = VerticalLike.optimization(ev20)
-  val ev15 = ProductSecond.optimization(ev18)
-  val ev14 = ProductSecond.optimization(ev15)
-  val ev11 = ProductFirst.optimization(ev14)
-  val ev10 = ProductFirst.optimization(ev11)
-  val ev06 = ClearId.optimization(ev10)
-  val ev0a = VertLeftAssoc.optimization(ev06)
-  val ev05 = VertLeftAssoc.optimization(ev0a)
-  val ev04 = VertLeftAssoc.optimization(ev05)
-  val ev03 = VertLeftAssoc.optimization(ev04)
-  val ev02 = VertLeftAssoc.optimization(ev03)
-  val ev01 = ProductProduct.optimization(ev02)
-  val ev00 = ProductProduct.optimization(ev01)
-  val ev_z = ProductProduct.optimization(ev00)
-  val ev_y = DistAs.optimization(ev_z)
-  val ev_x = DistAs.optimization(ev_y)
-
-  def runStack[A](p: Stack[A]): TSemantic[Const[String, ?], A] =
-    ev20.run(
-    ev18.run(
-    ev15.run(
-    ev14.run(
-    ev11.run(
-    ev10.run(
-    ev06.run(
-    ev0a.run(
-    ev05.run(
-    ev04.run(
-    ev03.run(
-    ev02.run(
-    ev01.run(
-    ev00.run(
-    ev_z.run(
-    ev_y.run(
-    ev_x.run(p)))))))))))))))))
-
-  private def wrap[O[_, _], S, A](
-      sem: TSemantic[Const[String, ?], O[S, A]]): Stack[O[S, A]] =
-    DistAs.Unk(
-    DistAs.Unk(
-    ProductProduct.Unk(
-    ProductProduct.Unk(
-    ProductProduct.Unk(
-    VertLeftAssoc.Unk(
-    VertLeftAssoc.Unk(
-    VertLeftAssoc.Unk(
-    VertLeftAssoc.Unk(
-    VertLeftAssoc.Unk(
-    ClearId.Unk(
-    ProductFirst.Unk(
-    ProductFirst.Unk(
-    ProductSecond.Unk(
-    ProductSecond.Unk(
-    VerticalLike.Unk(  
-    IntEval.Unk(sem)
-    ))))))))))))))))
+  type Stack[A] = TSemantic[Const[String, ?], A]
 
   private def wrapPlainG[S, A](s: String, inf: OpticInfo): Stack[Getter[S, A]] =
-    wrap(TGetter(expr = Wrap(Const(s), inf)))
+    TGetter(expr = Wrap(Const(s), inf))
 
   private def wrapTableG[S, A](
       v: String, s: String, inf: OpticInfo): Stack[Getter[S, A]] =
-    wrap(TGetter(Set(v -> Wrap[Const[String, ?], Getter, S, A](Const(s), inf)), Var(v)))
+    TGetter(Set(v -> Wrap[Const[String, ?], Getter, S, A](Const(s), inf)), Var(v))
 
   private def wrapTableF[S, A](
       v: String, s: String, inf: OpticInfo): Stack[Fold[S, A]] =
-    wrap(TFold(Set(v -> Wrap[Const[String, ?], Fold, S, A](Const(s), inf)), Var(v)))
+    TFold(Set(v -> Wrap[Const[String, ?], Fold, S, A](Const(s), inf)), Var(v))
 
   val instance = new CoupleExample[Stack] {
     type Couple = Unit
     type Person = Unit
 
-    val ev = ev_x
+    val ev = OpticLang[Stack]
 
     val couples = wrapTableF("c", "couples", 
       OpticInfo(KFold, "couples", TypeInfo("Couples"), TypeInfo("Couple", true)))

@@ -20,7 +20,7 @@ class CoupleExampleTest extends FlatSpec with Matchers {
   }
 
   def matchSql[S, A](q: String, stks: Stack[Fold[S, A]]*) =
-    stks.map(stk => genSql(runStack(stk))) should contain theSameElementsAs 
+    stks.map(stk => genSql(stk)) should contain theSameElementsAs 
       List.fill(stks.length)(q)
 
   "Statelesser" should "generate wildcard '*' selection" in {
