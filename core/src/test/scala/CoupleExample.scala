@@ -104,7 +104,7 @@ trait CoupleExample[Expr[_]] {
     couples > her.asFold
 
   def herNameAndStreet: Expr[Fold[Couples, (String, String)]] =
-    couples > (her > name * (address > street)).asFold
+    couples > (her > id > name * (address > street)).asFold
 
   def herAndHimStreet_1: Expr[Fold[Couples, (String, String)]] =
     couples > (
@@ -117,10 +117,10 @@ trait CoupleExample[Expr[_]] {
     couples > her.asFold > (name * age).asFold
 
   def getHerNameAndAge_2: Expr[Fold[Couples, (String, Int)]] =
-    couples > ((her > name) * (her > age)).asFold
+    couples > ((her > id > name) * (her > age)).asFold
 
   def getHerNameAndAge_3: Expr[Fold[Couples, (String, Int)]] =
-    couples > (her > name * age).asFold
+    couples > (id > her > name * age > id > id).asFold
 
   def getPeopleGt30: Expr[People => List[(String, Int)]] =
     getAll(people > (name.asAffineFold * 

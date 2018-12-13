@@ -388,23 +388,12 @@ object OpticLang {
 
   implicit def tsemantic[E[_]: OpticLang] = new OpticLang[TSemantic[E, ?]] {
 
-    // XXX: In several cases, we can get more variables than needed, I think
-    // that each expression should have its own variables, I mean, each tree
-    // should be a semantic itself!?!?
     private def vertical[O[_, _], S, A, B](
         vars1: Table[E, O],
         vars2: Table[E, O],
         expr1: TExpr[E, O, S, A],
         expr2: TExpr[E, O, A, B]): (Table[E, O], TExpr[E, O, S, B]) = 
       (expr1, expr2) match {
-        case (x@Var(_), y@Var(s)) => {
-          val e = Vertical(x, vars2.getV(y), vars1, vars2)
-          ((vars1 ++ vars2.deleteV(y)) + (s -> e), Var(s))
-        }
-        case (Vertical(prev, x@Var(_), _, _), y@Var(s)) => {
-          val e = Vertical(x, vars2.getV(y), vars1, vars2)
-          vertical(vars1, vars2.deleteV(y) + (s -> e), prev, Var(s))
-        }       
         case (e, Product(l, r, is, lt, rt)) => {
           val (vars3, expr3) = vertical(vars1, lt, e, l)
           val (vars4, expr4) = vertical(vars1, rt, e, r)
@@ -418,6 +407,18 @@ object OpticLang {
           (lt, l.asInstanceOf[TExpr[E, O, S, B]])
         case (Product(_, r, _, _, rt), Wrap(_, inf)) if inf.nme == "second" =>
           (rt, r.asInstanceOf[TExpr[E, O, S, B]])
+        case (x@Var(_), y@Var(s)) => {
+          val e = Vertical(x, vars2.getV(y), vars1, vars2)
+          ((vars1 ++ vars2.deleteV(y)) + (s -> e), Var(s))
+        }
+        case (Vertical(prev, x@Var(_), _, _), y@Var(s)) => {
+          val e = Vertical(x, vars2.getV(y), vars1, vars2)
+          vertical(vars1, vars2.deleteV(y) + (s -> e), prev, Var(s))
+        }
+        case (Wrap(_, inf), e) if inf.nme == "id" =>
+          (vars2, e.asInstanceOf[TExpr[E, O, S, B]])
+        case (e, Wrap(_, inf)) if inf.nme == "id" =>
+          (vars1, e.asInstanceOf[TExpr[E, O, S, B]])
         case _ => (vars1 ++ vars2, Vertical(expr1, expr2, vars1, vars2))
       }
 
@@ -518,7 +519,8 @@ object OpticLang {
       ???
 
     def id[S]: TSemantic[E, Getter[S, S]] =
-      ???
+      TGetter(expr = Wrap(OpticLang[E].id,
+        OpticInfo(KGetter, "id", TypeInfo("S"), TypeInfo("S"))))
 
     def not: TSemantic[E, Getter[Boolean, Boolean]] =
       ???
