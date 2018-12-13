@@ -73,26 +73,26 @@ trait CoupleExample[Expr[_]] {
       first >
       second).asFold)
 
-  def getPeopleNameAnd3_1: Expr[People => List[(String, Int)]] =
-    getAll(people > (name * likeInt(3)).asFold)
+  def getPeopleNameAnd3_1: Expr[Fold[People, (String, Int)]] =
+    people > (name * likeInt(3)).asFold
 
-  def getPeopleNameAnd3_2: Expr[People => List[(String, Int)]] =
-    getAll(people >
-      (name * weight * age * name * weight >
+  def getPeopleNameAnd3_2: Expr[Fold[People, (String, Int)]] =
+    people > (
+      name * weight * age * name * weight >
       id >
       first * likeInt(3) >
       (first[(((String, Int), Int), String), Int] > second) * second >
-      id).asFold)
+      id).asFold
 
-  def getPeopleNameAnd3_3: Expr[People => List[(String, Int)]] =
-    getAll(people >
-      ((name * (likeInt(3) * likeInt(0))) >
-      first * (second > sub)).asFold)
+  def getPeopleNameAnd3_3: Expr[Fold[People, (String, Int)]] =
+    people > (
+      (name * (likeInt(3) * likeInt(0))) >
+      first * (second > sub)).asFold
 
-  def getPeopleNameAnd3_4: Expr[People => List[(String, Int)]] =
-    getAll(people >
-      ((name * (likeInt(4) * likeInt(1))) >
-      first * (second > sub)).asFold)
+  def getPeopleNameAnd3_4: Expr[Fold[People, (String, Int)]] =
+    people > (
+      (name * (likeInt(4) * likeInt(1))) >
+      first * (second > sub)).asFold
 
   def getPeopleNameAndAge_1: Expr[Fold[People, (String, Int)]] =
     people > (name * age).asFold

@@ -76,7 +76,8 @@ trait FromSemantic {
     case Vertical(Product(l, r, _, _, _), Binary(op), _, _) => 
       SBinOp(mapOp(op), treeToExpr(l, keys), treeToExpr(r, keys))
     case Vertical(e, Unary(op), _, _) => SUnOp(mapOp(op), treeToExpr(e, keys))
-    case Like(x) => SCons(x)
+    case LikeInt(i, _) => SCons(i.toString)
+    case LikeBool(b, _) => SCons(b.toString)
     case _ => throw new Error(s"Don't know how to translate '$t' into SQL")
   }
 }

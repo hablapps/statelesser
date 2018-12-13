@@ -15,7 +15,7 @@ class CoupleExampleTest extends FlatSpec with Matchers {
   val keys = Map("Person" -> "name")
 
   def genSql[S, A](sem: TSemantic[Const[String, ?], Fold[S, A]]): String = {
-    // println(sem)
+    println(sem)
     sqlToString(fromSemantic(sem, keys))
   }
 
@@ -53,6 +53,15 @@ class CoupleExampleTest extends FlatSpec with Matchers {
     matchSql(
       "SELECT w.name, w.age FROM Couple AS c INNER JOIN Person AS w ON c.her = w.name;",
       getHerNameAndAge_1, getHerNameAndAge_2, getHerNameAndAge_3)
+  }
+
+  it should "generate multi-selection with literals" in {
+    matchSql(
+      "SELECT p.name, 3 FROM Person AS p;",
+      getPeopleNameAnd3_1,
+      getPeopleNameAnd3_2,
+      getPeopleNameAnd3_3,
+      getPeopleNameAnd3_4)
   }
 
   // it should "generate filters" in {

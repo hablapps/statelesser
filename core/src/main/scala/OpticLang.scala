@@ -344,7 +344,8 @@ object OpticLang {
       case Wrap(e, inf) => Wrap(f(e), inf)
       case Unary(op) => Unary(op)
       case Binary(op) => Binary(op)
-      case Like(s) => Like(s)
+      case LikeInt(i, is) => LikeInt(i, is)
+      case LikeBool(b, is) => LikeBool(b, is)
     }
   }
 
@@ -372,7 +373,11 @@ object OpticLang {
 
   case class Binary[E[_], O[_, _], S, A](name: String) extends TExpr[E, O, S, A]
 
-  case class Like[E[_], O[_, _], S, A](s: String) extends TExpr[E, O, S, A]
+  case class LikeInt[E[_], O[_, _], S, A](i: Int, is: A === Int) 
+    extends TExpr[E, O, S, A]
+
+  case class LikeBool[E[_], O[_, _], S, A](b: Boolean, is: A === Boolean) 
+    extends TExpr[E, O, S, A]
 
   implicit class TableOps[E[_], O[_, _]](table: Table[E, O]) {
 
@@ -419,6 +424,8 @@ object OpticLang {
           (vars2, e.asInstanceOf[TExpr[E, O, S, B]])
         case (e, Wrap(_, inf)) if inf.nme == "id" =>
           (vars1, e.asInstanceOf[TExpr[E, O, S, B]])
+        case (_, LikeInt(i, is)) => (vars2, LikeInt(i, is))
+        case (_, LikeBool(b, is)) => (vars2, LikeBool(b, is))
         case _ => (vars1 ++ vars2, Vertical(expr1, expr2, vars1, vars2))
       }
 
@@ -507,13 +514,13 @@ object OpticLang {
 
     def second[A, B]: TSemantic[E, Getter[(A, B), B]] =
       TGetter(expr = Wrap(OpticLang[E].second,
-        OpticInfo(KGetter, "first", TypeInfo("(A, B)"), TypeInfo("B"))))
+        OpticInfo(KGetter, "second", TypeInfo("(A, B)"), TypeInfo("B"))))
 
     def likeInt[S](i: Int): TSemantic[E, Getter[S, Int]] =
-      ???
+      TGetter(expr = LikeInt(i, implicitly))
 
     def likeBool[S](b: Boolean): TSemantic[E, Getter[S, Boolean]] =
-      ???
+      TGetter(expr = LikeBool(b, implicitly))
 
     def likeStr[S](s: String): TSemantic[E, Getter[S, String]] =
       ???
