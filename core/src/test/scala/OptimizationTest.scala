@@ -1,131 +1,30 @@
 package statelesser
 package test
 
-import scalaz._
 import org.scalatest._
 
-import OpticLang._
+import CoupleExample._, instance._
 
 class OptimizationTest extends FlatSpec with Matchers {
 
-  // XXX: Handling the stack is insane! We should take a look at Oleg's
-  // implementation. It feels like Shapeless could help here.
-
-  type Stack[A] = 
-    ProductProduct[
-    ProductProduct[
-    ProductProduct[
-    VertLeftAssoc[
-    VertLeftAssoc[
-    VertLeftAssoc[
-    VertLeftAssoc[
-    VertLeftAssoc[
-    ClearId[
-    ProductFirst[
-    ProductFirst[
-    ProductSecond[
-    ProductSecond[
-    VerticalLike[
-    IntEval[
-    TSemantic[Const[String, ?], 
-    ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], A]
-
-  val ev20 = IntEval.optimization[TSemantic[Const[String, ?], ?]]
-  val ev18 = VerticalLike.optimization(ev20)
-  val ev15 = ProductSecond.optimization(ev18)
-  val ev14 = ProductSecond.optimization(ev15)
-  val ev11 = ProductFirst.optimization(ev14)
-  val ev10 = ProductFirst.optimization(ev11)
-  val ev06 = ClearId.optimization(ev10)
-  val ev0a = VertLeftAssoc.optimization(ev06)
-  val ev05 = VertLeftAssoc.optimization(ev0a)
-  val ev04 = VertLeftAssoc.optimization(ev05)
-  val ev03 = VertLeftAssoc.optimization(ev04)
-  val ev02 = VertLeftAssoc.optimization(ev03)
-  val ev01 = ProductProduct.optimization(ev02)
-  val ev00 = ProductProduct.optimization(ev01)
-  val ev_f = ProductProduct.optimization(ev00)
-
-  private def wrap[O[_, _], S, A](
-      sem: TSemantic[Const[String, ?], O[S, A]]): Stack[O[S, A]] =
-    ProductProduct.Unk(
-    ProductProduct.Unk(
-    ProductProduct.Unk(
-    VertLeftAssoc.Unk(
-    VertLeftAssoc.Unk(
-    VertLeftAssoc.Unk(
-    VertLeftAssoc.Unk(
-    VertLeftAssoc.Unk(
-    ClearId.Unk(
-    ProductFirst.Unk(
-    ProductFirst.Unk(
-    ProductSecond.Unk(
-    ProductSecond.Unk(
-    VerticalLike.Unk(  
-    IntEval.Unk(sem)
-    ))))))))))))))
-
-  private def wrapPlainG[S, A](s: String): Stack[Getter[S, A]] =
-    wrap(TGetter(expr = Wrap(Const(s))))
-
-  private def wrapTableG[S, A](v: String, s: String): Stack[Getter[S, A]] =
-    wrap(TGetter(Set(v -> Wrap[Const[String, ?], Getter, S, A](Const(s))), Var(v)))
-
-  private def wrapTableF[S, A](v: String, s: String): Stack[Fold[S, A]] =
-    wrap(TFold(Set(v -> Wrap[Const[String, ?], Fold, S, A](Const(s))), Var(v)))
-
-  val pretty = new CoupleExample[Stack] {
-    type Couple = Unit
-    type Person = Unit
-
-    val ev = ev_f
-
-    def couples = wrapTableF("c", "couples")
-    val her = wrapTableG("w", "her")
-    val him = wrapTableG("m", "him")
-    def people = wrapTableF("p", "people")
-    val name = wrapPlainG("name")
-    val age = wrapPlainG("age")
-    val weight = wrapPlainG("weight")
-    val address = wrapTableG("a", "address")
-    val street = wrapPlainG("street")
-  }
-
-  import pretty._
-
-  val exp = ()
-
-  def run[A](p: Stack[A]): TSemantic[Const[String, ?], A] =
-    ev20.run(
-    ev18.run(
-    ev15.run(
-    ev14.run(
-    ev11.run(
-    ev10.run(
-    ev06.run(
-    ev0a.run(
-    ev05.run(
-    ev04.run(
-    ev03.run(
-    ev02.run(
-    ev01.run(
-    ev00.run(
-    ev.run(p)))))))))))))))
-
   "Test optimization stack" should "remove simple first from query" in {
-    run(peopleName_1) shouldBe exp
+    runStack(peopleName_1) shouldBe ""
   }
 
   it should "normalise a dummy query" in {
-    run(peopleName_2) shouldBe exp
+    runStack(peopleName_2) shouldBe ""
   }
 
   it should "produce variables" in {
-    run(herNameAndStreet) shouldBe exp
+    runStack(herNameAndStreet) shouldBe ""
   }
 
   it should "produce variables again" in {
-    run(herAndHimStreet_1) shouldBe exp
+    runStack(herAndHimStreet_1) shouldBe ""
+  }
+
+  it should "produce something" in {
+    runStack(getPeopleNameAndAge_1) shouldBe ""
   }
 
   // "Test optimization stack" should "remove simple first from query" in {

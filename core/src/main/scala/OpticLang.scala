@@ -262,7 +262,6 @@ object OpticLang {
   type OpticNme = String
   
   sealed abstract class OpticKind
-  case object KLens extends OpticKind
   case object KGetter extends OpticKind
   case object KAffineFold extends OpticKind
   case object KFold1 extends OpticKind
@@ -275,176 +274,6 @@ object OpticLang {
     src: TypeInfo, 
     tgt: TypeInfo)
   
-  sealed abstract class TTree
-
-  case object TEmpty extends TTree
-
-  sealed abstract class TApply extends TTree
-  
-  case class TApplyUnary(f: TTree => TTree) extends TApply
-
-  case class TApplyBinary(f: TTree => TTree => TTree) 
-    extends TApply
-
-  sealed abstract class TExpression extends TTree
-
-  case class TLiteral(s: String) extends TExpression
-
-  case class TUnary(op: String, e: TTree) extends TExpression
-
-  case class TBinary(op: String, l: TTree, r: TTree)
-    extends TExpression
-
-  sealed abstract class TVariable extends TExpression
-
-  case class TVar(nme: String) extends TVariable
-
-  sealed abstract class TSelection extends TExpression
-  
-  case class TOptic(info: OpticInfo) extends TSelection
-
-  case class TProj(vr: TVariable, op: TOptic) extends TSelection
-
-  def treeVertCompose(l: TTree, r: TTree): TTree = (l, r) match {
-    case (TEmpty, r) => r
-    case (l, TEmpty) => l
-    case (_, lit: TLiteral) => lit
-    case (TApplyUnary(f), TApplyUnary(g)) => TApplyUnary(g compose f)
-    case (TApplyBinary(f), TApplyUnary(g)) => 
-      TApplyBinary(t1 => t2 => g(f(t1)(t2)))
-    case (TApplyUnary(f), r: TExpression) => 
-      TApplyUnary(t => treeVertCompose(f(t), r))
-    case (l: TExpression, TApplyUnary(f)) => f(l)
-    case (TApplyBinary(f), r: TExpression) => 
-      TApplyBinary(t1 => t2 => treeVertCompose(f(t1)(t2), r))
-    case (TBinary("horizontal", l, r), TApplyBinary(f)) => f(l)(r)
-    case (_, r: TVar) => r
-    case (_, r: TProj) => r
-    case (l: TVar, r: TOptic) => TProj(l, r)
-    case (l: TExpression, TUnary(op, e)) => TUnary(op, treeVertCompose(l, e))
-    case (l: TExpression, TBinary(op, e1, e2)) => 
-      TBinary(op, treeVertCompose(l, e1), treeVertCompose(l, e2))
-    case _ => throw new Error(s"Invalid vertical tree composition: `$l` & `$r`")
-  }
-
-  case class Semantic(
-    pointer: TTree = TEmpty,
-    symbols: List[(String, TSelection)] = List(),
-    filters: Set[TTree] = Set())
-
-  def vertCompose(l: Semantic, r: Semantic): Semantic = {
-
-    val Semantic(p1, s1, f1) = l
-    val Semantic(p2, s2, f2) = r
-
-    val p3 = treeVertCompose(p1, p2)
-    
-    val s3 = ((s1.reverse, s2) match {
-      case (xs, Nil) => xs.reverse
-      case (Nil, ys) => ys
-      case ((n, _) :: xs, ys) => s1 ++ ys.map { 
-        case (k, opt: TOptic) => (k, TProj(TVar(n), opt))
-        case x => x
-      }
-      case (_, _) => 
-        throw new Error(s"Invalid vertical composition of symbols: $s1 $s2")
-    }).distinct
-
-    val f3 = f1 ++ f2.map(t => treeVertCompose(p1, t))
-
-    Semantic(p3, s3, f3)
-  }
-
-  def horiCompose(l: Semantic, r: Semantic): Semantic =
-    Semantic(
-      TBinary("horizontal", l.pointer, r.pointer), 
-      l.symbols ++ r.symbols, 
-      l.filters ++ r.filters)
-
-  implicit val semantic = new OpticLang[Const[Semantic, ?]] {
-
-    def flVert[S, A, B](
-        l: Const[Semantic, Fold[S, A]], 
-        r: Const[Semantic, Fold[A, B]]) =
-      Const(vertCompose(l.getConst, r.getConst))
-
-    def flHori[S, A ,B](
-        l: Const[Semantic, Fold[S, A]],
-        r: Const[Semantic, Fold[S, B]]) =
-      Const(horiCompose(l.getConst, r.getConst))
-
-    def gtVert[S, A, B](
-        l: Const[Semantic, Getter[S, A]], 
-        r: Const[Semantic, Getter[A, B]]) =
-      Const(vertCompose(l.getConst, r.getConst))
-
-    def gtHori[S, A, B](
-        l: Const[Semantic, Getter[S, A]],
-        r: Const[Semantic, Getter[S, B]]) =
-      Const(horiCompose(l.getConst, r.getConst))
-
-    def filtered[S](p: Const[Semantic, Getter[S, Boolean]]) =
-      Const(Semantic(filters = Set(p.getConst.pointer)))
-
-    def sub =
-      Const(Semantic(pointer = TApplyBinary(l => r => TBinary("-", l, r))))
-
-    def greaterThan: Const[Semantic, Getter[(Int, Int), Boolean]] =
-      Const(Semantic(pointer = TApplyBinary(l => r => TBinary(">", l, r))))
-
-    def equal[A] =
-      Const(Semantic(pointer = TApplyBinary(l => r => TBinary("=", l, r))))
-
-    def aflAsFl[S, A](afl: Const[Semantic, AffineFold[S, A]]) =
-      Const(afl.getConst)
-
-    def aflHori[S, A, B](
-        l: Const[Semantic, AffineFold[S, A]], 
-        r: Const[Semantic, AffineFold[S, B]]) =
-      Const(horiCompose(l.getConst, r.getConst))
-
-    def aflVert[S, A, B](
-        l: Const[Semantic, AffineFold[S, A]], 
-        r: Const[Semantic, AffineFold[A, B]]) =
-      Const(vertCompose(l.getConst, r.getConst))
-
-    def first[A, B] =
-      Const(Semantic(pointer = TApplyBinary(l => _ => l)))
-
-    def second[A, B] =
-      Const(Semantic(pointer = TApplyBinary(_ => r => r)))
-
-    def likeInt[S](i: Int) =
-      Const(Semantic(pointer = TLiteral(i.toString)))
-
-    def likeBool[S](b: Boolean) =
-      Const(Semantic(pointer = TLiteral(b.toString)))
-    
-    def likeStr[S](s: String) =
-      Const(Semantic(pointer = TLiteral(s""""$s"""")))
-
-    def id[S] =
-      Const(Semantic(pointer = TApplyUnary(identity)))
-
-    def not =
-      Const(Semantic(pointer = TApplyUnary(t => TUnary("NOT", t))))
-
-    def gtAsAfl[S, A](gt: Const[Semantic, Getter[S, A]]) =
-      Const(gt.getConst)
-
-    def getAll[S, A](fl: Const[Semantic, Fold[S, A]]) =
-      Const(fl.getConst)
-
-    def lnAsGt[S, A](ln: Const[Semantic, Lens[S, A]]) =
-      Const(ln.getConst)
-
-    def gtAsFl1[S, A](gt: Const[Semantic, Getter[S, A]]) =
-      Const(gt.getConst)
-
-    def fl1AsFl[S, A](fl1: Const[Semantic, Fold1[S, A]]) =
-      Const(fl1.getConst)
-  }
-
   private def unifyRewritings[E[_], O[_, _]](
       t1: Table[E, O], t2: Table[E, O]): List[Rewrite \/ Rewrite] = 
     (t1 ++ t2).groupBy(_._2).values.filter(_.length > 1)
@@ -465,18 +294,21 @@ object OpticLang {
   
   private def rewriteExpr[E[_], O[_, _], S, A](
       e: TExpr[E, O, S, A], rw: Rewrite): TExpr[E, O, S, A] = e match {
-    case Product(l, r, is) => Product(rewriteExpr(l, rw), rewriteExpr(r, rw), is)
-    case Vertical(u, d) => Vertical(rewriteExpr(u, rw), rewriteExpr(d, rw))
+    case Product(l, r, is, lt, rt) => Product(
+      rewriteExpr(l, rw), rewriteExpr(r, rw), is, 
+      rewriteTable(lt, rw), rewriteTable(rt, rw))
+    case Vertical(u, d, ut, dt) => Vertical(
+      rewriteExpr(u, rw), rewriteExpr(d, rw),
+      rewriteTable(ut, rw), rewriteTable(dt, rw))
     case Var(x) if x == rw._1 => Var(rw._2)
     case _ => e
   }
 
   private def rewriteTable[E[_], O[_, _]](
-      t: Table[E, O], rw: Rewrite): Table[E, O] =
-    t.map { 
-      case (v, e) if v == rw._1 => (rw._2, e)
-      case x => x
-    }
+      t: Table[E, O], rw: Rewrite): Table[E, O] = t.map { 
+    case (v, e) if v == rw._1 => (rw._2, e)
+    case x => x
+  }
 
   sealed abstract class TSemantic[E[_], A] 
 
@@ -504,27 +336,43 @@ object OpticLang {
 
   sealed abstract class TExpr[E[_], O[_, _], S, A] {
     def mapO[O2[_, _]](f: OpticMap[E, O, O2]): TExpr[E, O2, S, A] = this match {
-      case Product(l, r, is) => Product(l.mapO(f), r.mapO(f), is)
-      case Vertical(u, d) => Vertical(u.mapO(f), d.mapO(f))
+      case Product(l, r, is, lt, rt) => 
+        Product(l.mapO(f), r.mapO(f), is, lt.mapO(f), rt.mapO(f))
+      case Vertical(u, d, ut, dt) => 
+        Vertical(u.mapO(f), d.mapO(f), ut.mapO(f), dt.mapO(f))
       case Var(name) => Var(name)
-      case Wrap(e) => Wrap(f(e))
+      case Wrap(e, inf) => Wrap(f(e), inf)
+      case Unary(op) => Unary(op)
+      case Binary(op) => Binary(op)
+      case Like(s) => Like(s)
     }
   }
 
   case class Product[E[_], O[_, _], S, A, B, C](
       l: TExpr[E, O, S, A],
       r: TExpr[E, O, S, B],
-      is: (A, B) === C)
+      is: (A, B) === C,
+      lt: Table[E, O],
+      rt: Table[E, O])
     extends TExpr[E, O, S, C]
 
   case class Vertical[E[_], O[_, _], S, A, B](
       u: TExpr[E, O, S, A],
-      d: TExpr[E, O, A, B])
+      d: TExpr[E, O, A, B],
+      ut: Table[E, O],
+      dt: Table[E, O])
     extends TExpr[E, O, S, B]
 
   case class Var[E[_], O[_, _], S, A](name: String) extends TExpr[E, O, S, A]
 
-  case class Wrap[E[_], O[_, _], S, A](e: E[O[S, A]]) extends TExpr[E, O, S, A]
+  case class Wrap[E[_], O[_, _], S, A](e: E[O[S, A]], info: OpticInfo) 
+    extends TExpr[E, O, S, A]
+
+  case class Unary[E[_], O[_, _], S, A](name: String) extends TExpr[E, O, S, A]
+
+  case class Binary[E[_], O[_, _], S, A](name: String) extends TExpr[E, O, S, A]
+
+  case class Like[E[_], O[_, _], S, A](s: String) extends TExpr[E, O, S, A]
 
   implicit class TableOps[E[_], O[_, _]](table: Table[E, O]) {
 
@@ -540,23 +388,38 @@ object OpticLang {
 
   implicit def tsemantic[E[_]: OpticLang] = new OpticLang[TSemantic[E, ?]] {
 
+    // XXX: In several cases, we can get more variables than needed, I think
+    // that each expression should have its own variables, I mean, each tree
+    // should be a semantic itself!?!?
     private def vertical[O[_, _], S, A, B](
         vars1: Table[E, O],
         vars2: Table[E, O],
         expr1: TExpr[E, O, S, A],
-        expr2: TExpr[E, O, A, B]): (Table[E, O], TExpr[E, O, S, B]) = {
+        expr2: TExpr[E, O, A, B]): (Table[E, O], TExpr[E, O, S, B]) = 
       (expr1, expr2) match {
         case (x@Var(_), y@Var(s)) => {
-          val e = Vertical(x, vars2.getV(y))
-          ((vars1.deleteV(x) ++ vars2.deleteV(y)) + (s -> e), Var(s))
+          val e = Vertical(x, vars2.getV(y), vars1, vars2)
+          ((vars1 ++ vars2.deleteV(y)) + (s -> e), Var(s))
         }
-        case (Vertical(prev, x@Var(_)), y@Var(s)) => {
-          val e = Vertical(x, vars2.getV(y))
-          ((vars1.deleteV(x) ++ vars2.deleteV(y)) + (s -> e), Vertical(prev, Var(s)))
+        case (Vertical(prev, x@Var(_), _, _), y@Var(s)) => {
+          val e = Vertical(x, vars2.getV(y), vars1, vars2)
+          vertical(vars1, vars2.deleteV(y) + (s -> e), prev, Var(s))
+        }       
+        case (e, Product(l, r, is, lt, rt)) => {
+          val (vars3, expr3) = vertical(vars1, lt, e, l)
+          val (vars4, expr4) = vertical(vars1, rt, e, r)
+          horizontal(vars3, vars4, expr3, expr4).rightMap(is.subst)
         }
-        case _ => (vars1 ++ vars2, Vertical(expr1, expr2))
+        case (e, Vertical(u, d, ut, dt)) => {
+          val (vars3, expr3) = vertical(vars1, ut, e, u)
+          vertical(vars3, dt, expr3, d)
+        }
+        case (Product(l, _, _, lt, _), Wrap(_, inf)) if inf.nme == "first" => 
+          (lt, l.asInstanceOf[TExpr[E, O, S, B]])
+        case (Product(_, r, _, _, rt), Wrap(_, inf)) if inf.nme == "second" =>
+          (rt, r.asInstanceOf[TExpr[E, O, S, B]])
+        case _ => (vars1 ++ vars2, Vertical(expr1, expr2, vars1, vars2))
       }
-    }
 
     private def horizontal[O[_, _], S, A, B](
         vars1: Table[E, O],
@@ -571,7 +434,7 @@ object OpticLang {
           case ((vl, vr, el, er), \/-(rw)) =>
             (vl, rewriteTable(vr, rw), el, rewriteExpr(er, rw))
         }
-      (vars3 ++ vars4, Product(expr3, expr4, Leibniz.refl))
+      (vars3 ++ vars4, Product(expr3, expr4, Leibniz.refl, vars3, vars4))
     }
 
     def flVert[S, A, B](
@@ -628,21 +491,22 @@ object OpticLang {
       TAffineFold(vars3, expr3)
     }
 
-
     def filtered[S](p: TSemantic[E, Getter[S, Boolean]]): TSemantic[E, AffineFold[S, S]] = ???
 
     def sub: TSemantic[E, Getter[(Int, Int), Int]] =
-      TGetter(expr = Wrap(OpticLang[E].sub))
+      TGetter(expr = Binary("sub"))
 
     def greaterThan: TSemantic[E, Getter[(Int, Int), Boolean]] = ???
 
     def equal[A]: TSemantic[E, Getter[(A, A), Boolean]] = ???
 
     def first[A, B]: TSemantic[E, Getter[(A, B), A]] =
-      TGetter(expr = Wrap(OpticLang[E].first))
+      TGetter(expr = Wrap(OpticLang[E].first,
+        OpticInfo(KGetter, "first", TypeInfo("(A, B)"), TypeInfo("A"))))
 
     def second[A, B]: TSemantic[E, Getter[(A, B), B]] =
-      TGetter(expr = Wrap(OpticLang[E].second))
+      TGetter(expr = Wrap(OpticLang[E].second,
+        OpticInfo(KGetter, "first", TypeInfo("(A, B)"), TypeInfo("B"))))
 
     def likeInt[S](i: Int): TSemantic[E, Getter[S, Int]] =
       ???

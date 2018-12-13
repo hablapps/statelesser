@@ -3,6 +3,8 @@ package test
 
 import scalaz.Const
 
+import OpticLang._
+
 trait CoupleExample[Expr[_]] {
 
   implicit val ev: OpticLang[Expr]
@@ -30,14 +32,14 @@ trait CoupleExample[Expr[_]] {
   import ev._
   import OpticLang.syntax._
 
-  def getPeople: Expr[People => List[Person]] =
-    getAll(people)
+  def getPeople: Expr[Fold[People, Person]] =
+    people
 
-  def getPeopleName_1: Expr[People => List[String]] =
-    getAll(people > name.asFold)
+  def getPeopleName_1: Expr[Fold[People, String]] =
+    people > name.asFold
 
-  def getPeopleName_2: Expr[People => List[String]] =
-    getAll(people > ((name * age) > first).asFold)
+  def getPeopleName_2: Expr[Fold[People, String]] =
+    people > ((name * age) > first).asFold
 
   def peopleName_1: Expr[Fold[People, String]] = 
     people > (name * age * weight > first > first).asFold
@@ -92,14 +94,14 @@ trait CoupleExample[Expr[_]] {
       ((name * (likeInt(4) * likeInt(1))) >
       first * (second > sub)).asFold)
 
-  def getPeopleNameAndAge_1: Expr[People => List[(String, Int)]] =
-    getAll(people > (name * age).asFold)
+  def getPeopleNameAndAge_1: Expr[Fold[People, (String, Int)]] =
+    people > (name * age).asFold
 
-  def getPeopleNameAndAge_2: Expr[People => List[(String, Int)]] =
-    getAll(people > (((name * age) * weight) > first).asFold)
+  def getPeopleNameAndAge_2: Expr[Fold[People, (String, Int)]] =
+    people > ((name * age * weight) > first).asFold
 
-  def getHer: Expr[Couples => List[Person]] =
-    getAll(couples > her.asFold)
+  def getHer: Expr[Fold[Couples, Person]] =
+    couples > her.asFold
 
   def herNameAndStreet: Expr[Fold[Couples, (String, String)]] =
     couples > (her > name * (address > street)).asFold
@@ -108,17 +110,17 @@ trait CoupleExample[Expr[_]] {
     couples > (
       her * him > (first > address > street) * (second > address > street)).asFold
 
-  def getHerName: Expr[Couples => List[String]] =
-    getAll(couples > her.asFold > name.asFold)
+  def getHerName: Expr[Fold[Couples, String]] =
+    couples > her.asFold > name.asFold
 
-  def getHerNameAndAge_1: Expr[Couples => List[(String, Int)]] =
-    getAll(couples > her.asFold > (name * age).asFold)
+  def getHerNameAndAge_1: Expr[Fold[Couples, (String, Int)]] =
+    couples > her.asFold > (name * age).asFold
 
-  def getHerNameAndAge_2: Expr[Couples => List[(String, Int)]] =
-    getAll(couples > ((her > name) * (her > age)).asFold)
+  def getHerNameAndAge_2: Expr[Fold[Couples, (String, Int)]] =
+    couples > ((her > name) * (her > age)).asFold
 
-  def getHerNameAndAge_3: Expr[Couples => List[(String, Int)]] =
-    getAll(couples > (her > name * age).asFold)
+  def getHerNameAndAge_3: Expr[Fold[Couples, (String, Int)]] =
+    couples > (her > name * age).asFold
 
   def getPeopleGt30: Expr[People => List[(String, Int)]] =
     getAll(people > (name.asAffineFold * 
@@ -171,113 +173,129 @@ trait CoupleExample[Expr[_]] {
 }
 
 object CoupleExample {
-  import OpticLang._
 
-  implicit val semantic = new CoupleExample[Const[Semantic, ?]] {
+  type Stack[A] = 
+    DistAs[
+    DistAs[
+    ProductProduct[
+    ProductProduct[
+    ProductProduct[
+    VertLeftAssoc[
+    VertLeftAssoc[
+    VertLeftAssoc[
+    VertLeftAssoc[
+    VertLeftAssoc[
+    ClearId[
+    ProductFirst[
+    ProductFirst[
+    ProductSecond[
+    ProductSecond[
+    VerticalLike[
+    IntEval[
+    TSemantic[Const[String, ?], 
+    ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], ?], A]
 
-    implicit val ev = OpticLang.semantic
+  val ev20 = IntEval.optimization[TSemantic[Const[String, ?], ?]]
+  val ev18 = VerticalLike.optimization(ev20)
+  val ev15 = ProductSecond.optimization(ev18)
+  val ev14 = ProductSecond.optimization(ev15)
+  val ev11 = ProductFirst.optimization(ev14)
+  val ev10 = ProductFirst.optimization(ev11)
+  val ev06 = ClearId.optimization(ev10)
+  val ev0a = VertLeftAssoc.optimization(ev06)
+  val ev05 = VertLeftAssoc.optimization(ev0a)
+  val ev04 = VertLeftAssoc.optimization(ev05)
+  val ev03 = VertLeftAssoc.optimization(ev04)
+  val ev02 = VertLeftAssoc.optimization(ev03)
+  val ev01 = ProductProduct.optimization(ev02)
+  val ev00 = ProductProduct.optimization(ev01)
+  val ev_z = ProductProduct.optimization(ev00)
+  val ev_y = DistAs.optimization(ev_z)
+  val ev_x = DistAs.optimization(ev_y)
 
+  def runStack[A](p: Stack[A]): TSemantic[Const[String, ?], A] =
+    ev20.run(
+    ev18.run(
+    ev15.run(
+    ev14.run(
+    ev11.run(
+    ev10.run(
+    ev06.run(
+    ev0a.run(
+    ev05.run(
+    ev04.run(
+    ev03.run(
+    ev02.run(
+    ev01.run(
+    ev00.run(
+    ev_z.run(
+    ev_y.run(
+    ev_x.run(p)))))))))))))))))
+
+  private def wrap[O[_, _], S, A](
+      sem: TSemantic[Const[String, ?], O[S, A]]): Stack[O[S, A]] =
+    DistAs.Unk(
+    DistAs.Unk(
+    ProductProduct.Unk(
+    ProductProduct.Unk(
+    ProductProduct.Unk(
+    VertLeftAssoc.Unk(
+    VertLeftAssoc.Unk(
+    VertLeftAssoc.Unk(
+    VertLeftAssoc.Unk(
+    VertLeftAssoc.Unk(
+    ClearId.Unk(
+    ProductFirst.Unk(
+    ProductFirst.Unk(
+    ProductSecond.Unk(
+    ProductSecond.Unk(
+    VerticalLike.Unk(  
+    IntEval.Unk(sem)
+    ))))))))))))))))
+
+  private def wrapPlainG[S, A](s: String, inf: OpticInfo): Stack[Getter[S, A]] =
+    wrap(TGetter(expr = Wrap(Const(s), inf)))
+
+  private def wrapTableG[S, A](
+      v: String, s: String, inf: OpticInfo): Stack[Getter[S, A]] =
+    wrap(TGetter(Set(v -> Wrap[Const[String, ?], Getter, S, A](Const(s), inf)), Var(v)))
+
+  private def wrapTableF[S, A](
+      v: String, s: String, inf: OpticInfo): Stack[Fold[S, A]] =
+    wrap(TFold(Set(v -> Wrap[Const[String, ?], Fold, S, A](Const(s), inf)), Var(v)))
+
+  val instance = new CoupleExample[Stack] {
     type Couple = Unit
     type Person = Unit
 
-    val couples = {
+    val ev = ev_x
 
-      val oi = OpticInfo(
-        KFold,
-        "couples", 
-        TypeInfo("Couples", false), 
-        TypeInfo("Couple", true))
+    val couples = wrapTableF("c", "couples", 
+      OpticInfo(KFold, "couples", TypeInfo("Couples"), TypeInfo("Couple", true)))
+    
+    val her = wrapTableG("w", "her",
+      OpticInfo(KGetter, "her", TypeInfo("Couple", true), TypeInfo("Person", true)))
 
-      Const(Semantic(TVar("c"), List("c" -> TOptic(oi))))
-    }
+    val him = wrapTableG("m", "him",
+      OpticInfo(KGetter, "him", TypeInfo("Couple", true), TypeInfo("Person", true)))
+    
+    val people = wrapTableF("p", "people",
+      OpticInfo(KFold, "people", TypeInfo("People"), TypeInfo("Person", true)))
 
-    val her = {
+    val name = wrapPlainG("name",
+      OpticInfo(KGetter, "name", TypeInfo("Person", true), TypeInfo("String")))
 
-      val oi = OpticInfo(
-        KGetter,
-        "her", 
-        TypeInfo("Couple", true), 
-        TypeInfo("Person", true))
+    val age = wrapPlainG("age",
+      OpticInfo(KGetter, "age", TypeInfo("Person", true), TypeInfo("Int")))
 
-      Const(Semantic(TVar("w"), List("w" -> TOptic(oi))))
-    }
+    val weight = wrapPlainG("weight",
+      OpticInfo(KGetter, "weight", TypeInfo("Person", true), TypeInfo("Int")))
 
-    val him = {
-
-      val oi = OpticInfo( 
-        KGetter,
-        "him", 
-        TypeInfo("Couple", true), 
-        TypeInfo("Person", true))
-
-      Const(Semantic(TVar("m"), List("m" -> TOptic(oi))))
-    }
-
-    val address = {
-
-      val oi = OpticInfo( 
-        KGetter,
-        "address", 
-        TypeInfo("Person", true), 
-        TypeInfo("Address", true))
-
-      Const(Semantic(TVar("a"), List("a" -> TOptic(oi))))
-    }
-
-    val people = {
-
-      val oi = OpticInfo(
-        KFold,
-        "people", 
-        TypeInfo("People", false), 
-        TypeInfo("Person", true))
-
-      Const(Semantic(TVar("p"), List("p" -> TOptic(oi))))
-    }
-
-    val name = {
-
-      val oi = OpticInfo(
-        KGetter,
-        "name", 
-        TypeInfo("Person", false), 
-        TypeInfo("String", true))
-
-      Const(Semantic(TOptic(oi)))
-    }
-
-    val age = {
-
-      val oi = OpticInfo(
-        KGetter,
-        "age", 
-        TypeInfo("Person", false), 
-        TypeInfo("Int", true))
-
-      Const(Semantic(TOptic(oi)))
-    }
-
-    val weight = {
-
-      val oi = OpticInfo(
-        KGetter,
-        "weight", 
-        TypeInfo("Person", false), 
-        TypeInfo("Int", true))
-
-      Const(Semantic(TOptic(oi)))
-    }
-
-    val street = {
-
-      val oi = OpticInfo(
-        KGetter,
-        "street", 
-        TypeInfo("Address", true), 
-        TypeInfo("String", false))
-
-      Const(Semantic(TOptic(oi)))
-    }
+    val address = wrapTableG("a", "address",
+      OpticInfo(KGetter, "address", TypeInfo("Person", true), TypeInfo("Address", true)))
+    
+    val street = wrapPlainG("street",
+      OpticInfo(KGetter, "street", TypeInfo("Address", true), TypeInfo("String")))
   }
 }
 
