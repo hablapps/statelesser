@@ -312,7 +312,7 @@ object OpticLang {
 
   sealed abstract class TSemantic[E[_], A] 
 
-  type Row[E[_], O[_, _]] = (String, TExpr[E, O, _, _])
+  type Row[E[_], O[_, _]] = (String, TVarVal[E, O, _, _])
 
   type Table[E[_], O[_, _]] = Set[Row[E, O]]
 
@@ -332,6 +332,59 @@ object OpticLang {
 
   trait OpticMap[E[_], O[_, _], O2[_, _]] {
     def apply[S, A](e: E[O[S, A]]): E[O2[S, A]]
+  }
+
+  // Pretty much a category!
+  trait OpticComp[E[_], O[_, _]] {
+    def vert[S, A, B](u: E[O[S, A]], d: E[O[A, B]]): E[O[S, B]]
+    def hori[S, A, B](l: E[O[S, A]], r: E[O[S, B]]): E[O[S, (A, B)]]
+    def id[S]: E[O[S, S]]
+  }
+
+  def reifyVV[E[_], O[_, _], S, A](
+      vv: TVarVal[E, O, S, A],
+      t: Table[E, O])(implicit 
+      oc: OpticComp[E, O]): E[O[S, A]] = vv.vs match {
+    case ONil(_) => vv.w.e.asInstanceOf[E[O[S, A]]]
+    case OCons(v, vs) => 
+      oc.vert(reifyVV(t.getV(v), t), reifyVV(TVarVal(vs, vv.w), t))
+  }
+
+  sealed abstract class OList[E[_], O[_, _], S, A] {
+    def mapO[O2[_, _]](f: OpticMap[E, O, O2]): OList[E, O2, S, A] = this match {
+      case ONil(is) => ONil[E, O2, S, A](is)
+      case OCons(Var(x), t) => OCons(Var(x), t.mapO(f))
+    }
+  }
+
+  case class ONil[E[_], O[_, _], S, A](is: S === A) extends OList[E, O, S, A]
+
+  case class OCons[E[_], O[_, _], S, A, B](
+      head: Var[E, O, S, A], 
+      tail: OList[E, O, A, B])
+    extends OList[E, O, S, B]
+
+  trait TVarVal[E[_], O[_, _], S, B] {
+    type A
+
+    def vs: OList[E, O, S, A]
+    def w: Wrap[E, O, A, B]
+    
+    def mapO[O2[_, _]](f: OpticMap[E, O, O2]): TVarVal[E, O2, S, B] =
+      TVarVal(vs.mapO(f), Wrap(f(w.e), w.info))
+  }
+
+  object TVarVal {
+
+    type Aux[E[_], O[_, _], S, A2, B] = TVarVal[E, O, S, B] { type A = A2 }
+
+    def apply[E[_], O[_, _], S, A2, B](
+        vs2: OList[E, O, S, A2], 
+        w2: Wrap[E, O, A2, B]): Aux[E, O, S, A2, B] = new TVarVal[E, O, S, B] {
+      type A = A2
+      val vs = vs2
+      val w = w2
+    }
   }
 
   sealed abstract class TExpr[E[_], O[_, _], S, A] {
@@ -386,8 +439,8 @@ object OpticLang {
 
   implicit class TableOps[E[_], O[_, _]](table: Table[E, O]) {
 
-    def getV[S, A](v: Var[E, O, S, A]): TExpr[E, O, S, A] = 
-      table.toMap.apply(v.name).asInstanceOf[TExpr[E, O, S, A]]
+    def getV[S, A](v: Var[E, O, S, A]): TVarVal[E, O, S, A] = 
+      table.toMap.apply(v.name).asInstanceOf[TVarVal[E, O, S, A]]
 
     def deleteV[S, A](v: Var[E, O, S, A]): Table[E, O] =
       (table.toMap - v.name).toSet
@@ -418,11 +471,13 @@ object OpticLang {
         case (Product(_, r, _, _, rt), Wrap(_, inf)) if inf.nme == "second" =>
           (rt, r.asInstanceOf[TExpr[E, O, S, B]])
         case (x@Var(_), y@Var(s)) => {
-          val e = Vertical(x, vars2.getV(y), vars1, vars2)
+          val vv = vars2.getV(y)
+          val e = TVarVal(OCons(x, vv.vs), vv.w)
           ((vars1 ++ vars2.deleteV(y)) + (s -> e), Var(s))
         }
         case (Vertical(prev, x@Var(_), _, _), y@Var(s)) => {
-          val e = Vertical(x, vars2.getV(y), vars1, vars2)
+          val vv = vars2.getV(y)
+          val e = TVarVal(OCons(x, vv.vs), vv.w)
           vertical(vars1, vars2.deleteV(y) + (s -> e), prev, Var(s))
         }
         case (Wrap(_, inf), e) if inf.nme == "id" =>
