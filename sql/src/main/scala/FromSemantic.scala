@@ -31,11 +31,12 @@ trait FromSemantic {
   private def tabToSql[E[_]](
       tab: Table[E, Fold],
       keys: Map[TypeNme, FieldName]): SqlFrom =
-    SFrom(List(tab.toList match {
-      case (nme, Wrap(_, info)) :: xs => 
-        STable(info.tgt.nme, nme, xs.map(joinToSql(_, keys)))
-      case _ => throw new Error(s"No table was selected for FROM clause: $tab")
-    }))
+    tab.simpleTable.toList match {
+      case List((nme, TVarSimpleVal(Wrap(_, info)))) => SFrom(List(
+        STable(info.tgt.nme, nme, tab.nestedTable.toList.map(joinToSql(_, keys)))))
+      case _ => 
+        throw new Error(s"Sorry, but we don't support product roots yet: $tab")
+    }
 
   private def condToSql(
       v1: String, n1: FieldName, 
@@ -43,16 +44,17 @@ trait FromSemantic {
     if (n1 == n2) SUsing(n1) else SOn(SProj(v1, n1), SProj(v2, n2))
 
   private def joinToSql[E[_]](
-      vt: (String, TExpr[E, Fold, _, _]),
-      keys: Map[TypeNme, FieldName]): SqlJoin = vt match {
-    case (v1, Vertical(v2@Var(_), Wrap(_, inf@OpticInfo(KGetter, _, _, _)), _, _)) => {
-      val cond = condToSql(v2.name, inf.nme, v1, keys(inf.tgt.nme))
-      SEqJoin(s"${inf.tgt.nme}", v1, cond)
+      vt: (String, TVarNestedVal[E, Fold, _, _]),
+      keys: Map[TypeNme, FieldName]): SqlJoin = {
+    val nme = vt._1
+    val inf = vt._2.w.info
+    val v = vt._2.vs.lastVar
+    if (inf.kind == KGetter) {
+      val cond = condToSql(v.name, inf.nme, nme, keys(inf.tgt.nme))
+      SEqJoin(s"${inf.tgt.nme}", nme, cond)
+    } else {
+      SEqJoin(s"${inf.tgt.nme}", nme, SUsing(keys(inf.src.nme)))
     }
-    case (n1, Vertical(_, Wrap(_, inf), _, _)) => {
-      SEqJoin(s"${inf.tgt.nme}", n1, SUsing(keys(inf.src.nme)))
-    }
-    case _ => throw new Error(s"Don't know how to generate join for '$vt'")
   }
 
   // private def whrToSql(

@@ -52,7 +52,10 @@ class CoupleExampleTest extends FlatSpec with Matchers {
   it should "generate nested multi-selection" in {
     matchSql(
       "SELECT w.name, w.age FROM Couple AS c INNER JOIN Person AS w ON c.her = w.name;",
-      getHerNameAndAge_1, getHerNameAndAge_2, getHerNameAndAge_3)
+      //getHerNameAndAge_1, 
+      getHerNameAndAge_2, 
+      //getHerNameAndAge_3
+      )
   }
 
   it should "generate multi-selection with literals" in {

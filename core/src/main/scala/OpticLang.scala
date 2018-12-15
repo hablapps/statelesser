@@ -310,13 +310,13 @@ object OpticLang {
     case x => x
   }
 
-  sealed abstract class TSemantic[E[_], A] 
-
   type Row[E[_], O[_, _]] = (String, TVarVal[E, O, _, _])
 
   type Table[E[_], O[_, _]] = Set[Row[E, O]]
 
   type Rewrite = (String, String)
+
+  sealed abstract class TSemantic[E[_], A] 
 
   case class TGetter[E[_], S, A](
     vars: Table[E, Getter] = Set.empty[Row[E, Getter]],
@@ -344,47 +344,70 @@ object OpticLang {
   def reifyVV[E[_], O[_, _], S, A](
       vv: TVarVal[E, O, S, A],
       t: Table[E, O])(implicit 
-      oc: OpticComp[E, O]): E[O[S, A]] = vv.vs match {
-    case ONil(_) => vv.w.e.asInstanceOf[E[O[S, A]]]
-    case OCons(v, vs) => 
-      oc.vert(reifyVV(t.getV(v), t), reifyVV(TVarVal(vs, vv.w), t))
-  }
-
-  sealed abstract class OList[E[_], O[_, _], S, A] {
-    def mapO[O2[_, _]](f: OpticMap[E, O, O2]): OList[E, O2, S, A] = this match {
-      case ONil(is) => ONil[E, O2, S, A](is)
-      case OCons(Var(x), t) => OCons(Var(x), t.mapO(f))
+      oc: OpticComp[E, O]): E[O[S, A]] = vv match {
+    case TVarSimpleVal(w) => w.e
+    case vnv: TVarNestedVal[E, O, S, A] => vnv.vs match {
+      case ONil(v) => oc.vert(reifyVV(t.getV(v), t), vnv.w.e)
+      case OCons(v, vs) => 
+        oc.vert(reifyVV(t.getV(v), t), reifyVV(TVarNestedVal(vs, vnv.w), t))
     }
   }
 
-  case class ONil[E[_], O[_, _], S, A](is: S === A) extends OList[E, O, S, A]
+  sealed abstract class OList[E[_], O[_, _], S, A] {
+
+    def mapO[O2[_, _]](f: OpticMap[E, O, O2]): OList[E, O2, S, A] = this match {
+      case ONil(Var(x)) => ONil(Var(x))
+      case OCons(Var(x), t) => OCons(Var(x), t.mapO(f))
+    }
+
+    def lastVar: Var[E, O, _, A] = this match {
+      case ONil(x) => x
+      case OCons(_, tail) => tail.lastVar
+    }
+  }
+
+  case class ONil[E[_], O[_, _], S, A](last: Var[E, O, S, A])
+    extends OList[E, O, S, A]
 
   case class OCons[E[_], O[_, _], S, A, B](
       head: Var[E, O, S, A], 
       tail: OList[E, O, A, B])
     extends OList[E, O, S, B]
 
-  trait TVarVal[E[_], O[_, _], S, B] {
-    type A
-
-    def vs: OList[E, O, S, A]
-    def w: Wrap[E, O, A, B]
-    
-    def mapO[O2[_, _]](f: OpticMap[E, O, O2]): TVarVal[E, O2, S, B] =
-      TVarVal(vs.mapO(f), Wrap(f(w.e), w.info))
+  sealed abstract class TVarVal[E[_], O[_, _], S, A] {
+    def mapO[O2[_, _]](f: OpticMap[E, O, O2]): TVarVal[E, O2, S, A] = this match {
+      case TVarSimpleVal(Wrap(e, info)) => TVarSimpleVal(Wrap(f(e), info))
+      case vnv: TVarNestedVal[E, O, S, A] =>  
+        TVarNestedVal(vnv.vs.mapO(f), Wrap(f(vnv.w.e), vnv.w.info))
+    }
   }
 
-  object TVarVal {
+  case class TVarSimpleVal[E[_], O[_, _], S, A](w: Wrap[E, O, S, A])
+    extends TVarVal[E, O, S, A]
 
-    type Aux[E[_], O[_, _], S, A2, B] = TVarVal[E, O, S, B] { type A = A2 }
+  trait TVarNestedVal[E[_], O[_, _], S, B] extends TVarVal[E, O, S, B] {
+    type A
+    def vs: OList[E, O, S, A]
+    def w: Wrap[E, O, A, B]
+    override def equals(other: Any): Boolean = other match {
+      case vnv: TVarNestedVal[E, O, S, _] => vs == vnv.vs && vnv.w == w
+      case _ => false
+    }
+  }
+
+  object TVarNestedVal {
+
+    type Aux[E[_], O[_, _], S, A2, B] = 
+      TVarNestedVal[E, O, S, B] { type A = A2 }
 
     def apply[E[_], O[_, _], S, A2, B](
         vs2: OList[E, O, S, A2], 
-        w2: Wrap[E, O, A2, B]): Aux[E, O, S, A2, B] = new TVarVal[E, O, S, B] {
-      type A = A2
-      val vs = vs2
-      val w = w2
-    }
+        w2: Wrap[E, O, A2, B]): Aux[E, O, S, A2, B] = 
+      new TVarNestedVal[E, O, S, B] {
+        type A = A2
+        val vs = vs2
+        val w = w2
+      }
   }
 
   sealed abstract class TExpr[E[_], O[_, _], S, A] {
@@ -437,6 +460,8 @@ object OpticLang {
   case class LikeBool[E[_], O[_, _], S, A](b: Boolean, is: A === Boolean) 
     extends TExpr[E, O, S, A]
 
+  // XXX: we need a safer table implementation, since this is a really ugly
+  // workaround, but this is good enough for the time being.
   implicit class TableOps[E[_], O[_, _]](table: Table[E, O]) {
 
     def getV[S, A](v: Var[E, O, S, A]): TVarVal[E, O, S, A] = 
@@ -447,6 +472,15 @@ object OpticLang {
 
     def mapO[O2[_, _]](f: OpticMap[E, O, O2]): Table[E, O2] =
       table.map { case (s, e) => (s, e.mapO(f)) }
+
+    private def splitTables =
+      table.partition { case (_, TVarSimpleVal(_)) => true; case _ => false }
+
+    def simpleTable: Set[(String, TVarSimpleVal[E, O, _, _])] =
+      splitTables._1.asInstanceOf[Set[(String, TVarSimpleVal[E, O, _, _])]]
+
+    def nestedTable: Set[(String, TVarNestedVal[E, O, _, _])] =
+      splitTables._2.asInstanceOf[Set[(String, TVarNestedVal[E, O, _, _])]]
   }
 
   implicit def tsemantic[E[_]: OpticLang] = new OpticLang[TSemantic[E, ?]] {
@@ -472,12 +506,20 @@ object OpticLang {
           (rt, r.asInstanceOf[TExpr[E, O, S, B]])
         case (x@Var(_), y@Var(s)) => {
           val vv = vars2.getV(y)
-          val e = TVarVal(OCons(x, vv.vs), vv.w)
+          val e = vv match {
+            case TVarSimpleVal(w) => TVarNestedVal(ONil(x), w)
+            case vnv: TVarNestedVal[E, O, _, _] => 
+              TVarNestedVal(OCons(x, vnv.vs), vnv.w)
+          }
           ((vars1 ++ vars2.deleteV(y)) + (s -> e), Var(s))
         }
         case (Vertical(prev, x@Var(_), _, _), y@Var(s)) => {
           val vv = vars2.getV(y)
-          val e = TVarVal(OCons(x, vv.vs), vv.w)
+          val e = vv match {
+            case TVarSimpleVal(w) => TVarNestedVal(ONil(x), w)
+            case vnv: TVarNestedVal[E, O, _, _] => 
+              TVarNestedVal(OCons(x, vnv.vs), vnv.w)
+          }
           vertical(vars1, vars2.deleteV(y) + (s -> e), prev, Var(s))
         }
         case (Wrap(_, inf), e) if inf.nme == "id" =>

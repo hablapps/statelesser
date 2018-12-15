@@ -180,12 +180,14 @@ object CoupleExample {
     TGetter(expr = Wrap(Const(s), inf))
 
   private def wrapTableG[S, A](
-      v: String, s: String, inf: OpticInfo): Stack[Getter[S, A]] =
-    TGetter(Set(v -> Wrap[Const[String, ?], Getter, S, A](Const(s), inf)), Var(v))
+      v: String, s: String, inf: OpticInfo): Stack[Getter[S, A]] = TGetter(
+    Set(v -> TVarSimpleVal(Wrap[Const[String, ?], Getter, S, A](Const(s), inf))), 
+    Var(v))
 
   private def wrapTableF[S, A](
-      v: String, s: String, inf: OpticInfo): Stack[Fold[S, A]] =
-    TFold(Set(v -> Wrap[Const[String, ?], Fold, S, A](Const(s), inf)), Var(v))
+      v: String, s: String, inf: OpticInfo): Stack[Fold[S, A]] = TFold(
+    Set(v -> TVarSimpleVal(Wrap[Const[String, ?], Fold, S, A](Const(s), inf))), 
+    Var(v))
 
   val instance = new CoupleExample[Stack] {
     type Couple = Unit
