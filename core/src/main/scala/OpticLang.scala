@@ -410,6 +410,45 @@ object OpticLang {
       }
   }
 
+  def reifyTExpr[E[_], O[_, _], S, A](te: TExpr2[E, O, S, A]): E[O[S, A]] =
+    te match {
+      case Wrap2(e) => e
+      case _ => ???
+    }
+
+  sealed abstract class TExpr2[E[_], O[_, _], S, A]
+
+  case class Product2[E[_], O[_, _], S, A, B](
+    l: TExpr2[E, O, S, A],
+    r: TExpr2[E, O, A, B]) extends TExpr2[E, O, S, B]
+
+  sealed abstract class TSel2[E[_], O[_, _], S, A] extends TExpr2[E, O, S, A]
+
+  case class Var2[E[_], O[_, _], S, A](
+    s: String) extends TSel2[E, O, S, A]
+
+  case class Wrap2[E[_], O[_, _], S, A](
+    e: E[O[S, A]]) extends TSel2[E, O, S, A]
+
+  case class VarWrap2[E[_], O[_, _], S, A, B](
+    v: Var2[E, O, S, A],
+    w: Wrap2[E, O, A, B]) extends TSel2[E, O, S, B]
+
+  case class LikeInt2[E[_], O[_, _], S](
+    i: Int) extends TSel2[E, O, S, Int]
+
+  case class LikeBool2[E[_], O[_, _], S](
+    b: Boolean) extends TSel2[E, O, S, Boolean]
+
+  case class Unary2[E[_], O[_, _], S, A, B](
+    sel: TSel2[E, O, S, A],
+    op: Wrap2[E, O, A, B]) extends TSel2[E, O, S, B]
+
+  case class Binary2[E[_], O[_, _], S, A, B, C](
+    sel1: TSel2[E, O, S, A],
+    sel2: TSel2[E, O, S, B],
+    op: Wrap2[E, O, (A, B), C]) extends TSel2[E, O, S, C]
+
   sealed abstract class TExpr[E[_], O[_, _], S, A] {
     def mapO[O2[_, _]](f: OpticMap[E, O, O2]): TExpr[E, O2, S, A] = this match {
       case Product(l, r, is, lt, rt) => 
