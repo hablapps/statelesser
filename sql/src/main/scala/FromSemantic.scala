@@ -65,7 +65,6 @@ trait FromSemantic {
   //     case (Some(e), t) => Some(SBinOp("AND", e, treeToExpr(t, keys)))
   //   }
 
-
   private def treeToExpr[E[_]](
       t: TExpr[E, Fold, _, _],
       keys: Map[TypeNme, FieldName]): SqlExp = t match {

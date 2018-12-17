@@ -68,6 +68,9 @@ trait OpticLang[Expr[_]] {
   def gt(i: Int): Expr[Getter[Int, Boolean]] = 
     gtVert(gtHori(id, likeInt(i)), greaterThan)
 
+  def gtAsFl[S, A](gt: Expr[Getter[S, A]]): Expr[Fold[S, A]] =
+    aflAsFl(gtAsAfl(gt))
+
   // def eq(i: Int): Expr[Getter[Int, Boolean]] =
   //   gtVert(gtHori(id, like(i)), equal[A])
 
@@ -332,29 +335,24 @@ object OpticLang {
     expr: TExpr[E, AffineFold, S, A]) extends TSemantic[E, AffineFold[S, A]]
 
   case class TFold[E[_], S, A](
-    vars: Table[E, Fold] = Set.empty[Row[E, Fold]],
-    expr: TExpr[E, Fold, S, A]) extends TSemantic[E, Fold[S, A]]
+      vars: Table[E, Fold] = Set.empty[Row[E, Fold]],
+      expr: TExpr[E, Fold, S, A]) extends TSemantic[E, Fold[S, A]] {
+    def reify(implicit ev: OpticLang[E]): E[Fold[S, A]] = reifyExpr(expr, vars)
+  }
 
   trait OpticMap[E[_], O[_, _], O2[_, _]] {
     def apply[S, A](e: E[O[S, A]]): E[O2[S, A]]
   }
 
-  // Pretty much a category!
-  trait OpticComp[E[_], O[_, _]] {
-    def vert[S, A, B](u: E[O[S, A]], d: E[O[A, B]]): E[O[S, B]]
-    def hori[S, A, B](l: E[O[S, A]], r: E[O[S, B]]): E[O[S, (A, B)]]
-    def id[S]: E[O[S, S]]
-  }
- 
-  def reifyVV[E[_], O[_, _], S, A](
-      vv: TVarVal[E, O, S, A],
-      t: Table[E, O])(implicit 
-      oc: OpticComp[E, O]): E[O[S, A]] = vv match {
+  def reifyVV[E[_], S, A](
+      vv: TVarVal[E, Fold, S, A],
+      t: Table[E, Fold])(implicit 
+      ev: OpticLang[E]): E[Fold[S, A]] = vv match {
     case TVarSimpleVal(w) => w.e
-    case vnv: TVarNestedVal[E, O, S, A] => vnv.vs match {
-      case ONil(v) => oc.vert(reifyVV(t.getV(v), t), vnv.w.e)
+    case vnv: TVarNestedVal[E, Fold, S, A] => vnv.vs match {
+      case ONil(v) => ev.flVert(reifyVV(t.getV(v), t), vnv.w.e)
       case OCons(v, vs) => 
-        oc.vert(reifyVV(t.getV(v), t), reifyVV(TVarNestedVal(vs, vnv.w), t))
+        ev.flVert(reifyVV(t.getV(v), t), reifyVV(TVarNestedVal(vs, vnv.w), t))
     }
   }
 
@@ -413,6 +411,27 @@ object OpticLang {
         val vs = vs2
         val w = w2
       }
+  }
+
+  def reifyExpr[E[_], S, A](
+      expr: TExpr[E, Fold, S, A],
+      t: Table[E, Fold])(implicit
+      ev: OpticLang[E]): E[Fold[S, A]] = expr match {
+    case Product(l, r, is, lt, rt) => 
+      is.subst[λ[x => E[Fold[S, x]]]](ev.flHori(reifyExpr(l, lt), reifyExpr(r, rt)))
+    case Vertical(u, d, ut, dt) => ev.flVert(reifyExpr(u, ut), reifyExpr(d, dt))
+    case x: Var[E, Fold, S, A] => reifyVV(t.getV(x), t)
+    case w: Wrap[E, Fold, S, A] => w.e
+    case LikeInt(i, is) => 
+      is.flip.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.likeInt[S](i)))
+    case LikeBool(b, is) =>
+      is.flip.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.likeBool[S](b)))
+    case Not(is1, is2) => 
+      is2.flip.subst[λ[x => E[Fold[S, x]]]](
+        is1.flip.subst[λ[x => E[Fold[x, Boolean]]]](ev.gtAsFl(ev.not)))
+    case Sub(is1, is2) =>
+      is2.flip.subst[λ[x => E[Fold[S, x]]]](
+        is1.flip.subst[λ[x => E[Fold[x, Int]]]](ev.gtAsFl(ev.sub)))
   }
 
   sealed abstract class TExpr[E[_], O[_, _], S, A] {
@@ -643,6 +662,7 @@ object OpticLang {
 
     def likeBool[S](b: Boolean): TSemantic[E, Getter[S, Boolean]] =
       TGetter(expr = LikeBool(b, implicitly))
+
 
     def likeStr[S](s: String): TSemantic[E, Getter[S, String]] =
       ???
