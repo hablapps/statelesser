@@ -291,17 +291,22 @@ object OpticLang {
   private def getRewritings[E[_], O[_, _]](
       t1: Table[E, O], t2: Table[E, O]): List[Rewrite \/ Rewrite] =
     unifyRewritings(t1, t2) ++ diffRewritings(t1, t2)
+
+  private def rewriteSel[E[_], O[_, _], S, A](
+      e: TSel[E, O, S, A], rw: Rewrite): TSel[E, O, S, A] = e match {
+    case Var(x) if x == rw._1 => Var(rw._2)
+    case _ => e
+  }
   
   private def rewriteExpr[E[_], O[_, _], S, A](
       e: TExpr[E, O, S, A], rw: Rewrite): TExpr[E, O, S, A] = e match {
     case Product(l, r, is, lt, rt) => Product(
-      rewriteExpr(l, rw), rewriteExpr(r, rw), is, 
+      rewriteExpr(l, rw), rewriteExpr(r, rw), is,
       rewriteTable(lt, rw), rewriteTable(rt, rw))
     case Vertical(u, d, ut, dt) => Vertical(
-      rewriteExpr(u, rw), rewriteExpr(d, rw),
+      rewriteExpr(u, rw), rewriteSel(d, rw),
       rewriteTable(ut, rw), rewriteTable(dt, rw))
-    case Var(x) if x == rw._1 => Var(rw._2)
-    case _ => e
+    case sel: TSel[E, O, S, A] => rewriteSel(sel, rw)
   }
 
   private def rewriteTable[E[_], O[_, _]](
@@ -340,7 +345,7 @@ object OpticLang {
     def hori[S, A, B](l: E[O[S, A]], r: E[O[S, B]]): E[O[S, (A, B)]]
     def id[S]: E[O[S, S]]
   }
-
+ 
   def reifyVV[E[_], O[_, _], S, A](
       vv: TVarVal[E, O, S, A],
       t: Table[E, O])(implicit 
@@ -410,94 +415,61 @@ object OpticLang {
       }
   }
 
-  def reifyTExpr[E[_], O[_, _], S, A](te: TExpr2[E, O, S, A]): E[O[S, A]] =
-    te match {
-      case Wrap2(e) => e
-      case _ => ???
-    }
-
-  sealed abstract class TExpr2[E[_], O[_, _], S, A]
-
-  case class Product2[E[_], O[_, _], S, A, B](
-    l: TExpr2[E, O, S, A],
-    r: TExpr2[E, O, A, B]) extends TExpr2[E, O, S, B]
-
-  sealed abstract class TSel2[E[_], O[_, _], S, A] extends TExpr2[E, O, S, A]
-
-  case class Var2[E[_], O[_, _], S, A](
-    s: String) extends TSel2[E, O, S, A]
-
-  case class Wrap2[E[_], O[_, _], S, A](
-    e: E[O[S, A]]) extends TSel2[E, O, S, A]
-
-  case class VarWrap2[E[_], O[_, _], S, A, B](
-    v: Var2[E, O, S, A],
-    w: Wrap2[E, O, A, B]) extends TSel2[E, O, S, B]
-
-  case class LikeInt2[E[_], O[_, _], S](
-    i: Int) extends TSel2[E, O, S, Int]
-
-  case class LikeBool2[E[_], O[_, _], S](
-    b: Boolean) extends TSel2[E, O, S, Boolean]
-
-  case class Unary2[E[_], O[_, _], S, A, B](
-    sel: TSel2[E, O, S, A],
-    op: Wrap2[E, O, A, B]) extends TSel2[E, O, S, B]
-
-  case class Binary2[E[_], O[_, _], S, A, B, C](
-    sel1: TSel2[E, O, S, A],
-    sel2: TSel2[E, O, S, B],
-    op: Wrap2[E, O, (A, B), C]) extends TSel2[E, O, S, C]
-
   sealed abstract class TExpr[E[_], O[_, _], S, A] {
     def mapO[O2[_, _]](f: OpticMap[E, O, O2]): TExpr[E, O2, S, A] = this match {
       case Product(l, r, is, lt, rt) => 
         Product(l.mapO(f), r.mapO(f), is, lt.mapO(f), rt.mapO(f))
-      case Vertical(u, d, ut, dt) => 
-        Vertical(u.mapO(f), d.mapO(f), ut.mapO(f), dt.mapO(f))
+      case Vertical(u, d, ut, dt) =>
+        Vertical(u.mapO(f), d.mapOSel(f), ut.mapO(f), dt.mapO(f))
+      case x: TSel[E, O, S, A] => x.mapOSel(f)
+    }
+  }
+  case class Product[E[_], O[_, _], S, A, B, C](
+    l: TExpr[E, O, S, A],
+    r: TExpr[E, O, S, B],
+    is: (A, B) === C,
+    lt: Table[E, O],
+    rt: Table[E, O]) extends TExpr[E, O, S, C]
+
+  case class Vertical[E[_], O[_, _], S, A, B](
+    u: TExpr[E, O, S, A],
+    d: TSel[E, O, A, B],
+    ut: Table[E, O],
+    dt: Table[E, O]) extends TExpr[E, O, S, B]
+
+  sealed abstract class TSel[E[_], O[_, _], S, A] extends TExpr[E, O, S, A] {
+    def mapOSel[O2[_, _]](f: OpticMap[E, O, O2]): TSel[E, O2, S, A] = this match {
       case Var(name) => Var(name)
       case Wrap(e, inf) => Wrap(f(e), inf)
-      case Unary(op) => Unary(op)
-      case Binary(op) => Binary(op)
-      case Sub(is) => Sub(is)
       case LikeInt(i, is) => LikeInt(i, is)
       case LikeBool(b, is) => LikeBool(b, is)
+      case Sub(is1, is2) => Sub(is1, is2)
+      case Not(is1, is2) => Not(is1, is2)
     }
   }
 
-  case class Product[E[_], O[_, _], S, A, B, C](
-      l: TExpr[E, O, S, A],
-      r: TExpr[E, O, S, B],
-      is: (A, B) === C,
-      lt: Table[E, O],
-      rt: Table[E, O])
-    extends TExpr[E, O, S, C]
+  case class Var[E[_], O[_, _], S, A](
+    name: String) extends TSel[E, O, S, A]
 
-  case class Vertical[E[_], O[_, _], S, A, B](
-      u: TExpr[E, O, S, A],
-      d: TExpr[E, O, A, B],
-      ut: Table[E, O],
-      dt: Table[E, O])
-    extends TExpr[E, O, S, B]
+  case class Wrap[E[_], O[_, _], S, A](
+    e: E[O[S, A]],
+    info: OpticInfo) extends TSel[E, O, S, A]
 
-  case class Var[E[_], O[_, _], S, A](name: String) extends TExpr[E, O, S, A]
+  case class LikeInt[E[_], O[_, _], S, A](
+    i: Int,
+    is: A === Int) extends TSel[E, O, S, A]
 
-  case class Wrap[E[_], O[_, _], S, A](e: E[O[S, A]], info: OpticInfo) 
-    extends TExpr[E, O, S, A]
+  case class LikeBool[E[_], O[_, _], S, A](
+    b: Boolean,
+    is: A === Boolean) extends TSel[E, O, S, A]
 
-  case class Unary[E[_], O[_, _], S, A](name: String) extends TExpr[E, O, S, A]
+  case class Sub[E[_], O[_, _], S, A](
+    is1: S === (Int, Int),
+    is2: A === Int) extends TSel[E, O, S, A]
 
-  case class Binary[E[_], O[_, _], S, A](name: String) 
-    extends TExpr[E, O, S, A]
-
-  case class Sub[E[_], O[_, _], S, A](is: A === Int) 
-    extends TExpr[E, O, S, A]
-
-  case class LikeInt[E[_], O[_, _], S, A](i: Int, is: A === Int) 
-    extends TExpr[E, O, S, A]
-
-  case class LikeBool[E[_], O[_, _], S, A](b: Boolean, is: A === Boolean) 
-    extends TExpr[E, O, S, A]
+  case class Not[E[_], O[_, _], S, A](
+    is1: S === Boolean,
+    is2: A === Boolean) extends TSel[E, O, S, A]
 
   // XXX: we need a safer table implementation, since this is a really ugly
   // workaround, but this is good enough for the time being.
@@ -543,6 +515,20 @@ object OpticLang {
           (lt, l.asInstanceOf[TExpr[E, O, S, B]])
         case (Product(_, r, _, _, rt), Wrap(_, inf)) if inf.nme == "second" =>
           (rt, r.asInstanceOf[TExpr[E, O, S, B]])
+        case (Wrap(_, inf), e) if inf.nme == "id" =>
+          (vars2, e.asInstanceOf[TExpr[E, O, S, B]])
+        case (e, Wrap(_, inf)) if inf.nme == "id" =>
+          (vars1, e.asInstanceOf[TExpr[E, O, S, B]])
+        case (_, LikeInt(i, is)) => (vars2, LikeInt(i, is))
+        case (_, LikeBool(b, is)) => (vars2, LikeBool(b, is))
+        case (Product(l, LikeInt(0, _), _, lt, _), Sub(_, _)) => 
+          (lt, l.asInstanceOf[TExpr[E, O, S, B]])
+        case (Product(LikeInt(x, _), LikeInt(y, _), _, _, _), Sub(_, is)) =>
+          (vars1 ++ vars2, LikeInt(x - y, is))
+        case (LikeBool(b, _), Not(_, is)) =>
+          (vars1 ++ vars2, LikeBool(! b, is))
+        case (Vertical(e, Not(is1, _), ut, _), Not(_, is2)) =>
+          (ut, is2.flip.subst(is1.subst(e)))
         case (x@Var(_), y@Var(s)) => {
           val vv = vars2.getV(y)
           val e = vv match {
@@ -561,17 +547,8 @@ object OpticLang {
           }
           vertical(vars1, vars2.deleteV(y) + (s -> e), prev, Var(s))
         }
-        case (Wrap(_, inf), e) if inf.nme == "id" =>
-          (vars2, e.asInstanceOf[TExpr[E, O, S, B]])
-        case (e, Wrap(_, inf)) if inf.nme == "id" =>
-          (vars1, e.asInstanceOf[TExpr[E, O, S, B]])
-        case (_, LikeInt(i, is)) => (vars2, LikeInt(i, is))
-        case (_, LikeBool(b, is)) => (vars2, LikeBool(b, is))
-        case (Product(l, LikeInt(0, _), _, lt, _), Sub(_)) => 
-          (lt, l.asInstanceOf[TExpr[E, O, S, B]])
-        case (Product(LikeInt(x, _), LikeInt(y, _), _, _, _), Sub(is)) =>
-          (vars1 ++ vars2, LikeInt(x - y, is))
-        case _ => (vars1 ++ vars2, Vertical(expr1, expr2, vars1, vars2))
+        case (_, e: TSel[E, O, A, B]) => 
+          (vars1 ++ vars2, Vertical(expr1, e, vars1, vars2))
       }
 
     private def horizontal[O[_, _], S, A, B](
@@ -647,7 +624,7 @@ object OpticLang {
     def filtered[S](p: TSemantic[E, Getter[S, Boolean]]): TSemantic[E, AffineFold[S, S]] = ???
 
     def sub: TSemantic[E, Getter[(Int, Int), Int]] =
-      TGetter(expr = Sub(implicitly))
+      TGetter(expr = Sub(implicitly, implicitly))
 
     def greaterThan: TSemantic[E, Getter[(Int, Int), Boolean]] = ???
 

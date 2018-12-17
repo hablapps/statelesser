@@ -71,11 +71,9 @@ trait FromSemantic {
       keys: Map[TypeNme, FieldName]): SqlExp = t match {
     case Wrap(_, info) => SProj("", info.nme)
     case Vertical(Var(nme), Wrap(_, info), _, _) => SProj(nme, info.nme)
-    case Vertical(Product(l, r, _, _, _), Binary(op), _, _) => 
-      SBinOp(op, treeToExpr(l, keys), treeToExpr(r, keys))
-    case Vertical(Product(l, r, _, _, _), Sub(_), _, _) => 
+    case Vertical(Product(l, r, _, _, _), Sub(_, _), _, _) => 
       SBinOp("-", treeToExpr(l, keys), treeToExpr(r, keys))
-    case Vertical(e, Unary(op), _, _) => SUnOp(op, treeToExpr(e, keys))
+    case Vertical(e, Not(_, _), _, _) => SUnOp("NOT", treeToExpr(e, keys))
     case LikeInt(i, _) => SCons(i.toString)
     case LikeBool(b, _) => SCons(b.toString)
     case _ => throw new Error(s"Don't know how to translate '$t' into SQL")
