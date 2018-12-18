@@ -309,6 +309,8 @@ object OpticLang {
     case Vertical(u, d, ut, dt) => Vertical(
       rewriteExpr(u, rw), rewriteSel(d, rw),
       rewriteTable(ut, rw), rewriteTable(dt, rw))
+    case LikeInt(i, is) => LikeInt(i, is)
+    case LikeBool(b, is) => LikeBool(b, is)
     case sel: TSel[E, O, S, A] => rewriteSel(sel, rw)
   }
 
@@ -440,6 +442,8 @@ object OpticLang {
         Product(l.mapO(f), r.mapO(f), is, lt.mapO(f), rt.mapO(f))
       case Vertical(u, d, ut, dt) =>
         Vertical(u.mapO(f), d.mapOSel(f), ut.mapO(f), dt.mapO(f))
+      case LikeInt(i, is) => LikeInt(i, is)
+      case LikeBool(b, is) => LikeBool(b, is)
       case x: TSel[E, O, S, A] => x.mapOSel(f)
     }
   }
@@ -456,12 +460,18 @@ object OpticLang {
     ut: Table[E, O],
     dt: Table[E, O]) extends TExpr[E, O, S, B]
 
+  case class LikeInt[E[_], O[_, _], S, A](
+    i: Int,
+    is: A === Int) extends TExpr[E, O, S, A]
+
+  case class LikeBool[E[_], O[_, _], S, A](
+    b: Boolean,
+    is: A === Boolean) extends TExpr[E, O, S, A]
+
   sealed abstract class TSel[E[_], O[_, _], S, A] extends TExpr[E, O, S, A] {
     def mapOSel[O2[_, _]](f: OpticMap[E, O, O2]): TSel[E, O2, S, A] = this match {
       case Var(name) => Var(name)
       case Wrap(e, inf) => Wrap(f(e), inf)
-      case LikeInt(i, is) => LikeInt(i, is)
-      case LikeBool(b, is) => LikeBool(b, is)
       case Sub(is1, is2) => Sub(is1, is2)
       case Not(is1, is2) => Not(is1, is2)
     }
@@ -473,14 +483,6 @@ object OpticLang {
   case class Wrap[E[_], O[_, _], S, A](
     e: E[O[S, A]],
     info: OpticInfo) extends TSel[E, O, S, A]
-
-  case class LikeInt[E[_], O[_, _], S, A](
-    i: Int,
-    is: A === Int) extends TSel[E, O, S, A]
-
-  case class LikeBool[E[_], O[_, _], S, A](
-    b: Boolean,
-    is: A === Boolean) extends TSel[E, O, S, A]
 
   case class Sub[E[_], O[_, _], S, A](
     is1: S === (Int, Int),
