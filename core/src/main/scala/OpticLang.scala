@@ -333,12 +333,16 @@ object OpticLang {
     expr: TExpr[E, Getter, S, A]) extends TSemantic[E, Getter[S, A]]
 
   case class TAffineFold[E[_], S, A](
-    vars: Table[E, AffineFold] = Set.empty[Row[E, AffineFold]],
-    expr: TExpr[E, AffineFold, S, A]) extends TSemantic[E, AffineFold[S, A]]
+      vars: Table[E, AffineFold] = Set.empty[Row[E, AffineFold]],
+      expr: TExpr[E, AffineFold, S, A],
+      filt: Set[TExpr[E, AffineFold, S, Boolean]] = Set.empty[TExpr[E, AffineFold, S, Boolean]]) 
+    extends TSemantic[E, AffineFold[S, A]]
 
   case class TFold[E[_], S, A](
       vars: Table[E, Fold] = Set.empty[Row[E, Fold]],
-      expr: TExpr[E, Fold, S, A]) extends TSemantic[E, Fold[S, A]] {
+      expr: TExpr[E, Fold, S, A],
+      filt: Set[TExpr[E, Fold, S, Boolean]] = Set.empty[TExpr[E, Fold, S, Boolean]]) 
+    extends TSemantic[E, Fold[S, A]] {
     def reify(implicit ev: OpticLang[E]): E[Fold[S, A]] = reifyExpr(expr, vars)
   }
 
@@ -591,8 +595,8 @@ object OpticLang {
     def flVert[S, A, B](
         l: TSemantic[E, Fold[S, A]], 
         r: TSemantic[E, Fold[A, B]]) = {
-      val TFold(vars1, expr1) = l
-      val TFold(vars2, expr2) = r
+      val TFold(vars1, expr1, _) = l
+      val TFold(vars2, expr2, _) = r
       val (vars3, expr3) = vertical(vars1, vars2, expr1, expr2)
       TFold(vars3, expr3)
     }
@@ -600,8 +604,8 @@ object OpticLang {
     def flHori[S, A, B](
         l: TSemantic[E, Fold[S, A]], 
         r: TSemantic[E, Fold[S, B]]) = {
-      val TFold(vars1, expr1) = l
-      val TFold(vars2, expr2) = r
+      val TFold(vars1, expr1, _) = l
+      val TFold(vars2, expr2, _) = r
       val (vars3, expr3) = horizontal(vars1, vars2, expr1, expr2)
       TFold(vars3, expr3)
     }
@@ -627,8 +631,8 @@ object OpticLang {
     def aflVert[S, A, B](
         l: TSemantic[E, AffineFold[S, A]], 
         r: TSemantic[E, AffineFold[A, B]]) = {
-      val TAffineFold(vars1, expr1) = l
-      val TAffineFold(vars2, expr2) = r
+      val TAffineFold(vars1, expr1, _) = l
+      val TAffineFold(vars2, expr2, _) = r
       val (vars3, expr3) = vertical(vars1, vars2, expr1, expr2)
       TAffineFold(vars3, expr3)
     }
@@ -636,8 +640,8 @@ object OpticLang {
     def aflHori[S, A, B](
         l: TSemantic[E, AffineFold[S, A]],
         r: TSemantic[E, AffineFold[S, B]]) = {
-      val TAffineFold(vars1, expr1) = l
-      val TAffineFold(vars2, expr2) = r
+      val TAffineFold(vars1, expr1, _) = l
+      val TAffineFold(vars2, expr2, _) = r
       val (vars3, expr3) = horizontal(vars1, vars2, expr1, expr2)
       TAffineFold(vars3, expr3)
     }
@@ -691,7 +695,7 @@ object OpticLang {
     }
 
     def aflAsFl[S, A](afl: TSemantic[E, AffineFold[S, A]]) = {
-      val TAffineFold(vars, expr) = afl
+      val TAffineFold(vars, expr, _) = afl
       val f = new OpticMap[E, AffineFold, Fold] {
         def apply[X, Y](afl: E[AffineFold[X, Y]]) = OpticLang[E].aflAsFl(afl)
       }
