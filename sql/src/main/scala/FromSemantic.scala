@@ -11,13 +11,14 @@ trait FromSemantic {
   def fromSemantic[E[_], S, A](
       sem: TSemantic[E, Fold[S, A]],
       keys: Map[TypeNme, FieldName] = Map()): SSelect = {
-    val TFold(vars, expr) = sem
+    val TFold(vars, expr, _) = sem
     SSelect(selToSql(expr, keys), tabToSql(vars, keys), None)
   }
 
   private def flatProduct[E[_]](
       x: TExpr[E, Fold, _, _]): List[TExpr[E, Fold, _, _]] = x match {
-    case Product(l, r, is, _, _) => List(flatProduct(l), flatProduct(r)).join
+    case Product(TFold(_, l, _), TFold(_, r, _), is) => 
+      List(flatProduct(l), flatProduct(r)).join
     case _ => List(x)
   }
 
@@ -69,10 +70,12 @@ trait FromSemantic {
       t: TExpr[E, Fold, _, _],
       keys: Map[TypeNme, FieldName]): SqlExp = t match {
     case Wrap(_, info) => SProj("", info.nme)
-    case Vertical(Var(nme), Wrap(_, info), _, _) => SProj(nme, info.nme)
-    case Vertical(Product(l, r, _, _, _), Sub(_, _), _, _) => 
+    case Vertical(TFold(_, Var(nme), _), TFold(_, Wrap(_, info), _)) => 
+      SProj(nme, info.nme)
+    case Vertical(TFold(_, Product(TFold(_, l, _), TFold(_, r, _), _), _), TFold(_, Sub(_, _), _)) => 
       SBinOp("-", treeToExpr(l, keys), treeToExpr(r, keys))
-    case Vertical(e, Not(_, _), _, _) => SUnOp("NOT", treeToExpr(e, keys))
+    case Vertical(TFold(_, e, _), TFold(_, Not(_, _), _)) => 
+      SUnOp("NOT", treeToExpr(e, keys))
     case LikeInt(i, _) => SCons(i.toString)
     case LikeBool(b, _) => SCons(b.toString)
     case _ => throw new Error(s"Don't know how to translate '$t' into SQL")
