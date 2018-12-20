@@ -3,7 +3,7 @@ package statelesser
 import scalaz._, Scalaz._
 import Leibniz._
 
-import RewriteVar.syntax._
+import RewriteVar.{Rewrite, syntax}, syntax._
 
 trait OpticLang[Expr[_]] {
 
@@ -278,66 +278,43 @@ object OpticLang {
     nme: OpticNme, 
     src: TypeInfo, 
     tgt: TypeInfo)
+
+  type Symbol = String
   
-  private def unifyRewritings[E[_], O[_, _]](
-      t1: Table[E, O], t2: Table[E, O]): List[Rewrite \/ Rewrite] = 
-    (t1 ++ t2).groupBy(_._2).values.filter(_.length > 1)
-      .foldLeft(List.empty[Rewrite \/ Rewrite])(
-        (acc, s) => acc ++ List(\/-(s.last._1 -> s.head._1)))
-
-  private def diffRewritings[E[_], O[_, _]](
-      t1: Table[E, O], t2: Table[E, O]): List[Rewrite \/ Rewrite] = 
-    (t1 ++ t2).groupBy(_._1).values.filter(_.length > 1)
-      .foldLeft(List.empty[Rewrite \/ Rewrite])(
-        (acc, s) => acc ++ List(
-          -\/(s.head._1 -> (s.head._1 ++ "1")), 
-          \/-(s.last._1 -> (s.last._1 ++ "2"))))
-
-  private def getRewritings[E[_], O[_, _]](
-      t1: Table[E, O], t2: Table[E, O]): List[Rewrite \/ Rewrite] =
-    unifyRewritings(t1, t2) ++ diffRewritings(t1, t2)
-  
-  type Row[E[_], O[_, _]] = (String, TVarVal[E, O, _, _])
-
-  type Table[E[_], O[_, _]] = Set[Row[E, O]]
-
-  type Rewrite = (String, String)
+  case class Table(src: Stream[Symbol], rows: Map[Symbol, Any])
 
   sealed abstract class TSemantic[E[_], A]
 
   case class TGetter[E[_], S, A](
-    vars: Table[E, Getter] = Set.empty[Row[E, Getter]],
     expr: TExpr[E, Getter, S, A]) extends TSemantic[E, Getter[S, A]]
 
   case class TAffineFold[E[_], S, A](
-      vars: Table[E, AffineFold] = Set.empty[Row[E, AffineFold]],
       expr: TExpr[E, AffineFold, S, A],
       filt: Set[TExpr[E, AffineFold, S, Boolean]] = Set.empty[TExpr[E, AffineFold, S, Boolean]]) 
     extends TSemantic[E, AffineFold[S, A]]
 
   case class TFold[E[_], S, A](
-      vars: Table[E, Fold] = Set.empty[Row[E, Fold]],
       expr: TExpr[E, Fold, S, A],
       filt: Set[TExpr[E, Fold, S, Boolean]] = Set.empty[TExpr[E, Fold, S, Boolean]]) 
     extends TSemantic[E, Fold[S, A]] {
-    def reify(implicit ev: OpticLang[E]): E[Fold[S, A]] = reifyExpr(expr, vars)
+    def reify(implicit ev: OpticLang[E]): E[Fold[S, A]] = ??? // reifyExpr(expr, vars)
   }
 
   trait OpticMap[E[_], O[_, _], O2[_, _]] {
     def apply[S, A](e: E[O[S, A]]): E[O2[S, A]]
   }
 
-  def reifyVV[E[_], S, A](
-      vv: TVarVal[E, Fold, S, A],
-      t: Table[E, Fold])(implicit 
-      ev: OpticLang[E]): E[Fold[S, A]] = vv match {
-    case TVarSimpleVal(w) => w.e
-    case vnv: TVarNestedVal[E, Fold, S, A] => vnv.vs match {
-      case ONil(v) => ev.flVert(reifyVV(t.getV(v), t), vnv.w.e)
-      case OCons(v, vs) => 
-        ev.flVert(reifyVV(t.getV(v), t), reifyVV(TVarNestedVal(vs, vnv.w), t))
-    }
-  }
+  // def reifyVV[E[_], S, A](
+  //     vv: TVarVal[E, Fold, S, A],
+  //     t: Table[E, Fold])(implicit 
+  //     ev: OpticLang[E]): E[Fold[S, A]] = vv match {
+  //   case TVarSimpleVal(w) => w.e
+  //   case vnv: TVarNestedVal[E, Fold, S, A] => vnv.vs match {
+  //     case ONil(v) => ev.flVert(reifyVV(t.getV(v), t), vnv.w.e)
+  //     case OCons(v, vs) => 
+  //       ev.flVert(reifyVV(t.getV(v), t), reifyVV(TVarNestedVal(vs, vnv.w), t))
+  //   }
+  // }
 
   sealed abstract class OList[E[_], O[_, _], S, A] {
 
@@ -349,6 +326,11 @@ object OpticLang {
     def lastVar: Var[E, O, _, A] = this match {
       case ONil(x) => x
       case OCons(_, tail) => tail.lastVar
+    }
+
+    def vars: Set[String] = this match {
+      case ONil(Var(x)) => Set(x)
+      case OCons(Var(x), t) => t.vars + x
     }
   }
 
@@ -396,28 +378,29 @@ object OpticLang {
       }
   }
 
-  def reifyExpr[E[_], S, A](
-      expr: TExpr[E, Fold, S, A],
-      t: Table[E, Fold])(implicit
-      ev: OpticLang[E]): E[Fold[S, A]] = expr match {
-    case Product(l, r, is) => ???
-      // is.subst[λ[x => E[Fold[S, x]]]](ev.flHori(reifyExpr(l, lt), reifyExpr(r, rt)))
-    case Vertical(u, d) => ??? // ev.flVert(reifyExpr(u, ut), reifyExpr(d, dt))
-    case x: Var[E, Fold, S, A] => reifyVV(t.getV(x), t)
-    case w: Wrap[E, Fold, S, A] => w.e
-    case LikeInt(i, is) => 
-      is.flip.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.likeInt[S](i)))
-    case LikeBool(b, is) =>
-      is.flip.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.likeBool[S](b)))
-    case Not(is1, is2) => 
-      is2.flip.subst[λ[x => E[Fold[S, x]]]](
-        is1.flip.subst[λ[x => E[Fold[x, Boolean]]]](ev.gtAsFl(ev.not)))
-    case Sub(is1, is2) =>
-      is2.flip.subst[λ[x => E[Fold[S, x]]]](
-        is1.flip.subst[λ[x => E[Fold[x, Int]]]](ev.gtAsFl(ev.sub)))
-  }
+  // def reifyExpr[E[_], S, A](
+  //     expr: TExpr[E, Fold, S, A],
+  //     t: Table[E, Fold])(implicit
+  //     ev: OpticLang[E]): E[Fold[S, A]] = expr match {
+  //   case Product(l, r, is) => ???
+  //     // is.subst[λ[x => E[Fold[S, x]]]](ev.flHori(reifyExpr(l, lt), reifyExpr(r, rt)))
+  //   case Vertical(u, d) => ??? // ev.flVert(reifyExpr(u, ut), reifyExpr(d, dt))
+  //   case x: Var[E, Fold, S, A] => reifyVV(t.getV(x), t)
+  //   case w: Wrap[E, Fold, S, A] => w.e
+  //   case LikeInt(i, is) => 
+  //     is.flip.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.likeInt[S](i)))
+  //   case LikeBool(b, is) =>
+  //     is.flip.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.likeBool[S](b)))
+  //   case Not(is1, is2) => 
+  //     is2.flip.subst[λ[x => E[Fold[S, x]]]](
+  //       is1.flip.subst[λ[x => E[Fold[x, Boolean]]]](ev.gtAsFl(ev.not)))
+  //   case Sub(is1, is2) =>
+  //     is2.flip.subst[λ[x => E[Fold[S, x]]]](
+  //       is1.flip.subst[λ[x => E[Fold[x, Int]]]](ev.gtAsFl(ev.sub)))
+  // }
 
   sealed abstract class TExpr[E[_], O[_, _], S, A] {
+
     def mapO[O2[_, _]](f: OpticMap[E, O, O2]): TExpr[E, O2, S, A] = this match {
       case Product(l, r, is) => ??? // Product(l.mapO(f), r.mapO(f), is, lt.mapO(f), rt.mapO(f))
       case Vertical(u, d) => ???
@@ -426,15 +409,47 @@ object OpticLang {
       case LikeBool(b, is) => LikeBool(b, is)
       case x: TSel[E, O, S, A] => x.mapOSel(f)
     }
+
+    def vars: Set[String] = this match {
+      case Product(l, r, _) => l.vars ++ r.vars
+      case Vertical(u, d) => u.vars ++ d.vars
+      case Var(name) => Set(name)
+      case _ => Set.empty
+    }
   }
+  
+  object TExpr {
+
+    def product[E[_], O[_, _], S, A, B, C](
+        l: TExpr[E, O, S, A],
+        r: TExpr[E, O, S, B],
+        is: (A, B) === C): TExpr[E, O, S, C] =
+      Product(l, r, is)
+    
+    def vertical[E[_], O[_, _], S, A, B](
+        u: TExpr[E, O, S, A],
+        d: TExpr[E, O, A, B]): TExpr[E, O, S, B] =
+      Vertical(u, d)
+
+    def likeInt[E[_], O[_, _], S, A](
+        i: Int,
+        is: A === Int): TExpr[E, O, S, A] =
+      LikeInt(i, is)
+
+    def likeBool[E[_], O[_, _], S, A](
+        b: Boolean,
+        is: A === Boolean): TExpr[E, O, S, A] =
+      LikeBool(b, is)
+  }
+  
   case class Product[E[_], O[_, _], S, A, B, C](
-    l: TSemantic[E, O[S, A]],
-    r: TSemantic[E, O[S, B]],
+    l: TExpr[E, O, S, A],
+    r: TExpr[E, O, S, B],
     is: (A, B) === C) extends TExpr[E, O, S, C]
 
   case class Vertical[E[_], O[_, _], S, A, B](
-    u: TSemantic[E, O[S, A]],
-    d: TSemantic[E, O[A, B]]) extends TExpr[E, O, S, B]
+    u: TExpr[E, O, S, A],
+    d: TExpr[E, O, A, B]) extends TExpr[E, O, S, B]
 
   case class LikeInt[E[_], O[_, _], S, A](
     i: Int,
@@ -470,264 +485,268 @@ object OpticLang {
 
   // XXX: we need a safer table implementation, since this is a really ugly
   // workaround, but this is good enough for the time being.
-  implicit class TableOps[E[_], O[_, _]](table: Table[E, O]) {
+  // implicit class TableOps[E[_], O[_, _]](table: Table[E, O]) {
 
-    def getV[S, A](v: Var[E, O, S, A]): TVarVal[E, O, S, A] = 
-      table.toMap.apply(v.name).asInstanceOf[TVarVal[E, O, S, A]]
+  //   def getV[S, A](v: Var[E, O, S, A]): TVarVal[E, O, S, A] = 
+  //     table.toMap.apply(v.name).asInstanceOf[TVarVal[E, O, S, A]]
 
-    def deleteV[S, A](v: Var[E, O, S, A]): Table[E, O] =
-      (table.toMap - v.name).toSet
+  //   def deleteV[S, A](v: Var[E, O, S, A]): Table[E, O] =
+  //     (table.toMap - v.name).toSet
 
-    def mapO[O2[_, _]](f: OpticMap[E, O, O2]): Table[E, O2] =
-      table.map { case (s, e) => (s, e.mapO(f)) }
+  //   def mapO[O2[_, _]](f: OpticMap[E, O, O2]): Table[E, O2] =
+  //     table.map { case (s, e) => (s, e.mapO(f)) }
 
-    private def splitTables =
-      table.partition { case (_, TVarSimpleVal(_)) => true; case _ => false }
+  //   private def splitTables =
+  //     table.partition { case (_, TVarSimpleVal(_)) => true; case _ => false }
 
-    def simpleTable: Set[(String, TVarSimpleVal[E, O, _, _])] =
-      splitTables._1.asInstanceOf[Set[(String, TVarSimpleVal[E, O, _, _])]]
+  //   def simpleTable: Set[(String, TVarSimpleVal[E, O, _, _])] =
+  //     splitTables._1.asInstanceOf[Set[(String, TVarSimpleVal[E, O, _, _])]]
 
-    def nestedTable: Set[(String, TVarNestedVal[E, O, _, _])] =
-      splitTables._2.asInstanceOf[Set[(String, TVarNestedVal[E, O, _, _])]]
-  }
+  //   def nestedTable: Set[(String, TVarNestedVal[E, O, _, _])] =
+  //     splitTables._2.asInstanceOf[Set[(String, TVarNestedVal[E, O, _, _])]]
+  // }
 
-  implicit def tsemantic[E[_]: OpticLang] = new OpticLang[TSemantic[E, ?]] {
+  type Semantic[E[_], A] = State[Table, TSemantic[E, A]]
 
-    private def vertical[O[_, _], S, A, B](
-        vars1: Table[E, O],
-        vars2: Table[E, O],
-        expr1: TExpr[E, O, S, A],
-        expr2: TExpr[E, O, A, B]): (Table[E, O], TExpr[E, O, S, B]) = 
-      ???
-      // (expr1, expr2) match {
-      //   case (e, Product(l, r, is)) => {
-      //     // val (vars3, expr3) = vertical(vars1, lt, e, l)
-      //     // val (vars4, expr4) = vertical(vars1, rt, e, r)
-      //     // horizontal(vars3, vars4, expr3, expr4).rightMap(is.subst)
-      //     ???
-      //   }
-      //   case (e, Vertical(u, d)) => {
-      //     // val (vars3, expr3) = vertical(vars1, ut, e, u)
-      //     // vertical(vars3, dt, expr3, d)
-      //     ???
-      //   }
-      //   case (Product(l, _, _, lt, _), Wrap(_, inf)) if inf.nme == "first" => 
-      //     (lt, l.asInstanceOf[TExpr[E, O, S, B]])
-      //   case (Product(_, r, _, _, rt), Wrap(_, inf)) if inf.nme == "second" =>
-      //     (rt, r.asInstanceOf[TExpr[E, O, S, B]])
-      //   case (Wrap(_, inf), e) if inf.nme == "id" =>
-      //     (vars2, e.asInstanceOf[TExpr[E, O, S, B]])
-      //   case (e, Wrap(_, inf)) if inf.nme == "id" =>
-      //     (vars1, e.asInstanceOf[TExpr[E, O, S, B]])
-      //   case (_, LikeInt(i, is)) => (vars2, LikeInt(i, is))
-      //   case (_, LikeBool(b, is)) => (vars2, LikeBool(b, is))
-      //   case (Product(l, LikeInt(0, _), _, lt, _), Sub(_, _)) => 
-      //     (lt, l.asInstanceOf[TExpr[E, O, S, B]])
-      //   case (Product(LikeInt(x, _), LikeInt(y, _), _, _, _), Sub(_, is)) =>
-      //     (vars1 ++ vars2, LikeInt(x - y, is))
-      //   case (LikeBool(b, _), Not(_, is)) =>
-      //     (vars1 ++ vars2, LikeBool(! b, is))
-      //   case (Vertical(e, Not(is1, _), ut, _), Not(_, is2)) =>
-      //     (ut, is2.flip.subst(is1.subst(e)))
-      //   case (x@Var(_), y@Var(s)) => {
-      //     val vv = vars2.getV(y)
-      //     val e = vv match {
-      //       case TVarSimpleVal(w) => TVarNestedVal(ONil(x), w)
-      //       case vnv: TVarNestedVal[E, O, _, _] => 
-      //         TVarNestedVal(OCons(x, vnv.vs), vnv.w)
-      //     }
-      //     ((vars1 ++ vars2.deleteV(y)) + (s -> e), Var(s))
-      //   }
-      //   case (Vertical(prev, x@Var(_), _, _), y@Var(s)) => {
-      //     val vv = vars2.getV(y)
-      //     val e = vv match {
-      //       case TVarSimpleVal(w) => TVarNestedVal(ONil(x), w)
-      //       case vnv: TVarNestedVal[E, O, _, _] => 
-      //         TVarNestedVal(OCons(x, vnv.vs), vnv.w)
-      //     }
-      //     vertical(vars1, vars2.deleteV(y) + (s -> e), prev, Var(s))
-      //   }
-      //   case (_, e: TSel[E, O, A, B]) => 
-      //     (vars1 ++ vars2, Vertical(expr1, e, vars1, vars2))
-      // }
+  import State._
+
+  implicit def tsemantic[E[_]: OpticLang]: OpticLang[Semantic[E, ?]] = 
+      new OpticLang[Semantic[E, ?]] {
+
+    def gtVertAux[S, A, B](
+        u: TExpr[E, Getter, S, A], 
+        d: TExpr[E, Getter, A, B]): State[Table, TExpr[E, Getter, S, B]] =
+      (u, d) match {
+        case (_, Product(l, r, is)) =>
+          (gtVertAux(u, l) |@| gtVertAux(u, r)) { (l1, r1) => 
+            TExpr.product(l1, r1, is)
+          }
+        case (_, Vertical(u1, d1)) => 
+          gtVertAux(u, u1) >>= (u2 => gtVertAux(u2, d1))
+        case (Product(l, _, _), Wrap(_, inf)) if inf.nme == "first" => 
+          l.asInstanceOf[TExpr[E, Getter, S, B]].point[State[Table, ?]]
+        case (Product(_, r, _), Wrap(_, inf)) if inf.nme == "second" =>
+          r.asInstanceOf[TExpr[E, Getter, S, B]].point[State[Table, ?]]
+        case (Wrap(_, inf), e) if inf.nme == "id" => 
+          e.asInstanceOf[TExpr[E, Getter, S, B]].point[State[Table, ?]]
+        case (e, Wrap(_, inf)) if inf.nme == "id" => 
+          e.asInstanceOf[TExpr[E, Getter, S, B]].point[State[Table, ?]]
+        case (_, LikeInt(i, is)) => 
+          TExpr.likeInt(i, is).point[State[Table, ?]]
+        case (_, LikeBool(b, is)) => 
+          TExpr.likeBool(b, is).point[State[Table, ?]]
+        case (Product(l, LikeInt(0, _), _), Sub(_, _)) => 
+          l.asInstanceOf.point[State[Table, ?]]
+        case (Product(LikeInt(x, _), LikeInt(y, _), _), Sub(_, is)) =>
+          TExpr.likeInt(x - y, is).point[State[Table, ?]]
+        case (LikeBool(b, _), Not(_, is)) =>
+          TExpr.likeBool(! b, is).point[State[Table, ?]]
+        case (Vertical(e, Not(is1, _)), Not(_, is2)) =>
+          is2.flip.subst(is1.subst(e)).point[State[Table, ?]]
+        case (Not(is1, _), Not(_, is2)) => {
+          for {
+            tmp <- id[Boolean]
+            TGetter(expr) = tmp
+          } yield is1.flip.subst[λ[x => TExpr[E, Getter, x, B]]](
+                    is2.flip.subst[λ[x => TExpr[E, Getter, Boolean, x]]](expr))
+        }
+        case (x@Var(_), y@Var(s)) =>
+          for {
+            yv <- getVal(y)
+            e = yv match {
+              case TVarSimpleVal(w) => TVarNestedVal(ONil(x), w)
+              case vnv: TVarNestedVal[E, Getter, _, _] => 
+                TVarNestedVal(OCons(x, vnv.vs), vnv.w)
+            }
+            z <- assignVal(e) 
+          } yield z
+        case (Vertical(prev, x@Var(_)), y@Var(s)) =>
+          gtVertAux(x, y) >>= (z => gtVertAux(prev, z))
+        case _ => TExpr.vertical(u, d).point[State[Table, ?]]
+      }
 
     def gtVert[S, A, B](
-        lsem: TSemantic[E, Getter[S, A]], 
-        rsem: TSemantic[E, Getter[A, B]]) = {
-      val l@TGetter(vars1, expr1) = lsem
-      val r@TGetter(vars2, expr2) = rsem
-      (expr1, expr2) match {
-        case (_, Product(l1, r1, is)) => 
-          is.subst[λ[x => TSemantic[E, Getter[S, x]]]](
-            gtHori(gtVert(l, l1), gtVert(l, r1)))
-        case (_, Vertical(u, d)) => {
-          gtVert(gtVert(l, u), d)
-        }
-        case (Product(l, _, _), Wrap(_, inf)) if inf.nme == "first" => 
-          l.asInstanceOf[TSemantic[E, Getter[S, B]]]
-        case (Product(_, r, _), Wrap(_, inf)) if inf.nme == "second" =>
-          r.asInstanceOf[TSemantic[E, Getter[S, B]]]
-        case (Wrap(_, inf), e) if inf.nme == "id" => 
-          r.asInstanceOf[TSemantic[E, Getter[S, B]]]
-        case (e, Wrap(_, inf)) if inf.nme == "id" => 
-          l.asInstanceOf[TSemantic[E, Getter[S, B]]]
-        case (_, LikeInt(i, is)) => TGetter(vars2, LikeInt(i, is))
-        case (_, LikeBool(b, is)) => TGetter(vars2, LikeBool(b, is))
-        case (Product(l, TGetter(_, LikeInt(0, _)), _), Sub(_, _)) => 
-          l.asInstanceOf[TSemantic[E, Getter[S, B]]]
-        case (Product(TGetter(_, LikeInt(x, _)), TGetter(_, LikeInt(y, _)), _), Sub(_, is)) =>
-          TGetter(vars1 ++ vars2, LikeInt(x - y, is))
-        case (LikeBool(b, _), Not(_, is)) =>
-          TGetter(vars1 ++ vars2, LikeBool(! b, is))
-        case (Vertical(TGetter(ut, e), TGetter(_, Not(is1, _))), Not(_, is2)) =>
-          TGetter(ut, is2.flip.subst(is1.subst(e)))
-        case (Not(is1, _), Not(_, is2)) => {
-          val TGetter(_, expr) = id[Boolean]
-          is1.flip.subst[λ[x => TSemantic[E, Getter[x, B]]]](
-            is2.flip.subst[λ[x => TSemantic[E, Getter[Boolean, x]]]](
-              TGetter(vars1 ++ vars2, expr)))
-        }
-        case (x@Var(_), y@Var(s)) => {
-          val vv = vars2.getV(y)
-          val e = vv match {
-            case TVarSimpleVal(w) => TVarNestedVal(ONil(x), w)
-            case vnv: TVarNestedVal[E, Getter, _, _] => 
-              TVarNestedVal(OCons(x, vnv.vs), vnv.w)
-          }
-          TGetter((vars1 ++ vars2.deleteV(y)) + (s -> e), Var(s))
-        }
-        case (Vertical(prev, TGetter(vars3, x@Var(_))), y@Var(s)) => {
-          val vv = vars2.getV(y)
-          val e = vv match {
-            case TVarSimpleVal(w) => TVarNestedVal(ONil(x), w)
-            case vnv: TVarNestedVal[E, Getter, _, _] => 
-              TVarNestedVal(OCons(x, vnv.vs), vnv.w)
-          }
-          gtVert(prev, TGetter(vars3 ++ vars2.deleteV(y) + (s -> e), Var(s)))
-        }
-        case (_, e: TSel[E, Getter, A, B]) => 
-          TGetter(l.vars ++ r.vars, Vertical(l, r))
-      }
-    }
+        usem: Semantic[E, Getter[S, A]], 
+        dsem: Semantic[E, Getter[A, B]]): Semantic[E, Getter[S, B]] =
+      for {
+        tmp <- usem
+        TGetter(expr1) = tmp
+        tmp <- dsem
+        TGetter(expr2) = tmp
+        expr3 <- gtVertAux(expr1, expr2)
+        sem2 <- gtConsistency(TGetter(expr3))
+      } yield sem2
 
     def gtHori[S, A, B](
-        l: TSemantic[E, Getter[S, A]],
-        r: TSemantic[E, Getter[S, B]]): TSemantic[E, Getter[S, (A, B)]] = {
-      val l1@TGetter(vars1, expr1) = l
-      val r1@TGetter(vars2, expr2) = r
-      val rws = getRewritings(vars1, vars2)
-      val (l2, r2) = rws.foldLeft((l1, r1)) {
-        case ((x, y), -\/(rw)) => (x.rewrite(rw), y)
-        case ((x, y), \/-(rw)) => (x, y.rewrite(rw))
-      }
-      TGetter(l2.vars ++ r2.vars, Product(l2, r2, Leibniz.refl))
-    }
+        l: Semantic[E, Getter[S, A]],
+        r: Semantic[E, Getter[S, B]]): Semantic[E, Getter[S, (A, B)]] =
+      for {
+        tmp <- l
+        TGetter(expr1) = tmp
+        tmp <- r
+        TGetter(expr2) = tmp
+        sem2 <- gtConsistency(TGetter(Product(expr1, expr2, Leibniz.refl[(A, B)])))
+      } yield sem2
 
     def flVert[S, A, B](
-        l: TSemantic[E, Fold[S, A]], 
-        r: TSemantic[E, Fold[A, B]]) = {
-      val TFold(vars1, expr1, _) = l
-      val TFold(vars2, expr2, _) = r
-      val (vars3, expr3) = vertical(vars1, vars2, expr1, expr2)
-      TFold(vars3, expr3)
+        l: Semantic[E, Fold[S, A]], 
+        r: Semantic[E, Fold[A, B]]) = {
+      ???
     }
 
     def flHori[S, A, B](
-        l: TSemantic[E, Fold[S, A]], 
-        r: TSemantic[E, Fold[S, B]]) = {
-      val l1@TFold(vars1, _, _) = l
-      val r1@TFold(vars2, _, _) = r
-      val rws = getRewritings(vars1, vars2)
-      val (l2, r2) = rws.foldLeft((l1, r1)) {
-        case ((x, y), -\/(rw)) => (x.rewrite(rw), y)
-        case ((x, y), \/-(rw)) => (x, y.rewrite(rw))
-      }
-      TFold(l2.vars ++ r2.vars, Product(l2, r2, Leibniz.refl))
+        l: Semantic[E, Fold[S, A]], 
+        r: Semantic[E, Fold[S, B]]): Semantic[E, Fold[S, (A, B)]] = {
+      ???
     }
 
     def aflVert[S, A, B](
-        l: TSemantic[E, AffineFold[S, A]], 
-        r: TSemantic[E, AffineFold[A, B]]) = {
-      val TAffineFold(vars1, expr1, _) = l
-      val TAffineFold(vars2, expr2, _) = r
-      val (vars3, expr3) = vertical(vars1, vars2, expr1, expr2)
-      TAffineFold(vars3, expr3)
+        usem: Semantic[E, AffineFold[S, A]], 
+        dsem: Semantic[E, AffineFold[A, B]]): Semantic[E, AffineFold[S, B]] = {
+      ???
     }
 
     def aflHori[S, A, B](
-        l: TSemantic[E, AffineFold[S, A]],
-        r: TSemantic[E, AffineFold[S, B]]) = {
-      val l1@TAffineFold(vars1, _, _) = l
-      val r1@TAffineFold(vars2, _, _) = r
-      val rws = getRewritings(vars1, vars2)
-      val (l2, r2) = rws.foldLeft((l1, r1)) {
-        case ((x, y), -\/(rw)) => (x.rewrite(rw), y)
-        case ((x, y), \/-(rw)) => (x, y.rewrite(rw))
-      }
-      TAffineFold(l2.vars ++ r2.vars, Product(l2, r2, Leibniz.refl))
-    }
+        l: Semantic[E, AffineFold[S, A]],
+        r: Semantic[E, AffineFold[S, B]]) =
+      for {
+        tmp <- l
+        TAffineFold(expr1, filt1) = tmp
+        tmp <- r
+        TAffineFold(expr2, filt2) = tmp
+        sem2 <- aflConsistency(TAffineFold(
+          Product(expr1, expr2, Leibniz.refl[(A, B)]), 
+          filt1 ++ filt2))
+      } yield sem2
 
     def filtered[S](
-        p: TSemantic[E, Getter[S, Boolean]]): TSemantic[E, AffineFold[S, S]] = {
-      val TAffineFold(_, fil, _) = gtAsAfl(p)
-      val TAffineFold(_, exp, _) = gtAsAfl(id[S])
-      TAffineFold(expr = exp, filt = Set(fil))
-    }
+        p: Semantic[E, Getter[S, Boolean]]): Semantic[E, AffineFold[S, S]] = 
+      for {
+        tmp <- gtAsAfl(p)
+        TAffineFold(fil, _) = tmp
+        tmp <- gtAsAfl(id[S])
+        TAffineFold(exp, _) = tmp
+      } yield TAffineFold(expr = exp, filt = Set(fil))
 
-    def sub: TSemantic[E, Getter[(Int, Int), Int]] =
-      TGetter(expr = Sub(implicitly, implicitly))
+    def sub: Semantic[E, Getter[(Int, Int), Int]] =
+      state(TGetter(expr = Sub(implicitly, implicitly)))
 
-    def greaterThan: TSemantic[E, Getter[(Int, Int), Boolean]] = ???
+    def greaterThan: Semantic[E, Getter[(Int, Int), Boolean]] = ???
 
-    def equal[A]: TSemantic[E, Getter[(A, A), Boolean]] = ???
+    def equal[A]: Semantic[E, Getter[(A, A), Boolean]] = ???
 
-    def first[A, B]: TSemantic[E, Getter[(A, B), A]] =
-      TGetter(expr = Wrap(OpticLang[E].first,
-        OpticInfo(KGetter, "first", TypeInfo("(A, B)"), TypeInfo("A"))))
+    def first[A, B]: Semantic[E, Getter[(A, B), A]] =
+      state(TGetter(expr = Wrap(OpticLang[E].first,
+        OpticInfo(KGetter, "first", TypeInfo("(A, B)"), TypeInfo("A")))))
 
-    def second[A, B]: TSemantic[E, Getter[(A, B), B]] =
-      TGetter(expr = Wrap(OpticLang[E].second,
-        OpticInfo(KGetter, "second", TypeInfo("(A, B)"), TypeInfo("B"))))
+    def second[A, B]: Semantic[E, Getter[(A, B), B]] =
+      state(TGetter(expr = Wrap(OpticLang[E].second,
+        OpticInfo(KGetter, "second", TypeInfo("(A, B)"), TypeInfo("B")))))
 
-    def likeInt[S](i: Int): TSemantic[E, Getter[S, Int]] =
-      TGetter(expr = LikeInt(i, implicitly))
+    def likeInt[S](i: Int): Semantic[E, Getter[S, Int]] =
+      state(TGetter(expr = LikeInt(i, implicitly)))
 
-    def likeBool[S](b: Boolean): TSemantic[E, Getter[S, Boolean]] =
-      TGetter(expr = LikeBool(b, implicitly))
+    def likeBool[S](b: Boolean): Semantic[E, Getter[S, Boolean]] =
+      state(TGetter(expr = LikeBool(b, implicitly)))
 
-    def likeStr[S](s: String): TSemantic[E, Getter[S, String]] =
+    def likeStr[S](s: String): Semantic[E, Getter[S, String]] =
       ???
 
-    def id[S]: TSemantic[E, Getter[S, S]] =
-      TGetter(expr = Wrap(OpticLang[E].id,
-        OpticInfo(KGetter, "id", TypeInfo("S"), TypeInfo("S"))))
+    def id[S]: Semantic[E, Getter[S, S]] =
+      state(TGetter(expr = Wrap(OpticLang[E].id,
+        OpticInfo(KGetter, "id", TypeInfo("S"), TypeInfo("S")))))
 
-    def not: TSemantic[E, Getter[Boolean, Boolean]] =
+    def not: Semantic[E, Getter[Boolean, Boolean]] =
       ???
 
-    def getAll[S, A](fl: TSemantic[E, Fold[S, A]]): TSemantic[E, S => List[A]] = ???
+    def getAll[S, A](fl: Semantic[E, Fold[S, A]]): Semantic[E, S => List[A]] = ???
 
-    def lnAsGt[S, A](ln: TSemantic[E, Lens[S, A]]): TSemantic[E, Getter[S, A]] = ???
+    def lnAsGt[S, A](ln: Semantic[E, Lens[S, A]]): Semantic[E, Getter[S, A]] = ???
 
-    def gtAsFl1[S, A](gt: TSemantic[E, Getter[S, A]]): TSemantic[E, Fold1[S, A]] = ???
+    def gtAsFl1[S, A](gt: Semantic[E, Getter[S, A]]): Semantic[E, Fold1[S, A]] = ???
 
-    def gtAsAfl[S, A](gt: TSemantic[E, Getter[S, A]]) = {
-      val TGetter(vars, expr) = gt
-      val f = new OpticMap[E, Getter, AffineFold] {
-        def apply[X, Y](gt: E[Getter[X, Y]]) = OpticLang[E].gtAsAfl(gt)
+    def gtAsAfl[S, A](
+        gt: Semantic[E, Getter[S, A]]): Semantic[E, AffineFold[S, A]] =
+      for {
+        tmp <- gt
+        TGetter(expr) = tmp
+        f = new OpticMap[E, Getter, AffineFold] {
+          def apply[X, Y](gt: E[Getter[X, Y]]) = OpticLang[E].gtAsAfl(gt)
+        }
+      } yield TAffineFold(expr.mapO(f))
+
+    def aflAsFl[S, A](
+        afl: Semantic[E, AffineFold[S, A]]): Semantic[E, Fold[S, A]] =
+      for {
+        tmp <- afl
+        TAffineFold(expr, filt) = tmp
+        f = new OpticMap[E, AffineFold, Fold] {
+          def apply[X, Y](afl: E[AffineFold[X, Y]]) = OpticLang[E].aflAsFl(afl)
+        }
+      } yield TFold(expr.mapO(f), filt.map(_.mapO(f)))
+
+    def fl1AsFl[S, A](fl1: Semantic[E, Fold1[S, A]]): Semantic[E, Fold[S, A]] = ???
+
+    private def fresh: State[Table, String] =
+      for {
+        s <- gets[Table, Stream[String]](_.src)
+        _ <- modify[Table](_.copy(src = s.tail))
+      } yield s.head
+
+    private def assignVal[O[_, _], S, A](
+        vv: TVarVal[E, O, S, A]): State[Table, Var[E, O, S, A]] =
+      for {
+        s <- fresh
+        _ <- modify[Table](t => t.copy(rows = t.rows + (s -> vv)))
+      } yield Var(s)
+
+    private def getVal[O[_, _], S, A](
+        v: Var[E, O, S, A]): State[Table, TVarVal[E, O, S, A]] =
+      gets[Table, TVarVal[E, O, S, A]](
+        _.rows(v.name).asInstanceOf[TVarVal[E, O, S, A]])
+
+    private def unifyVars: State[Table, List[Rewrite]] =
+      for {
+        t <- get[Table]
+        gs = t.rows.groupBy(_._2).filter(_.length > 1).mapValues(_.keys)
+        rws <- gs.toList.traverse { 
+          case (vv, ks) =>
+            for {
+              s <- fresh
+              _ <- modify[Table](t => t.copy(rows = t.rows + (s -> vv)))
+            } yield ks.toList.map((_, s))
+        }
+      } yield rws.join
+
+    private def varDeps(s: String): State[Table, Set[String]] =
+      gets[Table, Set[String]] { t =>
+        t.rows(s) match {
+          case vv: TVarNestedVal[_, _, _, _] => vv.vs.vars + s
+          case _ => Set(s)
+        }
       }
-      TAffineFold(vars.mapO(f), expr.mapO(f))
-    }
 
-    def aflAsFl[S, A](afl: TSemantic[E, AffineFold[S, A]]) = {
-      val TAffineFold(vars, expr, _) = afl
-      val f = new OpticMap[E, AffineFold, Fold] {
-        def apply[X, Y](afl: E[AffineFold[X, Y]]) = OpticLang[E].aflAsFl(afl)
-      }
-      TFold(vars.mapO(f), expr.mapO(f))
-    }
+    private def removeVars(vars: Set[String]): State[Table, Unit] =
+      for {
+        vars2 <- vars.toList.traverse(varDeps).map(_.flatten)
+        _ <- modify[Table](t => t.copy(rows = t.rows.filterKeys(vars2.contains(_))))
+      } yield ()
 
-    def fl1AsFl[S, A](fl1: TSemantic[E, Fold1[S, A]]): TSemantic[E, Fold[S, A]] = ???
+    private def gtConsistency[S, A](
+        sem: TGetter[E, S, A]): Semantic[E, Getter[S, A]] =
+      for {
+        rws <- unifyVars
+        sem2 = rws.foldLeft(sem)(_ rewrite _)
+        _ <- removeVars(sem2.expr.vars)
+      } yield sem2
+
+    private def aflConsistency[S, A](
+        sem: TAffineFold[E, S, A]): Semantic[E, AffineFold[S, A]] =
+      for {
+        rws <- unifyVars
+        sem2 = rws.foldLeft(sem)(_ rewrite _)
+        _ <- removeVars(sem2.expr.vars ++ sem.filt.map(_.vars).flatten)
+      } yield sem2
   }
 
   trait Syntax {
