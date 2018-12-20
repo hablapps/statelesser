@@ -3,7 +3,7 @@ package sql
 package test
 
 import scalaz.Const
-import OpticLang.TSemantic
+import OpticLang.{Semantic, Table}
 import statelesser.test._
 import org.scalatest._
 
@@ -14,9 +14,10 @@ class CoupleExampleTest extends FlatSpec with Matchers {
 
   val keys = Map("Person" -> "name")
 
-  def genSql[S, A](sem: TSemantic[Const[String, ?], Fold[S, A]]): String = {
+  def genSql[S, A](sem: Semantic[Const[String, ?], Fold[S, A]]): String = {
     // println(sem)
-    sqlToString(fromSemantic(sem, keys))
+    val (t, out) = sem(Table(Stream.range('a', 'z').map(_.toString), Map()))
+    sqlToString(fromSemantic(t, out, keys))
   }
 
   def matchSql[S, A](q: String, stks: Stack[Fold[S, A]]*) =

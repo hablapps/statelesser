@@ -485,26 +485,19 @@ object OpticLang {
 
   // XXX: we need a safer table implementation, since this is a really ugly
   // workaround, but this is good enough for the time being.
-  // implicit class TableOps[E[_], O[_, _]](table: Table[E, O]) {
+  implicit class TableOps(table: Table) {
 
-  //   def getV[S, A](v: Var[E, O, S, A]): TVarVal[E, O, S, A] = 
-  //     table.toMap.apply(v.name).asInstanceOf[TVarVal[E, O, S, A]]
+    private def splitTables = table.rows.partition { 
+      case (_, TVarSimpleVal(_)) => true 
+      case _ => false 
+    }
 
-  //   def deleteV[S, A](v: Var[E, O, S, A]): Table[E, O] =
-  //     (table.toMap - v.name).toSet
+    def simpleTable[E[_], O[_, _]]: Set[(String, TVarSimpleVal[E, O, _, _])] =
+      splitTables._1.asInstanceOf[Set[(String, TVarSimpleVal[E, O, _, _])]]
 
-  //   def mapO[O2[_, _]](f: OpticMap[E, O, O2]): Table[E, O2] =
-  //     table.map { case (s, e) => (s, e.mapO(f)) }
-
-  //   private def splitTables =
-  //     table.partition { case (_, TVarSimpleVal(_)) => true; case _ => false }
-
-  //   def simpleTable: Set[(String, TVarSimpleVal[E, O, _, _])] =
-  //     splitTables._1.asInstanceOf[Set[(String, TVarSimpleVal[E, O, _, _])]]
-
-  //   def nestedTable: Set[(String, TVarNestedVal[E, O, _, _])] =
-  //     splitTables._2.asInstanceOf[Set[(String, TVarNestedVal[E, O, _, _])]]
-  // }
+    def nestedTable[E[_], O[_, _]]: Set[(String, TVarNestedVal[E, O, _, _])] =
+      splitTables._2.asInstanceOf[Set[(String, TVarNestedVal[E, O, _, _])]]
+  }
 
   type Semantic[E[_], A] = State[Table, TSemantic[E, A]]
 

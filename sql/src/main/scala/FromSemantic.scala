@@ -9,16 +9,16 @@ trait FromSemantic {
   import OpticLang.Table
 
   def fromSemantic[E[_], S, A](
+      tab: Table,
       sem: TSemantic[E, Fold[S, A]],
       keys: Map[TypeNme, FieldName] = Map()): SSelect = {
-    val TFold(vars, expr, _) = sem
-    SSelect(selToSql(expr, keys), tabToSql(vars, keys), None)
+    val TFold(expr, _) = sem
+    SSelect(selToSql(expr, keys), tabToSql(tab, keys), None)
   }
 
   private def flatProduct[E[_]](
       x: TExpr[E, Fold, _, _]): List[TExpr[E, Fold, _, _]] = x match {
-    case Product(TFold(_, l, _), TFold(_, r, _), is) => 
-      List(flatProduct(l), flatProduct(r)).join
+    case Product(l, r, is) => List(flatProduct(l), flatProduct(r)).join
     case _ => List(x)
   }
 
@@ -30,11 +30,11 @@ trait FromSemantic {
   }
 
   private def tabToSql[E[_]](
-      tab: Table[E, Fold],
+      tab: Table,
       keys: Map[TypeNme, FieldName]): SqlFrom =
-    tab.simpleTable.toList match {
+    tab.simpleTable[E, Fold].toList match {
       case List((nme, TVarSimpleVal(Wrap(_, info)))) => SFrom(List(
-        STable(info.tgt.nme, nme, tab.nestedTable.toList.map(joinToSql(_, keys)))))
+        STable(info.tgt.nme, nme, tab.nestedTable[E, Fold].toList.map(joinToSql(_, keys)))))
       case _ => 
         throw new Error(s"Sorry, but we don't support product roots yet: $tab")
     }
@@ -70,11 +70,11 @@ trait FromSemantic {
       t: TExpr[E, Fold, _, _],
       keys: Map[TypeNme, FieldName]): SqlExp = t match {
     case Wrap(_, info) => SProj("", info.nme)
-    case Vertical(TFold(_, Var(nme), _), TFold(_, Wrap(_, info), _)) => 
+    case Vertical(Var(nme), Wrap(_, info)) => 
       SProj(nme, info.nme)
-    case Vertical(TFold(_, Product(TFold(_, l, _), TFold(_, r, _), _), _), TFold(_, Sub(_, _), _)) => 
+    case Vertical(Product(l, r, _), Sub(_, _)) => 
       SBinOp("-", treeToExpr(l, keys), treeToExpr(r, keys))
-    case Vertical(TFold(_, e, _), TFold(_, Not(_, _), _)) => 
+    case Vertical(e, Not(_, _)) => 
       SUnOp("NOT", treeToExpr(e, keys))
     case LikeInt(i, _) => SCons(i.toString)
     case LikeBool(b, _) => SCons(b.toString)
