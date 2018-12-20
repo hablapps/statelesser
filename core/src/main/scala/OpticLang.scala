@@ -492,11 +492,11 @@ object OpticLang {
       case _ => false 
     }
 
-    def simpleTable[E[_], O[_, _]]: Set[(String, TVarSimpleVal[E, O, _, _])] =
-      splitTables._1.asInstanceOf[Set[(String, TVarSimpleVal[E, O, _, _])]]
+    def simpleTable[E[_], O[_, _]]: Map[String, TVarSimpleVal[E, O, _, _]] =
+      splitTables._1.asInstanceOf[Map[String, TVarSimpleVal[E, O, _, _]]]
 
-    def nestedTable[E[_], O[_, _]]: Set[(String, TVarNestedVal[E, O, _, _])] =
-      splitTables._2.asInstanceOf[Set[(String, TVarNestedVal[E, O, _, _])]]
+    def nestedTable[E[_], O[_, _]]: Map[String, TVarNestedVal[E, O, _, _]] =
+      splitTables._2.asInstanceOf[Map[String, TVarNestedVal[E, O, _, _]]]
   }
 
   type Semantic[E[_], A] = State[Table, TSemantic[E, A]]
