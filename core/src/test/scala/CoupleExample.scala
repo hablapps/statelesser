@@ -1,7 +1,7 @@
 package statelesser
 package test
 
-import scalaz.Const
+import scalaz._, Scalaz._
 
 import OpticLang._
 
@@ -173,38 +173,49 @@ trait CoupleExample[Expr[_]] {
 }
 
 object CoupleExample {
+  import OpticLang.Semantic
 
-  type Stack[A] = TSemantic[Const[String, ?], A]
+  type Stack[A] = Semantic[Const[String, ?], A]
 
   private def wrapPlainG[S, A](s: String, inf: OpticInfo): Stack[Getter[S, A]] =
-    TGetter(expr = Wrap(Const(s), inf))
-
-  private def wrapTableG[S, A](
-      v: String, s: String, inf: OpticInfo): Stack[Getter[S, A]] = TGetter(
-    Set(v -> TVarSimpleVal(Wrap[Const[String, ?], Getter, S, A](Const(s), inf))), 
-    Var(v))
-
-  private def wrapTableF[S, A](
-      v: String, s: String, inf: OpticInfo): Stack[Fold[S, A]] = TFold(
-    Set(v -> TVarSimpleVal(Wrap[Const[String, ?], Fold, S, A](Const(s), inf))), 
-    Var(v))
+    state(TGetter(Wrap(Const(s), inf)))
 
   val instance = new CoupleExample[Stack] {
     type Couple = Unit
     type Person = Unit
 
+    // XXX: next methods are redundant, unify with tSemantic in OpticLang.
+
+    private def assignValG[S, A](
+        inf: OpticInfo): Stack[Getter[S, A]] =
+      for {
+        s <- gets[Table, Stream[String]](_.src)
+        _ <- modify[Table](_.copy(src = s.tail))
+        _ <- modify[Table](t => t.copy(rows = t.rows + (s.head -> 
+          TVarSimpleVal(Wrap[Const[String, ?], Fold, S, A](Const(inf.nme), inf)))))
+      } yield TGetter(Var(s.head))
+
+    private def assignValF[S, A](
+        inf: OpticInfo): Stack[Fold[S, A]] =
+      for {
+        s <- gets[Table, Stream[String]](_.src)
+        _ <- modify[Table](_.copy(src = s.tail))
+        _ <- modify[Table](t => t.copy(rows = t.rows + (s.head -> 
+          TVarSimpleVal(Wrap[Const[String, ?], Fold, S, A](Const(inf.nme), inf)))))
+      } yield TFold(Var(s.head), Set())
+
     val ev = OpticLang[Stack]
 
-    val couples = wrapTableF("c", "couples", 
+    val couples = assignValF(
       OpticInfo(KFold, "couples", TypeInfo("Couples"), TypeInfo("Couple", true)))
     
-    val her = wrapTableG("w", "her",
+    val her = assignValG(
       OpticInfo(KGetter, "her", TypeInfo("Couple", true), TypeInfo("Person", true)))
 
-    val him = wrapTableG("m", "him",
+    val him = assignValG(
       OpticInfo(KGetter, "him", TypeInfo("Couple", true), TypeInfo("Person", true)))
     
-    val people = wrapTableF("p", "people",
+    val people = assignValF(
       OpticInfo(KFold, "people", TypeInfo("People"), TypeInfo("Person", true)))
 
     val name = wrapPlainG("name",
@@ -216,7 +227,7 @@ object CoupleExample {
     val weight = wrapPlainG("weight",
       OpticInfo(KGetter, "weight", TypeInfo("Person", true), TypeInfo("Int")))
 
-    val address = wrapTableG("a", "address",
+    val address = assignValG(
       OpticInfo(KGetter, "address", TypeInfo("Person", true), TypeInfo("Address", true)))
     
     val street = wrapPlainG("street",
