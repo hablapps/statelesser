@@ -122,54 +122,54 @@ trait CoupleExample[Expr[_]] {
   def getHerNameAndAge_3: Expr[Fold[Couples, (String, Int)]] =
     couples > (id > her > name * age > id > id).asFold
 
-  def getPeopleGt30: Expr[People => List[(String, Int)]] =
-    getAll(people > (name.asAffineFold * 
-      (age.asAffineFold > filtered (gt(30)))).asFold)
+  def getPeopleGt30: Expr[Fold[People, (String, Int)]] =
+    people > (name.asAffineFold * 
+      (age.asAffineFold > filtered (gt(30)))).asFold
 
-  def getHerGt30_1: Expr[Couples => List[(String, Int)]] =
-    getAll(couples > her.asFold > (name.asAffineFold * 
-      (age.asAffineFold > filtered (gt(30)))).asFold)
+  def getHerGt30_1: Expr[Fold[Couples, (String, Int)]] =
+    couples > her.asFold > (name.asAffineFold * 
+      (age.asAffineFold > filtered (gt(30)))).asFold
 
-  def getHerGt30_2: Expr[Couples => List[(String, Int)]] =
-    getAll(couples > ((her > name).asAffineFold * 
-      ((her > age).asAffineFold > filtered (gt(30)))).asFold)
+  def getHerGt30_2: Expr[Fold[Couples, (String, Int)]] =
+    couples > ((her > name).asAffineFold * 
+      ((her > age).asAffineFold > filtered (gt(30)))).asFold
 
-  def getHerNameGt30_1: Expr[Couples => List[String]] =
-    getAll(couples > her.asFold > (name.asAffineFold <* 
-      (age.asAffineFold > filtered (gt(30)))).asFold)
+  def getHerNameGt30_1: Expr[Fold[Couples, String]] =
+    couples > her.asFold > (name.asAffineFold <* 
+      (age.asAffineFold > filtered (gt(30)))).asFold
   
-  def getHerNameGt30_2: Expr[Couples => List[String]] =
-    getAll(couples > ((her > name).asAffineFold <* 
-      ((her > age).asAffineFold > filtered (gt(30)))).asFold)
+  def getHerNameGt30_2: Expr[Fold[Couples, String]] =
+    couples > ((her > name).asAffineFold <* 
+      ((her > age).asAffineFold > filtered (gt(30)))).asFold
 
   def differenceAll: Expr[Couples => List[(String, Int)]] =
     getAll(couples >
       ((her > name) * ((her > age) * (him > age) > sub)).asFold)
 
-  def difference: Expr[Couples => List[(String, Int)]] =
-    getAll(couples > 
+  def difference: Expr[Fold[Couples, (String, Int)]] =
+    couples > 
       ((her > name).asAffineFold * 
-        (((her > age) - (him > age)).asAffineFold > filtered (gt(0)))).asFold)
+        (((her > age) - (him > age)).asAffineFold > filtered (gt(0)))).asFold
 
-  def differenceName_1: Expr[Couples => List[String]] =
-    getAll(couples > 
+  def differenceName_1: Expr[Fold[Couples, String]] =
+    couples > 
       ((her > name).asAffineFold <* 
-        (((her > age) - (him > age)).asAffineFold > filtered (gt(0)))).asFold)
+        (((her > age) - (him > age)).asAffineFold > filtered (gt(0)))).asFold
 
-  def differenceName_2: Expr[Couples => List[String]] =
-    getAll(couples > 
+  def differenceName_2: Expr[Fold[Couples, String]] =
+    couples > 
       ((her > name).asAffineFold * 
         (((her > age) - (him > age)).asAffineFold > filtered (gt(0))) > 
-          first.asAffineFold).asFold)
+          first.asAffineFold).asFold
 
-  def dummyNameAndAge: Expr[People => List[(String, Int)]] =
-    getAll(people > ((name.asAffineFold * ((name * age > 
+  def dummyNameAndAge: Expr[Fold[People, (String, Int)]] =
+    people > ((name.asAffineFold * ((name * age > 
       first * second > 
       second * first > 
       second * first > 
       second).asAffineFold 
       > filtered (gt(30))
-      > filtered (gt(40))))).asFold)
+      > filtered (gt(40))))).asFold
 }
 
 object CoupleExample {

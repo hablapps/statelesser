@@ -53,6 +53,7 @@ trait OpticLang[Expr[_]] {
 
   def getAll[S, A](fl: Expr[Fold[S, A]]): Expr[S => List[A]]
 
+
   def lnAsGt[S, A](ln: Expr[Lens[S, A]]): Expr[Getter[S, A]]
 
   def gtAsFl1[S, A](gt: Expr[Getter[S, A]]): Expr[Fold1[S, A]]
@@ -461,6 +462,7 @@ object OpticLang {
       case Var(name) => Var(name)
       case Wrap(e, inf) => Wrap(f(e), inf)
       case Sub(is1, is2) => Sub(is1, is2)
+      case Gt(is1, is2) => Gt(is1, is2)
       case Not(is1, is2) => Not(is1, is2)
     }
   }
@@ -475,6 +477,10 @@ object OpticLang {
   case class Sub[E[_], O[_, _], S, A](
     is1: S === (Int, Int),
     is2: A === Int) extends TSel[E, O, S, A]
+
+  case class Gt[E[_], O[_, _], S, A](
+    is1: S === (Int, Int),
+    is2: A === Boolean) extends TSel[E, O, S, A]
 
   case class Not[E[_], O[_, _], S, A](
     is1: S === Boolean,
@@ -740,7 +746,8 @@ object OpticLang {
     def sub: Semantic[E, Getter[(Int, Int), Int]] =
       state(TGetter(expr = Sub(implicitly, implicitly)))
 
-    def greaterThan: Semantic[E, Getter[(Int, Int), Boolean]] = ???
+    def greaterThan: Semantic[E, Getter[(Int, Int), Boolean]] =
+      state(TGetter(expr = Gt(implicitly, implicitly)))
 
     def equal[A]: Semantic[E, Getter[(A, A), Boolean]] = ???
 

@@ -12,8 +12,8 @@ trait FromSemantic {
       tab: Table,
       sem: TSemantic[E, Fold[S, A]],
       keys: Map[TypeNme, FieldName] = Map()): SSelect = {
-    val TFold(expr, _) = sem
-    SSelect(selToSql(expr, keys), tabToSql(tab, keys), None)
+    val TFold(expr, filt) = sem
+    SSelect(selToSql(expr, keys), tabToSql(tab, keys), whrToSql(filt, keys))
   }
 
   private def flatProduct[E[_]](
@@ -33,7 +33,7 @@ trait FromSemantic {
       tab: Table,
       keys: Map[TypeNme, FieldName]): SqlFrom =
     tab.simpleTable[E, Fold].toList match {
-      case List((nme, TVarSimpleVal(Wrap(_, info)))) => SFrom(List(
+      case (nme, TVarSimpleVal(Wrap(_, info))) :: _ => SFrom(List(
         STable(info.tgt.nme, nme, tab.nestedTable[E, Fold].toList.map(joinToSql(_, keys)))))
       case _ => 
         throw new Error(s"Sorry, but we don't support product roots yet: $tab")
@@ -58,13 +58,13 @@ trait FromSemantic {
     }
   }
 
-  // private def whrToSql(
-  //     whr: Set[TTree],
-  //     keys: Map[TypeNme, FieldName]): Option[SqlExp] =
-  //   whr.foldLeft(Option.empty[SqlExp]) {
-  //     case (None, t) => Some(treeToExpr(t, keys))
-  //     case (Some(e), t) => Some(SBinOp("AND", e, treeToExpr(t, keys)))
-  //   }
+  private def whrToSql[E[_], S](
+      whr: Set[TExpr[E, Fold, S, Boolean]],
+      keys: Map[TypeNme, FieldName]): Option[SqlExp] =
+    whr.foldLeft(Option.empty[SqlExp]) {
+      case (None, t) => Some(treeToExpr(t, keys))
+      case (Some(e), t) => Some(SBinOp("AND", e, treeToExpr(t, keys)))
+    }
 
   private def treeToExpr[E[_]](
       t: TExpr[E, Fold, _, _],
@@ -74,6 +74,8 @@ trait FromSemantic {
       SProj(nme, info.nme)
     case Vertical(Product(l, r, _), Sub(_, _)) => 
       SBinOp("-", treeToExpr(l, keys), treeToExpr(r, keys))
+    case Vertical(Product(l, r, _), Gt(_, _)) => 
+      SBinOp(">", treeToExpr(l, keys), treeToExpr(r, keys))
     case Vertical(e, Not(_, _)) => 
       SUnOp("NOT", treeToExpr(e, keys))
     case LikeInt(i, _) => SCons(i.toString)

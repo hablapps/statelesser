@@ -75,38 +75,41 @@ class CoupleExampleTest extends FlatSpec with Matchers {
       getPeopleNameAnd3_4)
   }
 
-  // it should "generate filters" in {
-  //   matchSql(
-  //     "SELECT p.name, p.age FROM Person AS p WHERE (p.age > 30);", 
-  //     getPeopleGt30)
-  // }
+  it should "generate filters" in {
+    matchSql(
+      raw"SELECT (.)\.name, \1\.age FROM Person AS \1 WHERE \(\1\.age > 30\);".r, 
+      getPeopleGt30)
+  }
 
-  // it should "generate filters for nested fields" in {
-  //   matchSql(
-  //     "SELECT w.name, w.age FROM Couple AS c INNER JOIN Person AS w ON c.her = w.name WHERE (w.age > 30);",
-  //     getHerGt30_1, getHerGt30_2)
-  // }
+  it should "generate filters for nested fields" in {
+    matchSql(
+      raw"SELECT (.)\.name, \1\.age FROM Couple AS (.) INNER JOIN Person AS \1 ON \2\.her = \1\.name WHERE \(\1\.age > 30\);".r,
+      getHerGt30_1, 
+      getHerGt30_2)
+  }
 
-  // it should "generate remove filtering fields from select" in {
-  //   matchSql(
-  //     "SELECT w.name FROM Couple AS c INNER JOIN Person AS w ON c.her = w.name WHERE (w.age > 30);",
-  //     getHerNameGt30_1, getHerNameGt30_2)
-  // }
+  it should "generate remove filtering fields from select" in {
+    matchSql(
+      raw"SELECT (.)\.name FROM Couple AS (.) INNER JOIN Person AS \1 ON \2\.her = \1\.name WHERE \(\1\.age > 30\);".r,
+      getHerNameGt30_1, 
+      getHerNameGt30_2)
+  }
 
-  // it should "generate complex queries" in {
-  //   matchSql(
-  //     "SELECT w.name, (w.age - m.age) FROM Couple AS c INNER JOIN Person AS w ON c.her = w.name INNER JOIN Person AS m ON c.him = m.name WHERE ((w.age - m.age) > 0);",
-  //     difference)
+  it should "generate complex queries" in {
+    matchSql(
+      raw"SELECT (.)\.name, \(\1\.age - (.)\.age\) FROM Couple AS (.) INNER JOIN Person AS \1 ON \3\.her = \1\.name INNER JOIN Person AS \2 ON \3\.him = \2\.name WHERE \(\(\1\.age - \2\.age\) > 0\);".r,
+      difference)
 
-  //   matchSql(
-  //     "SELECT w.name FROM Couple AS c INNER JOIN Person AS w ON c.her = w.name INNER JOIN Person AS m ON c.him = m.name WHERE ((w.age - m.age) > 0);",
-  //     differenceName_1, differenceName_2)
-  // }
+    matchSql(
+      raw"SELECT (.)\.name FROM Couple AS (.) INNER JOIN Person AS \1 ON \2\.her = \1\.name INNER JOIN Person AS (.) ON \2\.him = \3\.name WHERE \(\(\1\.age - \3\.age\) > 0\);".r,
+      differenceName_1, 
+      differenceName_2)
+  }
 
-  // it should "normalise a stupid query" in {
-  //   matchSql(
-  //     "SELECT p.name, p.age FROM Person AS p WHERE ((p.age > 30) AND (p.age > 40));", 
-  //     dummyNameAndAge)
-  // }
+  it should "normalise a stupid query" in {
+    matchSql(
+      raw"SELECT (.)\.name, \1\.age FROM Person AS \1 WHERE \(\(\1\.age > 30\) AND \(\1\.age > 40\)\);".r, 
+      dummyNameAndAge)
+  }
 }
 
