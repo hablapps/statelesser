@@ -177,8 +177,8 @@ object CoupleExample {
 
   type Stack[A] = Semantic[Const[String, ?], A]
 
-  private def wrapPlainG[S, A](s: String, inf: OpticInfo): Stack[Getter[S, A]] =
-    state(TGetter(Wrap(Const(s), inf)))
+  private def wrapPlainG[S, A](inf: OpticInfo): Stack[Getter[S, A]] =
+    state(TGetter(Wrap(Const(inf.nme), inf)))
 
   val instance = new CoupleExample[Stack] {
     type Couple = Unit
@@ -218,19 +218,19 @@ object CoupleExample {
     val people = assignValF(
       OpticInfo(KFold, "people", TypeInfo("People"), TypeInfo("Person", true)))
 
-    val name = wrapPlainG("name",
+    val name = wrapPlainG(
       OpticInfo(KGetter, "name", TypeInfo("Person", true), TypeInfo("String")))
 
-    val age = wrapPlainG("age",
+    val age = wrapPlainG(
       OpticInfo(KGetter, "age", TypeInfo("Person", true), TypeInfo("Int")))
 
-    val weight = wrapPlainG("weight",
+    val weight = wrapPlainG(
       OpticInfo(KGetter, "weight", TypeInfo("Person", true), TypeInfo("Int")))
 
     val address = assignValG(
       OpticInfo(KGetter, "address", TypeInfo("Person", true), TypeInfo("Address", true)))
     
-    val street = wrapPlainG("street",
+    val street = wrapPlainG(
       OpticInfo(KGetter, "street", TypeInfo("Address", true), TypeInfo("String")))
   }
 }

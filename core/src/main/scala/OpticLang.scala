@@ -3,8 +3,6 @@ package statelesser
 import scalaz._, Scalaz._
 import Leibniz._
 
-import RewriteVar.{Rewrite, syntax}, syntax._
-
 trait OpticLang[Expr[_]] {
 
   def flVert[S, A, B](
@@ -402,9 +400,8 @@ object OpticLang {
   sealed abstract class TExpr[E[_], O[_, _], S, A] {
 
     def mapO[O2[_, _]](f: OpticMap[E, O, O2]): TExpr[E, O2, S, A] = this match {
-      case Product(l, r, is) => ??? // Product(l.mapO(f), r.mapO(f), is, lt.mapO(f), rt.mapO(f))
-      case Vertical(u, d) => ???
-        // Vertical(u.mapO(f), d.mapOSel(f), ut.mapO(f), dt.mapO(f))
+      case Product(l, r, is) => Product(l.mapO(f), r.mapO(f), is)
+      case Vertical(u, d) => Vertical(u.mapO(f), d.mapO(f))
       case LikeInt(i, is) => LikeInt(i, is)
       case LikeBool(b, is) => LikeBool(b, is)
       case x: TSel[E, O, S, A] => x.mapOSel(f)
@@ -567,8 +564,7 @@ object OpticLang {
         tmp <- dsem
         TGetter(expr2) = tmp
         expr3 <- gtVertAux(expr1, expr2)
-        sem2 <- gtConsistency(TGetter(expr3))
-      } yield sem2
+      } yield TGetter(expr3)
 
     def gtHori[S, A, B](
         l: Semantic[E, Getter[S, A]],
@@ -578,8 +574,7 @@ object OpticLang {
         TGetter(expr1) = tmp
         tmp <- r
         TGetter(expr2) = tmp
-        sem2 <- gtConsistency(TGetter(Product(expr1, expr2, Leibniz.refl[(A, B)])))
-      } yield sem2
+      } yield TGetter(Product(expr1, expr2, Leibniz.refl[(A, B)]))
 
     def aflVertAux[S, A, B](
         u: TExpr[E, AffineFold, S, A], 
@@ -643,8 +638,7 @@ object OpticLang {
         TAffineFold(expr2, filt2) = tmp
         expr3 <- aflVertAux(expr1, expr2)
         filt3 <- filt2.toList.traverse(aflVertAux(expr1, _))
-        sem2 <- aflConsistency(TAffineFold(expr3, filt1 ++ filt3))
-      } yield sem2
+      } yield TAffineFold(expr3, filt1 ++ filt3)
 
     def aflHori[S, A, B](
         l: Semantic[E, AffineFold[S, A]],
@@ -654,10 +648,9 @@ object OpticLang {
         TAffineFold(expr1, filt1) = tmp
         tmp <- r
         TAffineFold(expr2, filt2) = tmp
-        sem2 <- aflConsistency(TAffineFold(
+      } yield TAffineFold(
           Product(expr1, expr2, Leibniz.refl[(A, B)]), 
-          filt1 ++ filt2))
-      } yield sem2
+          filt1 ++ filt2)
 
     def flVertAux[S, A, B](
         u: TExpr[E, Fold, S, A], 
@@ -721,8 +714,7 @@ object OpticLang {
         TFold(expr2, filt2) = tmp
         expr3 <- flVertAux(expr1, expr2)
         filt3 <- filt2.toList.traverse(flVertAux(expr1, _))
-        sem2 <- flConsistency(TFold(expr3, filt1 ++ filt3))
-      } yield sem2
+      } yield TFold(expr3, filt1 ++ filt3)
 
     def flHori[S, A, B](
         l: Semantic[E, Fold[S, A]], 
@@ -732,10 +724,9 @@ object OpticLang {
         TFold(expr1, filt1) = tmp
         tmp <- r
         TFold(expr2, filt2) = tmp
-        sem2 <- flConsistency(TFold(
+      } yield TFold(
           Product(expr1, expr2, Leibniz.refl[(A, B)]), 
-          filt1 ++ filt2))
-      } yield sem2
+          filt1 ++ filt2)
 
     def filtered[S](
         p: Semantic[E, Getter[S, Boolean]]): Semantic[E, AffineFold[S, S]] = 
@@ -814,8 +805,10 @@ object OpticLang {
     def assignVal[O[_, _], S, A](
         vv: TVarVal[E, O, S, A]): State[Table, Var[E, O, S, A]] =
       for {
-        s <- fresh
-        _ <- modify[Table](t => t.copy(rows = t.rows + (s -> vv)))
+        os <- gets[Table, Option[String]](_.rows.find(_._2 == vv).map(_._1))
+        s <- os.fold(
+          fresh >>! (s => modify[Table](t => t.copy(rows = t.rows + (s -> vv)))))(
+          _.point[State[Table, ?]])
       } yield Var(s)
 
     private def getVal[O[_, _], S, A](
@@ -823,21 +816,14 @@ object OpticLang {
       gets[Table, TVarVal[E, O, S, A]](
         _.rows(v.name).asInstanceOf[TVarVal[E, O, S, A]])
 
-    private def unifyVars: State[Table, List[Rewrite]] =
-      for {
-        t <- get[Table]
-        gs = t.rows.groupBy(_._2).filter(_.length > 1).mapValues(_.keys)
-        rws <- gs.toList.traverse { 
-          case (vv, ks) =>
-            for {
-              s <- fresh
-              _ <- modify[Table](t => t.copy(rows = t.rows + (s -> vv)))
-            } yield ks.toList.map((_, s))
-        }
-      } yield rws.join
-
     private def varDeps(s: String): State[Table, Set[String]] =
       gets[Table, Set[String]] { t =>
+        if (t.rows.get(s) == None) {
+          println()
+          println(s"Asking for ${s}")
+          println(t.rows)
+          println()
+        }
         t.rows(s) match {
           case vv: TVarNestedVal[_, _, _, _] => vv.vs.vars + s
           case _ => Set(s)
@@ -849,30 +835,6 @@ object OpticLang {
         vars2 <- vars.toList.traverse(varDeps).map(_.flatten)
         _ <- modify[Table](t => t.copy(rows = t.rows.filterKeys(vars2.contains(_))))
       } yield ()
-
-    private def gtConsistency[S, A](
-        sem: TGetter[E, S, A]): Semantic[E, Getter[S, A]] =
-      for {
-        rws <- unifyVars
-        sem2 = rws.foldLeft(sem)(_ rewrite _)
-        _ <- removeVars(sem2.expr.vars)
-      } yield sem2
-
-    private def aflConsistency[S, A](
-        sem: TAffineFold[E, S, A]): Semantic[E, AffineFold[S, A]] =
-      for {
-        rws <- unifyVars
-        sem2 = rws.foldLeft(sem)(_ rewrite _)
-        _ <- removeVars(sem2.expr.vars ++ sem.filt.map(_.vars).flatten)
-      } yield sem2
-
-    private def flConsistency[S, A](
-        sem: TFold[E, S, A]): Semantic[E, Fold[S, A]] =
-      for {
-        rws <- unifyVars
-        sem2 = rws.foldLeft(sem)(_ rewrite _)
-        _ <- removeVars(sem2.expr.vars ++ sem.filt.map(_.vars).flatten)
-      } yield sem2
   }
 
   trait Syntax {
