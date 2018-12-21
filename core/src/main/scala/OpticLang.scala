@@ -229,6 +229,7 @@ object OpticLang {
       is.flip.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.likeInt[S](i)))
     case LikeBool(b, is) =>
       is.flip.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.likeBool[S](b)))
+    case Id(is) => is.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.id[S]))
     case Not(is1, is2) => 
       is2.flip.subst[λ[x => E[Fold[S, x]]]](
         is1.flip.subst[λ[x => E[Fold[x, Boolean]]]](ev.gtAsFl(ev.not)))
@@ -264,24 +265,24 @@ object OpticLang {
   implicit def tsemantic[E[_]: OpticLang]: OpticLang[Semantic[E, ?]] = 
       new OpticLang[Semantic[E, ?]] {
 
-    def gtVertAux[S, A, B](
-        u: TExpr[E, Getter, S, A], 
-        d: TExpr[E, Getter, A, B]): State[Table, TExpr[E, Getter, S, B]] =
+    private def vertAux[O[_, _], S, A, B](
+        u: TExpr[E, O, S, A], 
+        d: TExpr[E, O, A, B]): State[Table, TExpr[E, O, S, B]] =
       (u, d) match {
         case (_, Product(l, r, is)) =>
-          (gtVertAux(u, l) |@| gtVertAux(u, r)) { (l1, r1) => 
+          (vertAux(u, l) |@| vertAux(u, r)) { (l1, r1) => 
             TExpr.product(l1, r1, is)
           }
         case (_, Vertical(u1, d1)) => 
-          gtVertAux(u, u1) >>= (u2 => gtVertAux(u2, d1))
+          vertAux(u, u1) >>= (u2 => vertAux(u2, d1))
         case (Product(l, _, _), Wrap(_, inf)) if inf.nme == "first" => 
-          l.asInstanceOf[TExpr[E, Getter, S, B]].point[State[Table, ?]]
+          l.asInstanceOf[TExpr[E, O, S, B]].point[State[Table, ?]]
         case (Product(_, r, _), Wrap(_, inf)) if inf.nme == "second" =>
-          r.asInstanceOf[TExpr[E, Getter, S, B]].point[State[Table, ?]]
-        case (Wrap(_, inf), e) if inf.nme == "id" => 
-          e.asInstanceOf[TExpr[E, Getter, S, B]].point[State[Table, ?]]
-        case (e, Wrap(_, inf)) if inf.nme == "id" => 
-          e.asInstanceOf[TExpr[E, Getter, S, B]].point[State[Table, ?]]
+          r.asInstanceOf[TExpr[E, O, S, B]].point[State[Table, ?]]
+        case (Id(is), e) => 
+          is.flip.subst[λ[x => TExpr[E, O, x, B]]](e).point[State[Table, ?]]
+        case (e, Id(is)) => 
+          is.subst[λ[x => TExpr[E, O, S, x]]](e).point[State[Table, ?]]
         case (_, LikeInt(i, is)) => 
           TExpr.likeInt(i, is).point[State[Table, ?]]
         case (_, LikeBool(b, is)) => 
@@ -294,26 +295,20 @@ object OpticLang {
           TExpr.likeBool(! b, is).point[State[Table, ?]]
         case (Vertical(e, Not(is1, _)), Not(_, is2)) =>
           is2.flip.subst(is1.subst(e)).point[State[Table, ?]]
-        case (Not(is1, _), Not(_, is2)) => {
-          for {
-            tmp <- id[Boolean]
-            TGetter(expr) = tmp
-          } yield is1.flip.subst[λ[x => TExpr[E, Getter, x, B]]](
-                    is2.flip.subst[λ[x => TExpr[E, Getter, Boolean, x]]](expr))
-        }
+        case (Not(is1, _), Not(_, is2)) => 
+          TExpr.id[E, O, S, B](is2.flip compose is1).point[State[Table, ?]]
         case (x@Var(_), y@Var(s)) =>
           for {
             yv <- getVal(y)
             e = yv match {
               case TVarSimpleVal(w) => TVarNestedVal(ONil(x), w)
-              case vnv: TVarNestedVal[E, Getter, _, _] => 
+              case vnv: TVarNestedVal[E, O, _, _] => 
                 TVarNestedVal(OCons(x, vnv.vs), vnv.w)
             }
             z <- assignVal(e) 
-
           } yield z
         case (Vertical(prev, x@Var(_)), y@Var(s)) =>
-          gtVertAux(x, y) >>= (z => gtVertAux(prev, z))
+          vertAux(x, y) >>= (z => vertAux(prev, z))
         case _ => TExpr.vertical(u, d).point[State[Table, ?]]
       }
 
@@ -325,7 +320,7 @@ object OpticLang {
         TGetter(expr1) = tmp
         tmp <- dsem
         TGetter(expr2) = tmp
-        expr3 <- gtVertAux(expr1, expr2)
+        expr3 <- vertAux(expr1, expr2)
       } yield TGetter(expr3)
 
     def gtHori[S, A, B](
@@ -338,59 +333,6 @@ object OpticLang {
         TGetter(expr2) = tmp
       } yield TGetter(Product(expr1, expr2, Leibniz.refl[(A, B)]))
 
-    def aflVertAux[S, A, B](
-        u: TExpr[E, AffineFold, S, A], 
-        d: TExpr[E, AffineFold, A, B]): State[Table, TExpr[E, AffineFold, S, B]] =
-      (u, d) match {
-        case (_, Product(l, r, is)) =>
-          (aflVertAux(u, l) |@| aflVertAux(u, r)) { (l1, r1) => 
-            TExpr.product(l1, r1, is)
-          }
-        case (_, Vertical(u1, d1)) => 
-          aflVertAux(u, u1) >>= (u2 => aflVertAux(u2, d1))
-        case (Product(l, _, _), Wrap(_, inf)) if inf.nme == "first" => 
-          l.asInstanceOf[TExpr[E, AffineFold, S, B]].point[State[Table, ?]]
-        case (Product(_, r, _), Wrap(_, inf)) if inf.nme == "second" =>
-          r.asInstanceOf[TExpr[E, AffineFold, S, B]].point[State[Table, ?]]
-        case (Wrap(_, inf), e) if inf.nme == "id" => 
-          e.asInstanceOf[TExpr[E, AffineFold, S, B]].point[State[Table, ?]]
-        case (e, Wrap(_, inf)) if inf.nme == "id" => 
-          e.asInstanceOf[TExpr[E, AffineFold, S, B]].point[State[Table, ?]]
-        case (_, LikeInt(i, is)) => 
-          TExpr.likeInt(i, is).point[State[Table, ?]]
-        case (_, LikeBool(b, is)) => 
-          TExpr.likeBool(b, is).point[State[Table, ?]]
-        case (Product(l, LikeInt(0, _), _), Sub(_, _)) => 
-          l.asInstanceOf.point[State[Table, ?]]
-        case (Product(LikeInt(x, _), LikeInt(y, _), _), Sub(_, is)) =>
-          TExpr.likeInt(x - y, is).point[State[Table, ?]]
-        case (LikeBool(b, _), Not(_, is)) =>
-          TExpr.likeBool(! b, is).point[State[Table, ?]]
-        case (Vertical(e, Not(is1, _)), Not(_, is2)) =>
-          is2.flip.subst(is1.subst(e)).point[State[Table, ?]]
-        case (Not(is1, _), Not(_, is2)) => {
-          for {
-            tmp <- gtAsAfl(id[Boolean])
-            TAffineFold(expr, _) = tmp
-          } yield is1.flip.subst[λ[x => TExpr[E, AffineFold, x, B]]](
-                    is2.flip.subst[λ[x => TExpr[E, AffineFold, Boolean, x]]](expr))
-        }
-        case (x@Var(_), y@Var(s)) =>
-          for {
-            yv <- getVal(y)
-            e = yv match {
-              case TVarSimpleVal(w) => TVarNestedVal(ONil(x), w)
-              case vnv: TVarNestedVal[E, AffineFold, _, _] => 
-                TVarNestedVal(OCons(x, vnv.vs), vnv.w)
-            }
-            z <- assignVal(e) 
-          } yield z
-        case (Vertical(prev, x@Var(_)), y@Var(s)) =>
-
-          aflVertAux(x, y) >>= (z => aflVertAux(prev, z))
-        case _ => TExpr.vertical(u, d).point[State[Table, ?]]
-      }
-
     def aflVert[S, A, B](
         u: Semantic[E, AffineFold[S, A]], 
         d: Semantic[E, AffineFold[A, B]]): Semantic[E, AffineFold[S, B]] =
@@ -399,8 +341,8 @@ object OpticLang {
         TAffineFold(expr1, filt1) = tmp
         tmp <- d
         TAffineFold(expr2, filt2) = tmp
-        expr3 <- aflVertAux(expr1, expr2)
-        filt3 <- filt2.toList.traverse(aflVertAux(expr1, _))
+        expr3 <- vertAux(expr1, expr2)
+        filt3 <- filt2.toList.traverse(vertAux(expr1, _))
       } yield TAffineFold(expr3, filt1 ++ filt3)
 
     def aflHori[S, A, B](
@@ -415,58 +357,6 @@ object OpticLang {
           Product(expr1, expr2, Leibniz.refl[(A, B)]), 
           filt1 ++ filt2)
 
-    def flVertAux[S, A, B](
-        u: TExpr[E, Fold, S, A], 
-        d: TExpr[E, Fold, A, B]): State[Table, TExpr[E, Fold, S, B]] =
-      (u, d) match {
-        case (_, Product(l, r, is)) =>
-          (flVertAux(u, l) |@| flVertAux(u, r)) { (l1, r1) => 
-            TExpr.product(l1, r1, is)
-          }
-        case (_, Vertical(u1, d1)) => 
-          flVertAux(u, u1) >>= (u2 => flVertAux(u2, d1))
-        case (Product(l, _, _), Wrap(_, inf)) if inf.nme == "first" => 
-          l.asInstanceOf[TExpr[E, Fold, S, B]].point[State[Table, ?]]
-        case (Product(_, r, _), Wrap(_, inf)) if inf.nme == "second" =>
-          r.asInstanceOf[TExpr[E, Fold, S, B]].point[State[Table, ?]]
-        case (Wrap(_, inf), e) if inf.nme == "id" => 
-          e.asInstanceOf[TExpr[E, Fold, S, B]].point[State[Table, ?]]
-        case (e, Wrap(_, inf)) if inf.nme == "id" => 
-          e.asInstanceOf[TExpr[E, Fold, S, B]].point[State[Table, ?]]
-        case (_, LikeInt(i, is)) => 
-          TExpr.likeInt(i, is).point[State[Table, ?]]
-        case (_, LikeBool(b, is)) => 
-          TExpr.likeBool(b, is).point[State[Table, ?]]
-        case (Product(l, LikeInt(0, _), _), Sub(_, _)) => 
-          l.asInstanceOf.point[State[Table, ?]]
-        case (Product(LikeInt(x, _), LikeInt(y, _), _), Sub(_, is)) =>
-          TExpr.likeInt(x - y, is).point[State[Table, ?]]
-        case (LikeBool(b, _), Not(_, is)) =>
-          TExpr.likeBool(! b, is).point[State[Table, ?]]
-        case (Vertical(e, Not(is1, _)), Not(_, is2)) =>
-          is2.flip.subst(is1.subst(e)).point[State[Table, ?]]
-        case (Not(is1, _), Not(_, is2)) => {
-          for {
-            tmp <- aflAsFl(gtAsAfl(id[Boolean]))
-            TFold(expr, _) = tmp
-          } yield is1.flip.subst[λ[x => TExpr[E, Fold, x, B]]](
-                    is2.flip.subst[λ[x => TExpr[E, Fold, Boolean, x]]](expr))
-        }
-        case (x@Var(_), y@Var(s)) =>
-          for {
-            yv <- getVal(y)
-            e = yv match {
-              case TVarSimpleVal(w) => TVarNestedVal(ONil(x), w)
-              case vnv: TVarNestedVal[E, Fold, _, _] => 
-                TVarNestedVal(OCons(x, vnv.vs), vnv.w)
-            }
-            z <- assignVal(e) 
-          } yield z
-        case (Vertical(prev, x@Var(_)), y@Var(s)) =>
-          flVertAux(x, y) >>= (z => flVertAux(prev, z))
-        case _ => TExpr.vertical(u, d).point[State[Table, ?]]
-      }
-
     def flVert[S, A, B](
         u: Semantic[E, Fold[S, A]], 
         d: Semantic[E, Fold[A, B]]) =
@@ -475,8 +365,8 @@ object OpticLang {
         TFold(expr1, filt1) = tmp
         tmp <- d
         TFold(expr2, filt2) = tmp
-        expr3 <- flVertAux(expr1, expr2)
-        filt3 <- filt2.toList.traverse(flVertAux(expr1, _))
+        expr3 <- vertAux(expr1, expr2)
+        filt3 <- filt2.toList.traverse(vertAux(expr1, _))
       } yield TFold(expr3, filt1 ++ filt3)
 
     def flHori[S, A, B](
@@ -528,8 +418,7 @@ object OpticLang {
       ???
 
     def id[S]: Semantic[E, Getter[S, S]] =
-      state(TGetter(expr = Wrap(OpticLang[E].id,
-        OpticInfo(KGetter, "id", TypeInfo("S"), TypeInfo("S")))))
+      state(TGetter(expr = Id(Leibniz.refl)))
 
     def not: Semantic[E, Getter[Boolean, Boolean]] =
       ???

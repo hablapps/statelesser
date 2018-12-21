@@ -43,6 +43,9 @@ object TExpr {
       b: Boolean,
       is: A === Boolean): TExpr[E, O, S, A] =
     LikeBool(b, is)
+
+  def id[E[_], O[_, _], S, A](is: S === A): TExpr[E, O, S, A] = 
+    Id(is)
 }
 
 case class Product[E[_], O[_, _], S, A, B, C](
@@ -69,6 +72,7 @@ sealed abstract class TSel[E[_], O[_, _], S, A] extends TExpr[E, O, S, A] {
     case Sub(is1, is2) => Sub(is1, is2)
     case Gt(is1, is2) => Gt(is1, is2)
     case Not(is1, is2) => Not(is1, is2)
+    case Id(is) => Id(is)
   }
 }
 
@@ -78,6 +82,9 @@ case class Var[E[_], O[_, _], S, A](
 case class Wrap[E[_], O[_, _], S, A](
   e: E[O[S, A]],
   info: OpticInfo) extends TSel[E, O, S, A]
+
+case class Id[E[_], O[_, _], S, A](
+  is: S === A) extends TSel[E, O, S, A]
 
 case class Sub[E[_], O[_, _], S, A](
   is1: S === (Int, Int),
