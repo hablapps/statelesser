@@ -1,7 +1,7 @@
 package statelesser
 package test
 
-import scalaz.Const
+import scalaz._, Scalaz._
 
 import OpticLang._
 
@@ -122,104 +122,115 @@ trait CoupleExample[Expr[_]] {
   def getHerNameAndAge_3: Expr[Fold[Couples, (String, Int)]] =
     couples > (id > her > name * age > id > id).asFold
 
-  def getPeopleGt30: Expr[People => List[(String, Int)]] =
-    getAll(people > (name.asAffineFold * 
-      (age.asAffineFold > filtered (gt(30)))).asFold)
+  def getPeopleGt30: Expr[Fold[People, (String, Int)]] =
+    people > (name.asAffineFold * 
+      (age.asAffineFold > filtered (gt(30)))).asFold
 
-  def getHerGt30_1: Expr[Couples => List[(String, Int)]] =
-    getAll(couples > her.asFold > (name.asAffineFold * 
-      (age.asAffineFold > filtered (gt(30)))).asFold)
+  def getHerGt30_1: Expr[Fold[Couples, (String, Int)]] =
+    couples > her.asFold > (name.asAffineFold * 
+      (age.asAffineFold > filtered (gt(30)))).asFold
 
-  def getHerGt30_2: Expr[Couples => List[(String, Int)]] =
-    getAll(couples > ((her > name).asAffineFold * 
-      ((her > age).asAffineFold > filtered (gt(30)))).asFold)
+  def getHerGt30_2: Expr[Fold[Couples, (String, Int)]] =
+    couples > ((her > name).asAffineFold * 
+      ((her > age).asAffineFold > filtered (gt(30)))).asFold
 
-  def getHerNameGt30_1: Expr[Couples => List[String]] =
-    getAll(couples > her.asFold > (name.asAffineFold <* 
-      (age.asAffineFold > filtered (gt(30)))).asFold)
+  def getHerNameGt30_1: Expr[Fold[Couples, String]] =
+    couples > her.asFold > (name.asAffineFold <* 
+      (age.asAffineFold > filtered (gt(30)))).asFold
   
-  def getHerNameGt30_2: Expr[Couples => List[String]] =
-    getAll(couples > ((her > name).asAffineFold <* 
-      ((her > age).asAffineFold > filtered (gt(30)))).asFold)
+  def getHerNameGt30_2: Expr[Fold[Couples, String]] =
+    couples > ((her > name).asAffineFold <* 
+      ((her > age).asAffineFold > filtered (gt(30)))).asFold
 
   def differenceAll: Expr[Couples => List[(String, Int)]] =
     getAll(couples >
       ((her > name) * ((her > age) * (him > age) > sub)).asFold)
 
-  def difference: Expr[Couples => List[(String, Int)]] =
-    getAll(couples > 
+  def difference: Expr[Fold[Couples, (String, Int)]] =
+    couples > 
       ((her > name).asAffineFold * 
-        (((her > age) - (him > age)).asAffineFold > filtered (gt(0)))).asFold)
+        (((her > age) - (him > age)).asAffineFold > filtered (gt(0)))).asFold
 
-  def differenceName_1: Expr[Couples => List[String]] =
-    getAll(couples > 
+  def differenceName_1: Expr[Fold[Couples, String]] =
+    couples > 
       ((her > name).asAffineFold <* 
-        (((her > age) - (him > age)).asAffineFold > filtered (gt(0)))).asFold)
+        (((her > age) - (him > age)).asAffineFold > filtered (gt(0)))).asFold
 
-  def differenceName_2: Expr[Couples => List[String]] =
-    getAll(couples > 
+  def differenceName_2: Expr[Fold[Couples, String]] =
+    couples > 
       ((her > name).asAffineFold * 
         (((her > age) - (him > age)).asAffineFold > filtered (gt(0))) > 
-          first.asAffineFold).asFold)
+          first.asAffineFold).asFold
 
-  def dummyNameAndAge: Expr[People => List[(String, Int)]] =
-    getAll(people > ((name.asAffineFold * ((name * age > 
+  def dummyNameAndAge: Expr[Fold[People, (String, Int)]] =
+    people > ((name.asAffineFold * ((name * age > 
       first * second > 
       second * first > 
       second * first > 
       second).asAffineFold 
       > filtered (gt(30))
-      > filtered (gt(40))))).asFold)
+      > filtered (gt(40))))).asFold
 }
 
 object CoupleExample {
+  import OpticLang.Semantic
 
-  type Stack[A] = TSemantic[Const[String, ?], A]
+  type Stack[A] = Semantic[Const[String, ?], A]
 
-  private def wrapPlainG[S, A](s: String, inf: OpticInfo): Stack[Getter[S, A]] =
-    TGetter(expr = Wrap(Const(s), inf))
-
-  private def wrapTableG[S, A](
-      v: String, s: String, inf: OpticInfo): Stack[Getter[S, A]] = TGetter(
-    Set(v -> TVarSimpleVal(Wrap[Const[String, ?], Getter, S, A](Const(s), inf))), 
-    Var(v))
-
-  private def wrapTableF[S, A](
-      v: String, s: String, inf: OpticInfo): Stack[Fold[S, A]] = TFold(
-    Set(v -> TVarSimpleVal(Wrap[Const[String, ?], Fold, S, A](Const(s), inf))), 
-    Var(v))
+  private def wrapPlainG[S, A](inf: OpticInfo): Stack[Getter[S, A]] =
+    state(TGetter(Wrap(Const(inf.nme), inf)))
 
   val instance = new CoupleExample[Stack] {
     type Couple = Unit
     type Person = Unit
 
+    // XXX: next methods are redundant, unify with tSemantic in OpticLang.
+
+    private def assignValG[S, A](
+        inf: OpticInfo): Stack[Getter[S, A]] =
+      for {
+        s <- gets[Table, Stream[String]](_.src)
+        _ <- modify[Table](_.copy(src = s.tail))
+        _ <- modify[Table](t => t.copy(rows = t.rows + (s.head -> 
+          TVarSimpleVal(Wrap[Const[String, ?], Fold, S, A](Const(inf.nme), inf)))))
+      } yield TGetter(Var(s.head))
+
+    private def assignValF[S, A](
+        inf: OpticInfo): Stack[Fold[S, A]] =
+      for {
+        s <- gets[Table, Stream[String]](_.src)
+        _ <- modify[Table](_.copy(src = s.tail))
+        _ <- modify[Table](t => t.copy(rows = t.rows + (s.head -> 
+          TVarSimpleVal(Wrap[Const[String, ?], Fold, S, A](Const(inf.nme), inf)))))
+      } yield TFold(Var(s.head), Set())
+
     val ev = OpticLang[Stack]
 
-    val couples = wrapTableF("c", "couples", 
+    val couples = assignValF(
       OpticInfo(KFold, "couples", TypeInfo("Couples"), TypeInfo("Couple", true)))
     
-    val her = wrapTableG("w", "her",
+    val her = assignValG(
       OpticInfo(KGetter, "her", TypeInfo("Couple", true), TypeInfo("Person", true)))
 
-    val him = wrapTableG("m", "him",
+    val him = assignValG(
       OpticInfo(KGetter, "him", TypeInfo("Couple", true), TypeInfo("Person", true)))
     
-    val people = wrapTableF("p", "people",
+    val people = assignValF(
       OpticInfo(KFold, "people", TypeInfo("People"), TypeInfo("Person", true)))
 
-    val name = wrapPlainG("name",
+    val name = wrapPlainG(
       OpticInfo(KGetter, "name", TypeInfo("Person", true), TypeInfo("String")))
 
-    val age = wrapPlainG("age",
+    val age = wrapPlainG(
       OpticInfo(KGetter, "age", TypeInfo("Person", true), TypeInfo("Int")))
 
-    val weight = wrapPlainG("weight",
+    val weight = wrapPlainG(
       OpticInfo(KGetter, "weight", TypeInfo("Person", true), TypeInfo("Int")))
 
-    val address = wrapTableG("a", "address",
+    val address = assignValG(
       OpticInfo(KGetter, "address", TypeInfo("Person", true), TypeInfo("Address", true)))
     
-    val street = wrapPlainG("street",
+    val street = wrapPlainG(
       OpticInfo(KGetter, "street", TypeInfo("Address", true), TypeInfo("String")))
   }
 }
