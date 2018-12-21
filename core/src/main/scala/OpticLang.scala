@@ -288,7 +288,7 @@ object OpticLang {
         case (_, LikeBool(b, is)) => 
           TExpr.likeBool(b, is).point[State[Table, ?]]
         case (Product(l, LikeInt(0, _), _), Sub(_, _)) => 
-          l.asInstanceOf.point[State[Table, ?]]
+          l.asInstanceOf[TExpr[E, O, S, B]].point[State[Table, ?]]
         case (Product(LikeInt(x, _), LikeInt(y, _), _), Sub(_, is)) =>
           TExpr.likeInt(x - y, is).point[State[Table, ?]]
         case (Product(LikeInt(x, _), LikeInt(y, _), _), Gt(_, is)) =>
