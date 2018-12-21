@@ -291,6 +291,8 @@ object OpticLang {
           l.asInstanceOf.point[State[Table, ?]]
         case (Product(LikeInt(x, _), LikeInt(y, _), _), Sub(_, is)) =>
           TExpr.likeInt(x - y, is).point[State[Table, ?]]
+        case (Product(LikeInt(x, _), LikeInt(y, _), _), Gt(_, is)) =>
+          TExpr.likeBool(x > y, is).point[State[Table, ?]]
         case (LikeBool(b, _), Not(_, is)) =>
           TExpr.likeBool(! b, is).point[State[Table, ?]]
         case (Vertical(e, Not(is1, _)), Not(_, is2)) =>
@@ -445,7 +447,6 @@ object OpticLang {
         tmp <- afl
         TAffineFold(expr, filt) = tmp
         f = new OpticMap[E, AffineFold, Fold] {
-
           def apply[X, Y](afl: E[AffineFold[X, Y]]) = OpticLang[E].aflAsFl(afl)
         }
       } yield TFold(expr.mapO(f), filt.map(_.mapO(f)))
