@@ -53,7 +53,6 @@ trait OpticLang[Expr[_]] {
 
   def getAll[S, A](fl: Expr[Fold[S, A]]): Expr[S => List[A]]
 
-
   def lnAsGt[S, A](ln: Expr[Lens[S, A]]): Expr[Getter[S, A]]
 
   def gtAsFl1[S, A](gt: Expr[Getter[S, A]]): Expr[Fold1[S, A]]
@@ -295,25 +294,32 @@ object OpticLang {
   case class TFold[E[_], S, A](
       expr: TExpr[E, Fold, S, A],
       filt: Set[TExpr[E, Fold, S, Boolean]] = Set.empty[TExpr[E, Fold, S, Boolean]]) 
-    extends TSemantic[E, Fold[S, A]] {
-    def reify(implicit ev: OpticLang[E]): E[Fold[S, A]] = ??? // reifyExpr(expr, vars)
-  }
+    extends TSemantic[E, Fold[S, A]]
 
   trait OpticMap[E[_], O[_, _], O2[_, _]] {
     def apply[S, A](e: E[O[S, A]]): E[O2[S, A]]
   }
 
-  // def reifyVV[E[_], S, A](
-  //     vv: TVarVal[E, Fold, S, A],
-  //     t: Table[E, Fold])(implicit 
-  //     ev: OpticLang[E]): E[Fold[S, A]] = vv match {
-  //   case TVarSimpleVal(w) => w.e
-  //   case vnv: TVarNestedVal[E, Fold, S, A] => vnv.vs match {
-  //     case ONil(v) => ev.flVert(reifyVV(t.getV(v), t), vnv.w.e)
-  //     case OCons(v, vs) => 
-  //       ev.flVert(reifyVV(t.getV(v), t), reifyVV(TVarNestedVal(vs, vnv.w), t))
-  //   }
-  // }
+  def reifySem[E[_], S, A](
+      sem: Semantic[E, Fold[S, A]])(implicit
+      ev: OpticLang[E]): E[Fold[S, A]] = {
+    val (t, TFold(expr, filt)) = sem(Table(Stream.empty, Map()))
+    filt.map(reifyExpr(_, t)).foldLeft(reifyExpr(expr, t)) { (acc, e) => 
+      ev.flVert(ev.flHori(acc, e), ev.aflAsFl(ev.gtAsAfl(ev.first[A, Boolean])))
+    }
+  }
+
+  def reifyVV[E[_], S, A](
+      vv: TVarVal[E, Fold, S, A],
+      t: Table)(implicit 
+      ev: OpticLang[E]): E[Fold[S, A]] = vv match {
+    case TVarSimpleVal(w) => w.e
+    case vnv: TVarNestedVal[E, Fold, S, A] => vnv.vs match {
+      case ONil(v) => ev.flVert(reifyVV(t.getV(v), t), vnv.w.e)
+      case OCons(v, vs) => 
+        ev.flVert(reifyVV(t.getV(v), t), reifyVV(TVarNestedVal(vs, vnv.w), t))
+    }
+  }
 
   sealed abstract class OList[E[_], O[_, _], S, A] {
 
@@ -377,26 +383,29 @@ object OpticLang {
       }
   }
 
-  // def reifyExpr[E[_], S, A](
-  //     expr: TExpr[E, Fold, S, A],
-  //     t: Table[E, Fold])(implicit
-  //     ev: OpticLang[E]): E[Fold[S, A]] = expr match {
-  //   case Product(l, r, is) => ???
-  //     // is.subst[λ[x => E[Fold[S, x]]]](ev.flHori(reifyExpr(l, lt), reifyExpr(r, rt)))
-  //   case Vertical(u, d) => ??? // ev.flVert(reifyExpr(u, ut), reifyExpr(d, dt))
-  //   case x: Var[E, Fold, S, A] => reifyVV(t.getV(x), t)
-  //   case w: Wrap[E, Fold, S, A] => w.e
-  //   case LikeInt(i, is) => 
-  //     is.flip.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.likeInt[S](i)))
-  //   case LikeBool(b, is) =>
-  //     is.flip.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.likeBool[S](b)))
-  //   case Not(is1, is2) => 
-  //     is2.flip.subst[λ[x => E[Fold[S, x]]]](
-  //       is1.flip.subst[λ[x => E[Fold[x, Boolean]]]](ev.gtAsFl(ev.not)))
-  //   case Sub(is1, is2) =>
-  //     is2.flip.subst[λ[x => E[Fold[S, x]]]](
-  //       is1.flip.subst[λ[x => E[Fold[x, Int]]]](ev.gtAsFl(ev.sub)))
-  // }
+  def reifyExpr[E[_], S, A](
+      expr: TExpr[E, Fold, S, A],
+      t: Table)(implicit
+      ev: OpticLang[E]): E[Fold[S, A]] = expr match {
+    case Product(l, r, is) => 
+      is.subst[λ[x => E[Fold[S, x]]]](ev.flHori(reifyExpr(l, t), reifyExpr(r, t)))
+    case Vertical(u, d) => ev.flVert(reifyExpr(u, t), reifyExpr(d, t))
+    case x: Var[E, Fold, S, A] => reifyVV(t.getV(x), t)
+    case w: Wrap[E, Fold, S, A] => w.e
+    case LikeInt(i, is) => 
+      is.flip.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.likeInt[S](i)))
+    case LikeBool(b, is) =>
+      is.flip.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.likeBool[S](b)))
+    case Not(is1, is2) => 
+      is2.flip.subst[λ[x => E[Fold[S, x]]]](
+        is1.flip.subst[λ[x => E[Fold[x, Boolean]]]](ev.gtAsFl(ev.not)))
+    case Sub(is1, is2) =>
+      is2.flip.subst[λ[x => E[Fold[S, x]]]](
+        is1.flip.subst[λ[x => E[Fold[x, Int]]]](ev.gtAsFl(ev.sub)))
+    case Gt(is1, is2) =>
+      is2.flip.subst[λ[x => E[Fold[S, x]]]](
+        is1.flip.subst[λ[x => E[Fold[x, Boolean]]]](ev.gtAsFl(ev.greaterThan)))
+  }
 
   sealed abstract class TExpr[E[_], O[_, _], S, A] {
 
@@ -494,6 +503,9 @@ object OpticLang {
       case (_, TVarSimpleVal(_)) => true 
       case _ => false 
     }
+
+    def getV[E[_], O[_, _], S, A](v: Var[E, O, S, A]): TVarVal[E, O, S, A] =
+      table.rows(v.name).asInstanceOf[TVarVal[E, O, S, A]]
 
     def simpleTable[E[_], O[_, _]]: Map[String, TVarSimpleVal[E, O, _, _]] =
       splitTables._1.asInstanceOf[Map[String, TVarSimpleVal[E, O, _, _]]]
@@ -740,6 +752,8 @@ object OpticLang {
         tmp <- gtAsAfl(p)
         TAffineFold(fil, _) = tmp
         tmp <- gtAsAfl(id[S])
+        // XXX: it's still unclear what should we do with a predicate
+        // containing filters itself, so we just ignore it.
         TAffineFold(exp, _) = tmp
       } yield TAffineFold(expr = exp, filt = Set(fil))
 
@@ -797,6 +811,7 @@ object OpticLang {
         tmp <- afl
         TAffineFold(expr, filt) = tmp
         f = new OpticMap[E, AffineFold, Fold] {
+
           def apply[X, Y](afl: E[AffineFold[X, Y]]) = OpticLang[E].aflAsFl(afl)
         }
       } yield TFold(expr.mapO(f), filt.map(_.mapO(f)))
@@ -809,7 +824,7 @@ object OpticLang {
         _ <- modify[Table](_.copy(src = s.tail))
       } yield s.head
 
-    def assignVal[O[_, _], S, A](
+    private def assignVal[O[_, _], S, A](
         vv: TVarVal[E, O, S, A]): State[Table, Var[E, O, S, A]] =
       for {
         os <- gets[Table, Option[String]](_.rows.find(_._2 == vv).map(_._1))
@@ -822,26 +837,6 @@ object OpticLang {
         v: Var[E, O, S, A]): State[Table, TVarVal[E, O, S, A]] =
       gets[Table, TVarVal[E, O, S, A]](
         _.rows(v.name).asInstanceOf[TVarVal[E, O, S, A]])
-
-    private def varDeps(s: String): State[Table, Set[String]] =
-      gets[Table, Set[String]] { t =>
-        if (t.rows.get(s) == None) {
-          println()
-          println(s"Asking for ${s}")
-          println(t.rows)
-          println()
-        }
-        t.rows(s) match {
-          case vv: TVarNestedVal[_, _, _, _] => vv.vs.vars + s
-          case _ => Set(s)
-        }
-      }
-
-    private def removeVars(vars: Set[String]): State[Table, Unit] =
-      for {
-        vars2 <- vars.toList.traverse(varDeps).map(_.flatten)
-        _ <- modify[Table](t => t.copy(rows = t.rows.filterKeys(vars2.contains(_))))
-      } yield ()
   }
 
   trait Syntax {
