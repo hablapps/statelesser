@@ -173,7 +173,6 @@ trait CoupleExample[Expr[_]] {
 }
 
 object CoupleExample {
-  import OpticLang.Semantic
 
   type Stack[A] = Semantic[Const[String, ?], A]
 

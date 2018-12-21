@@ -176,9 +176,6 @@ object OpticLang {
       Const(s"${fl1.getConst}.asFold")
   }
 
-  type TypeNme = String
-  type OpticNme = String
-  
   sealed abstract class OpticKind
   case object KGetter extends OpticKind
   case object KAffineFold extends OpticKind
@@ -192,28 +189,11 @@ object OpticLang {
     src: TypeInfo, 
     tgt: TypeInfo)
 
-  type Symbol = String
-  
-  case class Table(src: Stream[Symbol], rows: Map[Symbol, Any])
-
-  sealed abstract class TSemantic[E[_], A]
-
-  case class TGetter[E[_], S, A](
-    expr: TExpr[E, Getter, S, A]) extends TSemantic[E, Getter[S, A]]
-
-  case class TAffineFold[E[_], S, A](
-      expr: TExpr[E, AffineFold, S, A],
-      filt: Set[TExpr[E, AffineFold, S, Boolean]] = Set.empty[TExpr[E, AffineFold, S, Boolean]]) 
-    extends TSemantic[E, AffineFold[S, A]]
-
-  case class TFold[E[_], S, A](
-      expr: TExpr[E, Fold, S, A],
-      filt: Set[TExpr[E, Fold, S, Boolean]] = Set.empty[TExpr[E, Fold, S, Boolean]]) 
-    extends TSemantic[E, Fold[S, A]]
-
   trait OpticMap[E[_], O[_, _], O2[_, _]] {
     def apply[S, A](e: E[O[S, A]]): E[O2[S, A]]
   }
+  
+  case class Table(src: Stream[Symbol], rows: Map[Symbol, Any])
 
   def reifySem[E[_], S, A](
       sem: Semantic[E, Fold[S, A]])(implicit
@@ -234,68 +214,6 @@ object OpticLang {
       case OCons(v, vs) => 
         ev.flVert(reifyVV(t.getV(v), t), reifyVV(TVarNestedVal(vs, vnv.w), t))
     }
-  }
-
-  sealed abstract class OList[E[_], O[_, _], S, A] {
-
-    def mapO[O2[_, _]](f: OpticMap[E, O, O2]): OList[E, O2, S, A] = this match {
-      case ONil(Var(x)) => ONil(Var(x))
-      case OCons(Var(x), t) => OCons(Var(x), t.mapO(f))
-    }
-
-    def lastVar: Var[E, O, _, A] = this match {
-      case ONil(x) => x
-      case OCons(_, tail) => tail.lastVar
-    }
-
-    def vars: Set[String] = this match {
-      case ONil(Var(x)) => Set(x)
-      case OCons(Var(x), t) => t.vars + x
-    }
-  }
-
-  case class ONil[E[_], O[_, _], S, A](last: Var[E, O, S, A])
-    extends OList[E, O, S, A]
-
-  case class OCons[E[_], O[_, _], S, A, B](
-      head: Var[E, O, S, A], 
-      tail: OList[E, O, A, B])
-    extends OList[E, O, S, B]
-
-  sealed abstract class TVarVal[E[_], O[_, _], S, A] {
-    def mapO[O2[_, _]](f: OpticMap[E, O, O2]): TVarVal[E, O2, S, A] = this match {
-      case TVarSimpleVal(Wrap(e, info)) => TVarSimpleVal(Wrap(f(e), info))
-      case vnv: TVarNestedVal[E, O, S, A] =>  
-        TVarNestedVal(vnv.vs.mapO(f), Wrap(f(vnv.w.e), vnv.w.info))
-    }
-  }
-
-  case class TVarSimpleVal[E[_], O[_, _], S, A](w: Wrap[E, O, S, A])
-    extends TVarVal[E, O, S, A]
-
-  trait TVarNestedVal[E[_], O[_, _], S, B] extends TVarVal[E, O, S, B] {
-    type A
-    def vs: OList[E, O, S, A]
-    def w: Wrap[E, O, A, B]
-    override def equals(other: Any): Boolean = other match {
-      case vnv: TVarNestedVal[E, O, S, _] => vs == vnv.vs && vnv.w == w
-      case _ => false
-    }
-  }
-
-  object TVarNestedVal {
-
-    type Aux[E[_], O[_, _], S, A2, B] = 
-      TVarNestedVal[E, O, S, B] { type A = A2 }
-
-    def apply[E[_], O[_, _], S, A2, B](
-        vs2: OList[E, O, S, A2], 
-        w2: Wrap[E, O, A2, B]): Aux[E, O, S, A2, B] = 
-      new TVarNestedVal[E, O, S, B] {
-        type A = A2
-        val vs = vs2
-        val w = w2
-      }
   }
 
   def reifyExpr[E[_], S, A](
@@ -322,94 +240,6 @@ object OpticLang {
         is1.flip.subst[λ[x => E[Fold[x, Boolean]]]](ev.gtAsFl(ev.greaterThan)))
   }
 
-  sealed abstract class TExpr[E[_], O[_, _], S, A] {
-
-    def mapO[O2[_, _]](f: OpticMap[E, O, O2]): TExpr[E, O2, S, A] = this match {
-      case Product(l, r, is) => Product(l.mapO(f), r.mapO(f), is)
-      case Vertical(u, d) => Vertical(u.mapO(f), d.mapO(f))
-      case LikeInt(i, is) => LikeInt(i, is)
-      case LikeBool(b, is) => LikeBool(b, is)
-      case x: TSel[E, O, S, A] => x.mapOSel(f)
-    }
-
-    def vars: Set[String] = this match {
-      case Product(l, r, _) => l.vars ++ r.vars
-      case Vertical(u, d) => u.vars ++ d.vars
-      case Var(name) => Set(name)
-      case _ => Set.empty
-    }
-  }
-  
-  object TExpr {
-
-    def product[E[_], O[_, _], S, A, B, C](
-        l: TExpr[E, O, S, A],
-        r: TExpr[E, O, S, B],
-        is: (A, B) === C): TExpr[E, O, S, C] =
-      Product(l, r, is)
-    
-    def vertical[E[_], O[_, _], S, A, B](
-        u: TExpr[E, O, S, A],
-        d: TExpr[E, O, A, B]): TExpr[E, O, S, B] =
-      Vertical(u, d)
-
-    def likeInt[E[_], O[_, _], S, A](
-        i: Int,
-        is: A === Int): TExpr[E, O, S, A] =
-      LikeInt(i, is)
-
-    def likeBool[E[_], O[_, _], S, A](
-        b: Boolean,
-        is: A === Boolean): TExpr[E, O, S, A] =
-      LikeBool(b, is)
-  }
-  
-  case class Product[E[_], O[_, _], S, A, B, C](
-    l: TExpr[E, O, S, A],
-    r: TExpr[E, O, S, B],
-    is: (A, B) === C) extends TExpr[E, O, S, C]
-
-  case class Vertical[E[_], O[_, _], S, A, B](
-    u: TExpr[E, O, S, A],
-    d: TExpr[E, O, A, B]) extends TExpr[E, O, S, B]
-
-  case class LikeInt[E[_], O[_, _], S, A](
-    i: Int,
-    is: A === Int) extends TExpr[E, O, S, A]
-
-  case class LikeBool[E[_], O[_, _], S, A](
-    b: Boolean,
-    is: A === Boolean) extends TExpr[E, O, S, A]
-
-  sealed abstract class TSel[E[_], O[_, _], S, A] extends TExpr[E, O, S, A] {
-    def mapOSel[O2[_, _]](f: OpticMap[E, O, O2]): TSel[E, O2, S, A] = this match {
-      case Var(name) => Var(name)
-      case Wrap(e, inf) => Wrap(f(e), inf)
-      case Sub(is1, is2) => Sub(is1, is2)
-      case Gt(is1, is2) => Gt(is1, is2)
-      case Not(is1, is2) => Not(is1, is2)
-    }
-  }
-
-  case class Var[E[_], O[_, _], S, A](
-    name: String) extends TSel[E, O, S, A]
-
-  case class Wrap[E[_], O[_, _], S, A](
-    e: E[O[S, A]],
-    info: OpticInfo) extends TSel[E, O, S, A]
-
-  case class Sub[E[_], O[_, _], S, A](
-    is1: S === (Int, Int),
-    is2: A === Int) extends TSel[E, O, S, A]
-
-  case class Gt[E[_], O[_, _], S, A](
-    is1: S === (Int, Int),
-    is2: A === Boolean) extends TSel[E, O, S, A]
-
-  case class Not[E[_], O[_, _], S, A](
-    is1: S === Boolean,
-    is2: A === Boolean) extends TSel[E, O, S, A]
-
   // XXX: we need a safer table implementation, since this is a really ugly
   // workaround, but this is good enough for the time being.
   implicit class TableOps(table: Table) {
@@ -428,8 +258,6 @@ object OpticLang {
     def nestedTable[E[_], O[_, _]]: Map[String, TVarNestedVal[E, O, _, _]] =
       splitTables._2.asInstanceOf[Map[String, TVarNestedVal[E, O, _, _]]]
   }
-
-  type Semantic[E[_], A] = State[Table, TSemantic[E, A]]
 
   import State._
 
@@ -482,6 +310,7 @@ object OpticLang {
                 TVarNestedVal(OCons(x, vnv.vs), vnv.w)
             }
             z <- assignVal(e) 
+
           } yield z
         case (Vertical(prev, x@Var(_)), y@Var(s)) =>
           gtVertAux(x, y) >>= (z => gtVertAux(prev, z))
@@ -557,6 +386,7 @@ object OpticLang {
             z <- assignVal(e) 
           } yield z
         case (Vertical(prev, x@Var(_)), y@Var(s)) =>
+
           aflVertAux(x, y) >>= (z => aflVertAux(prev, z))
         case _ => TExpr.vertical(u, d).point[State[Table, ?]]
       }
@@ -668,7 +498,7 @@ object OpticLang {
         TAffineFold(fil, _) = tmp
         tmp <- gtAsAfl(id[S])
         // XXX: it's still unclear what should we do with a predicate
-        // containing filters itself, so we just ignore it.
+        // containing filters itself,  so we just ignore it.
         TAffineFold(exp, _) = tmp
       } yield TAffineFold(expr = exp, filt = Set(fil))
 

@@ -4,7 +4,7 @@ package test
 
 import scala.util.matching.Regex
 import scalaz._, Scalaz._
-import OpticLang.{Semantic, Table}
+import OpticLang.Table
 import statelesser.test._
 import org.scalatest._
 
