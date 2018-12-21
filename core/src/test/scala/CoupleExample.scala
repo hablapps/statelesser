@@ -1,7 +1,9 @@
 package statelesser
 package test
 
-import scalaz.Const
+import scalaz._, Scalaz._
+
+import OpticLang._
 
 trait CoupleExample[Expr[_]] {
 
@@ -13,164 +15,222 @@ trait CoupleExample[Expr[_]] {
   type Couples = List[Couple]
   type Person
   type People = List[Person]
+  type Address
 
-  val couples: Expr[Fold[Couples, Couple]]
-  val her: Expr[Getter[Couple, Person]]
-  val him: Expr[Getter[Couple, Person]]
-  val people: Expr[Fold[People, Person]]
-  val name: Expr[Getter[Person, String]]
-  val age: Expr[Getter[Person, Int]]
+  def couples: Expr[Fold[Couples, Couple]]
+  def her: Expr[Getter[Couple, Person]]
+  def him: Expr[Getter[Couple, Person]]
+  def people: Expr[Fold[People, Person]]
+  def name: Expr[Getter[Person, String]]
+  def age: Expr[Getter[Person, Int]]
+  def weight: Expr[Getter[Person, Int]]
+  def address: Expr[Getter[Person, Address]]
+  def street: Expr[Getter[Address, String]]
 
   /* logic */
 
   import ev._
   import OpticLang.syntax._
 
-  def getPeople: Expr[People => List[Person]] =
-    getAll(people)
+  def getPeople: Expr[Fold[People, Person]] =
+    people
 
-  def getPeopleName: Expr[People => List[String]] =
-    getAll(people > name.asFold)
+  def getPeopleName_1: Expr[Fold[People, String]] =
+    people > name.asFold
 
-  def getPeopleNameAndAge: Expr[People => List[(String, Int)]] =
-    getAll(people > (name * age).asFold)
+  def getPeopleName_2: Expr[Fold[People, String]] =
+    people > ((name * age) > first).asFold
 
-  def getHer: Expr[Couples => List[Person]] =
-    getAll(couples > her.asFold)
+  def peopleName_1: Expr[Fold[People, String]] = 
+    people > (name * age * weight > first > first).asFold
 
-  def getHerName: Expr[Couples => List[String]] =
-    getAll(couples > her.asFold > name.asFold)
+  def peopleName_2: Expr[Fold[People, String]] =
+    people > (
+      name * weight * age * name * weight >
+      id >
+      second * first >
+      second * first >
+      first * id >
+      first >
+      second).asFold
 
-  def getHerNameAndAge_1: Expr[Couples => List[(String, Int)]] =
-    getAll(couples > her.asFold > (name * age).asFold)
+  def getPeopleName_3: Expr[People => List[String]] =
+    getAll(people > (((name * age) * weight > first) > first).asFold)
 
-  def getHerNameAndAge_2: Expr[Couples => List[(String, Int)]] =
-    getAll(couples > ((her > name) * (her > age)).asFold)
+  def getPeopleName_4: Expr[People => List[String]] =
+    getAll(people > (((name * age) * weight > (first > first))).asFold)
 
-  def getHerNameAndAge_3: Expr[Couples => List[(String, Int)]] =
-    getAll(couples > (her > name * age).asFold)
+  def getPeopleName_5: Expr[People => List[String]] =
+    getAll(people > (name * (age * weight) > (first > id)).asFold)
 
-  def getPeopleGt30: Expr[People => List[(String, Int)]] =
-    getAll(people > (name.asAffineFold * 
-      (age.asAffineFold > filtered (gt(30)))).asFold)
+  def getPeopleName_6: Expr[People => List[String]] =
+    getAll(people >
+      (name * weight * age * name * weight >
+      id >
+      second * first >
+      second * first >
+      first * id >
+      first >
+      second).asFold)
 
-  def getHerGt30_1: Expr[Couples => List[(String, Int)]] =
-    getAll(couples > her.asFold > (name.asAffineFold * 
-      (age.asAffineFold > filtered (gt(30)))).asFold)
+  def getPeopleNameAnd3_1: Expr[Fold[People, (String, Int)]] =
+    people > (name * likeInt(3)).asFold
 
-  def getHerGt30_2: Expr[Couples => List[(String, Int)]] =
-    getAll(couples > ((her > name).asAffineFold * 
-      ((her > age).asAffineFold > filtered (gt(30)))).asFold)
+  def getPeopleNameAnd3_2: Expr[Fold[People, (String, Int)]] =
+    people > (
+      name * weight * age * name * weight >
+      id >
+      first * likeInt(3) >
+      (first[(((String, Int), Int), String), Int] > second) * second >
+      id).asFold
 
-  def getHerNameGt30_1: Expr[Couples => List[String]] =
-    getAll(couples > her.asFold > (name.asAffineFold <* 
-      (age.asAffineFold > filtered (gt(30)))).asFold)
+  def getPeopleNameAnd3_3: Expr[Fold[People, (String, Int)]] =
+    people > (
+      (name * (likeInt(3) * likeInt(0))) >
+      first * (second > sub)).asFold
+
+  def getPeopleNameAnd3_4: Expr[Fold[People, (String, Int)]] =
+    people > (
+      (name * (likeInt(4) * likeInt(1))) >
+      first * (second > sub)).asFold
+
+  def getPeopleNameAndAge_1: Expr[Fold[People, (String, Int)]] =
+    people > (name * age).asFold
+
+  def getPeopleNameAndAge_2: Expr[Fold[People, (String, Int)]] =
+    people > ((name * age * weight) > first).asFold
+
+  def getHer: Expr[Fold[Couples, Person]] =
+    couples > her.asFold
+
+  def herNameAndStreet: Expr[Fold[Couples, (String, String)]] =
+    couples > (her > id > name * (address > street)).asFold
+
+  def herAndHimStreet_1: Expr[Fold[Couples, (String, String)]] =
+    couples > (
+      her * him > (first > address > street) * (second > address > street)).asFold
+
+  def getHerName: Expr[Fold[Couples, String]] =
+    couples > her.asFold > name.asFold
+
+  def getHerNameAndAge_1: Expr[Fold[Couples, (String, Int)]] =
+    couples > her.asFold > (name * age).asFold
+
+  def getHerNameAndAge_2: Expr[Fold[Couples, (String, Int)]] =
+    couples > ((her > id > name) * (her > age)).asFold
+
+  def getHerNameAndAge_3: Expr[Fold[Couples, (String, Int)]] =
+    couples > (id > her > name * age > id > id).asFold
+
+  def getPeopleGt30: Expr[Fold[People, (String, Int)]] =
+    people > (name.asAffineFold * 
+      (age.asAffineFold > filtered (gt(30)))).asFold
+
+  def getHerGt30_1: Expr[Fold[Couples, (String, Int)]] =
+    couples > her.asFold > (name.asAffineFold * 
+      (age.asAffineFold > filtered (gt(30)))).asFold
+
+  def getHerGt30_2: Expr[Fold[Couples, (String, Int)]] =
+    couples > ((her > name).asAffineFold * 
+      ((her > age).asAffineFold > filtered (gt(30)))).asFold
+
+  def getHerNameGt30_1: Expr[Fold[Couples, String]] =
+    couples > her.asFold > (name.asAffineFold <* 
+      (age.asAffineFold > filtered (gt(30)))).asFold
   
-  def getHerNameGt30_2: Expr[Couples => List[String]] =
-    getAll(couples > ((her > name).asAffineFold <* 
-      ((her > age).asAffineFold > filtered (gt(30)))).asFold)
+  def getHerNameGt30_2: Expr[Fold[Couples, String]] =
+    couples > ((her > name).asAffineFold <* 
+      ((her > age).asAffineFold > filtered (gt(30)))).asFold
 
-  def difference: Expr[Couples => List[(String, Int)]] =
-    getAll(couples > 
+  def differenceAll: Expr[Couples => List[(String, Int)]] =
+    getAll(couples >
+      ((her > name) * ((her > age) * (him > age) > sub)).asFold)
+
+  def difference: Expr[Fold[Couples, (String, Int)]] =
+    couples > 
       ((her > name).asAffineFold * 
-        (((her > age) - (him > age)).asAffineFold > filtered (gt(0)))).asFold)
+        (((her > age) - (him > age)).asAffineFold > filtered (gt(0)))).asFold
 
-  def differenceName_1: Expr[Couples => List[String]] =
-    getAll(couples > 
+  def differenceName_1: Expr[Fold[Couples, String]] =
+    couples > 
       ((her > name).asAffineFold <* 
-        (((her > age) - (him > age)).asAffineFold > filtered (gt(0)))).asFold)
+        (((her > age) - (him > age)).asAffineFold > filtered (gt(0)))).asFold
 
-  def differenceName_2: Expr[Couples => List[String]] =
-    getAll(couples > 
+  def differenceName_2: Expr[Fold[Couples, String]] =
+    couples > 
       ((her > name).asAffineFold * 
         (((her > age) - (him > age)).asAffineFold > filtered (gt(0))) > 
-          first.asAffineFold).asFold)
+          first.asAffineFold).asFold
 
-  def dummyNameAndAge: Expr[People => List[(String, Int)]] =
-    getAll(people > ((name.asAffineFold * ((name * age > 
+  def dummyNameAndAge: Expr[Fold[People, (String, Int)]] =
+    people > ((name.asAffineFold * ((name * age > 
       first * second > 
       second * first > 
       second * first > 
       second).asAffineFold 
       > filtered (gt(30))
-      > filtered (gt(40))))).asFold)
+      > filtered (gt(40))))).asFold
 }
 
 object CoupleExample {
-  import OpticLang._
 
-  implicit val semantic = new CoupleExample[Const[Semantic, ?]] {
+  type Stack[A] = Semantic[Const[String, ?], A]
 
-    implicit val ev = OpticLang.semantic
+  private def wrapPlainG[S, A](inf: OpticInfo): Stack[Getter[S, A]] =
+    state(TGetter(Wrap(Const(inf.nme), inf)))
 
+  val instance = new CoupleExample[Stack] {
     type Couple = Unit
     type Person = Unit
 
-    val couples = {
+    // XXX: next methods are redundant, unify with tSemantic in OpticLang.
 
-      val oi = OpticInfo(
-        KFold,
-        "couples", 
-        TypeInfo("Couples", false), 
-        TypeInfo("Couple", true))
+    private def assignValG[S, A](
+        inf: OpticInfo): Stack[Getter[S, A]] =
+      for {
+        s <- gets[Table, Stream[String]](_.src)
+        _ <- modify[Table](_.copy(src = s.tail))
+        _ <- modify[Table](t => t.copy(rows = t.rows + (s.head -> 
+          TVarSimpleVal(Wrap[Const[String, ?], Fold, S, A](Const(inf.nme), inf)))))
+      } yield TGetter(Var(s.head))
 
-      Const(Semantic(Map(Var("c") -> GLabel(oi)), List(Var("c"))))
-    }
+    private def assignValF[S, A](
+        inf: OpticInfo): Stack[Fold[S, A]] =
+      for {
+        s <- gets[Table, Stream[String]](_.src)
+        _ <- modify[Table](_.copy(src = s.tail))
+        _ <- modify[Table](t => t.copy(rows = t.rows + (s.head -> 
+          TVarSimpleVal(Wrap[Const[String, ?], Fold, S, A](Const(inf.nme), inf)))))
+      } yield TFold(Var(s.head), Set())
 
-    val her = {
+    val ev = OpticLang[Stack]
 
-      val oi = OpticInfo(
-        KGetter,
-        "her", 
-        TypeInfo("Couple", false), 
-        TypeInfo("Person", true))
+    val couples = assignValF(
+      OpticInfo(KFold, "couples", TypeInfo("Couples"), TypeInfo("Couple", true)))
+    
+    val her = assignValG(
+      OpticInfo(KGetter, "her", TypeInfo("Couple", true), TypeInfo("Person", true)))
 
-      Const(Semantic(Map(Var("w") -> GLabel(oi)), List(Var("w"))))
-    }
+    val him = assignValG(
+      OpticInfo(KGetter, "him", TypeInfo("Couple", true), TypeInfo("Person", true)))
+    
+    val people = assignValF(
+      OpticInfo(KFold, "people", TypeInfo("People"), TypeInfo("Person", true)))
 
-    val him = {
+    val name = wrapPlainG(
+      OpticInfo(KGetter, "name", TypeInfo("Person", true), TypeInfo("String")))
 
-      val oi = OpticInfo( 
-        KGetter,
-        "him", 
-        TypeInfo("Couple", false), 
-        TypeInfo("Person", true))
+    val age = wrapPlainG(
+      OpticInfo(KGetter, "age", TypeInfo("Person", true), TypeInfo("Int")))
 
-      Const(Semantic(Map(Var("m") -> GLabel(oi)), List(Var("m"))))
-    }
+    val weight = wrapPlainG(
+      OpticInfo(KGetter, "weight", TypeInfo("Person", true), TypeInfo("Int")))
 
-    val people = {
-
-      val oi = OpticInfo(
-        KFold,
-        "people", 
-        TypeInfo("People", false), 
-        TypeInfo("Person", true))
-
-      Const(Semantic(Map(Var("p") -> GLabel(oi)), List(Var("p"))))
-    }
-
-    val name = {
-
-      val oi = OpticInfo(
-        KGetter,
-        "name", 
-        TypeInfo("Person", false), 
-        TypeInfo("Person", true))
-
-      Const(Semantic(Map(), List(GLabel(oi))))
-    }
-
-    val age = {
-
-      val oi = OpticInfo(
-        KGetter,
-        "age", 
-        TypeInfo("Person", false), 
-        TypeInfo("Person", true))
-
-      Const(Semantic(Map(), List(GLabel(oi))))
-    }
+    val address = assignValG(
+      OpticInfo(KGetter, "address", TypeInfo("Person", true), TypeInfo("Address", true)))
+    
+    val street = wrapPlainG(
+      OpticInfo(KGetter, "street", TypeInfo("Address", true), TypeInfo("String")))
   }
 }
 

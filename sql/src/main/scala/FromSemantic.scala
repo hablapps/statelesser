@@ -1,70 +1,85 @@
 package statelesser
 package sql
 
+import scalaz._, Scalaz._
+
 import OpticLang._
 
 trait FromSemantic {
+  import OpticLang.Table
 
-  import OpticLang.Var
-
-  def fromSemantic(
-      sem: Semantic, 
-      keys: Map[TypeNme, FieldName] = Map()): SSelect = 
-    SSelect(
-      selToSql(sem.select, keys), 
-      tabToSql(sem.table, keys), 
-      whrToSql(sem.where, keys))
-
-  private def selToSql(
-      sel: List[Tree],
-      keys: Map[TypeNme, FieldName]): SqlSelect = sel match {
-    case Var(e) :: Nil => SAll(e)
-    case xs => SList(xs.map(e => SField(treeToExpr(e, keys), "")))
+  def fromSemantic[E[_], S, A](
+      tab: Table,
+      sem: TSemantic[E, Fold[S, A]],
+      keys: Map[TypeNme, FieldName] = Map()): SSelect = {
+    val TFold(expr, filt) = sem
+    SSelect(selToSql(expr, keys), tabToSql(tab, keys), whrToSql(filt, keys))
   }
 
-  private def tabToSql(
-      tab: Map[Var, Tree], 
-      keys: Map[TypeNme, FieldName]): SqlFrom = 
-    SFrom(List(tab.toList match {
-      case (Var(nme), GLabel(info)) :: xs => 
-        STable(info.tgt.nme, nme, xs.map(joinToSql(_, keys)))
-      case _ => throw new Error(s"No table was selected for FROM clause")
-    }))
+  private def flatProduct[E[_]](
+      x: TExpr[E, Fold, _, _]): List[TExpr[E, Fold, _, _]] = x match {
+    case Product(l, r, is) => List(flatProduct(l), flatProduct(r)).join
+    case _ => List(x)
+  }
+
+  private def selToSql[E[_], S, A](
+      sel: TExpr[E, Fold, S, A],
+      keys: Map[TypeNme, FieldName]): SqlSelect = sel match {
+    case Var(e) => SAll(e)
+    case t => SList(flatProduct(t).map(e => SField(treeToExpr(e, keys), "")))
+  }
+
+  private def tabToSql[E[_]](
+      tab: Table,
+      keys: Map[TypeNme, FieldName]): SqlFrom =
+    tab.simpleTable[E, Fold].toList match {
+      case (nme, TVarSimpleVal(Wrap(_, info))) :: _ => SFrom(List(
+        STable(info.tgt.nme, nme, tab.nestedTable[E, Fold].toList.map(joinToSql(_, keys)))))
+      case _ => 
+        throw new Error(s"Sorry, but we don't support product roots yet: $tab")
+    }
 
   private def condToSql(
-      v1: Var, n1: FieldName, 
-      v2: Var, n2: FieldName): SqlEqJoinCond =
-    if (n1 == n2) SUsing(n1) else SOn(SProj(v1.nme, n1), SProj(v2.nme, n2))
+      v1: String, n1: FieldName, 
+      v2: String, n2: FieldName): SqlEqJoinCond =
+    if (n1 == n2) SUsing(n1) else SOn(SProj(v1, n1), SProj(v2, n2))
 
-  private def joinToSql(
-      vt: (OpticLang.Var, Tree),
-      keys: Map[TypeNme, FieldName]): SqlJoin = vt match {
-    case (v1, VL(v2, GLabel(inf@OpticInfo(KGetter | KLens, _, _, _)))) => {
-      val cond = condToSql(v2, inf.nme, v1, keys(inf.tgt.nme)) // XXX: unsafe
-      SEqJoin(s"${inf.tgt.nme}", v1.nme, cond)
+  private def joinToSql[E[_]](
+      vt: (String, TVarNestedVal[E, Fold, _, _]),
+      keys: Map[TypeNme, FieldName]): SqlJoin = {
+    val nme = vt._1
+    val inf = vt._2.w.info
+    val v = vt._2.vs.lastVar
+    if (inf.kind == KGetter) {
+      val cond = condToSql(v.name, inf.nme, nme, keys(inf.tgt.nme))
+      SEqJoin(s"${inf.tgt.nme}", nme, cond)
+    } else {
+      SEqJoin(s"${inf.tgt.nme}", nme, SUsing(keys(inf.src.nme)))
     }
-    case (Var(n1), VL(_, GLabel(inf))) => {
-      SEqJoin(s"${inf.tgt.nme}", n1, SUsing(keys(inf.src.nme))) // XXX: unsafe
-    }
-    case _ => throw new Error(s"Don't know how to generate join for '$vt'")
   }
 
-  private def whrToSql(
-      whr: Set[Tree],
+  private def whrToSql[E[_], S](
+      whr: Set[TExpr[E, Fold, S, Boolean]],
       keys: Map[TypeNme, FieldName]): Option[SqlExp] =
     whr.foldLeft(Option.empty[SqlExp]) {
       case (None, t) => Some(treeToExpr(t, keys))
       case (Some(e), t) => Some(SBinOp("AND", e, treeToExpr(t, keys)))
     }
 
-  private def treeToExpr(
-      t: Tree, 
+  private def treeToExpr[E[_]](
+      t: TExpr[E, Fold, _, _],
       keys: Map[TypeNme, FieldName]): SqlExp = t match {
-    case VL(Var(nme), GLabel(info)) => SProj(nme, info.nme)
-    case Op(op, l, r) => SBinOp(op, treeToExpr(l, keys), treeToExpr(r, keys))
-    case Unary(t, op) => SUnOp(op, treeToExpr(t, keys))
-    case Val(x) => SCons(x)
-    case Sub(sem) => SExists(fromSemantic(sem, keys))
+    case Wrap(_, info) => SProj("", info.nme)
+    case Vertical(Var(nme), Wrap(_, info)) => 
+      SProj(nme, info.nme)
+    case Vertical(Product(l, r, _), Sub(_, _)) => 
+      SBinOp("-", treeToExpr(l, keys), treeToExpr(r, keys))
+    case Vertical(Product(l, r, _), Gt(_, _)) => 
+      SBinOp(">", treeToExpr(l, keys), treeToExpr(r, keys))
+    case Vertical(e, Not(_, _)) => 
+      SUnOp("NOT", treeToExpr(e, keys))
+    case LikeInt(i, _) => SCons(i.toString)
+    case LikeBool(b, _) => SCons(b.toString)
     case _ => throw new Error(s"Don't know how to translate '$t' into SQL")
   }
 }
