@@ -103,6 +103,9 @@ trait CoupleExample[Expr[_]] {
   def getHer: Expr[Fold[Couples, Person]] =
     couples > her.asFold
 
+  def getHerAndHim: Expr[Fold[Couples, (Person, Person)]] =
+    couples > (her * him).asFold
+
   def herNameAndStreet: Expr[Fold[Couples, (String, String)]] =
     couples > (her > id > name * (address > street)).asFold
 
@@ -168,8 +171,10 @@ trait CoupleExample[Expr[_]] {
       second * first > 
       second * first > 
       second).asAffineFold 
-      > filtered (gt(30))
-      > filtered (gt(40))))).asFold
+      > filtered(gt(30))
+      > filtered(
+          id * (likeInt[Int](41) * likeInt[Int](1) > sub) 
+            > greaterThan)))).asFold
 }
 
 object CoupleExample {

@@ -19,9 +19,9 @@ case class SUsing(fn: FieldName) extends SqlEqJoinCond
 
 sealed abstract class SqlSelect
 case class SList(es: List[SField]) extends SqlSelect
-case class SAll(e: String) extends SqlSelect
 
 sealed abstract class SqlExp
+case class SAll(e: String) extends SqlExp
 case class SField(e: SqlExp, fn: FieldName) extends SqlExp
 case class SProj(v: Var, fn: FieldName) extends SqlExp
 case class SBinOp(op: String, l: SqlExp, r: SqlExp) extends SqlExp

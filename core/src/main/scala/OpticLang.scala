@@ -192,8 +192,17 @@ object OpticLang {
   trait OpticMap[E[_], O[_, _], O2[_, _]] {
     def apply[S, A](e: E[O[S, A]]): E[O2[S, A]]
   }
+
+  private val varStr: Stream[String] = {
+    def syms(pattern: Stream[String], i: Int = 0): Stream[String] = 
+      pattern.map(_ + i) #::: syms(pattern, i + 1)
+    val pattern = Stream.range('a', 'z').map(_.toString)
+    /*pattern #:::*/ syms(pattern)
+  }
   
-  case class Table(src: Stream[Symbol], rows: Map[Symbol, Any])
+  case class Table(
+    src: Stream[Symbol] = varStr, 
+    rows: Map[Symbol, Any] = Map())
 
   def reifySem[E[_], S, A](
       sem: Semantic[E, Fold[S, A]])(implicit
@@ -230,6 +239,8 @@ object OpticLang {
     case LikeBool(b, is) =>
       is.flip.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.likeBool[S](b)))
     case Id(is) => is.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.id[S]))
+    case First(is) => is.flip.subst[λ[x => E[Fold[x, A]]]](ev.gtAsFl(ev.first))
+    case Second(is) => is.flip.subst[λ[x => E[Fold[x, A]]]](ev.gtAsFl(ev.second))
     case Not(is1, is2) => 
       is2.flip.subst[λ[x => E[Fold[S, x]]]](
         is1.flip.subst[λ[x => E[Fold[x, Boolean]]]](ev.gtAsFl(ev.not)))
@@ -275,9 +286,9 @@ object OpticLang {
           }
         case (_, Vertical(u1, d1)) => 
           vertAux(u, u1) >>= (u2 => vertAux(u2, d1))
-        case (Product(l, _, _), Wrap(_, inf)) if inf.nme == "first" => 
+        case (Product(l /* : TExpr[E, O, S, B] */, _, _), First(is)) => 
           l.asInstanceOf[TExpr[E, O, S, B]].point[State[Table, ?]]
-        case (Product(_, r, _), Wrap(_, inf)) if inf.nme == "second" =>
+        case (Product(_, r /* : TExpr[E, O, S, B] */, _), Second(is)) =>
           r.asInstanceOf[TExpr[E, O, S, B]].point[State[Table, ?]]
         case (Id(is), e) => 
           is.flip.subst[λ[x => TExpr[E, O, x, B]]](e).point[State[Table, ?]]
@@ -287,8 +298,9 @@ object OpticLang {
           TExpr.likeInt(i, is).point[State[Table, ?]]
         case (_, LikeBool(b, is)) => 
           TExpr.likeBool(b, is).point[State[Table, ?]]
-        case (Product(l, LikeInt(0, _), _), Sub(_, _)) => 
-          l.asInstanceOf[TExpr[E, O, S, B]].point[State[Table, ?]]
+        case (Product(l /*: TExpr[E, O, S, Int] */, LikeInt(0, _), _), Sub(_, is)) => 
+          is.flip.subst[λ[x => TExpr[E, O, S, x]]](
+            l.asInstanceOf[TExpr[E, O, S, Int]]).point[State[Table, ?]]
         case (Product(LikeInt(x, _), LikeInt(y, _), _), Sub(_, is)) =>
           TExpr.likeInt(x - y, is).point[State[Table, ?]]
         case (Product(LikeInt(x, _), LikeInt(y, _), _), Gt(_, is)) =>
@@ -403,12 +415,10 @@ object OpticLang {
     def equal[A]: Semantic[E, Getter[(A, A), Boolean]] = ???
 
     def first[A, B]: Semantic[E, Getter[(A, B), A]] =
-      state(TGetter(expr = Wrap(OpticLang[E].first,
-        OpticInfo(KGetter, "first", TypeInfo("(A, B)"), TypeInfo("A")))))
+      state(TGetter(expr = First(Leibniz.refl[(A, B)])))
 
     def second[A, B]: Semantic[E, Getter[(A, B), B]] =
-      state(TGetter(expr = Wrap(OpticLang[E].second,
-        OpticInfo(KGetter, "second", TypeInfo("(A, B)"), TypeInfo("B")))))
+      state(TGetter(expr = Second(Leibniz.refl[(A, B)])))
 
     def likeInt[S](i: Int): Semantic[E, Getter[S, Int]] =
       state(TGetter(expr = LikeInt(i, implicitly)))
@@ -423,7 +433,7 @@ object OpticLang {
       state(TGetter(expr = Id(Leibniz.refl)))
 
     def not: Semantic[E, Getter[Boolean, Boolean]] =
-      ???
+      state(TGetter(expr = Not(Leibniz.refl[Boolean], Leibniz.refl[Boolean])))
 
     def getAll[S, A](fl: Semantic[E, Fold[S, A]]): Semantic[E, S => List[A]] = ???
 

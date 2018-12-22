@@ -73,6 +73,8 @@ sealed abstract class TSel[E[_], O[_, _], S, A] extends TExpr[E, O, S, A] {
     case Gt(is1, is2) => Gt(is1, is2)
     case Not(is1, is2) => Not(is1, is2)
     case Id(is) => Id(is)
+    case First(is) => First(is)
+    case Second(is) => Second(is)
   }
 }
 
@@ -82,6 +84,12 @@ case class Var[E[_], O[_, _], S, A](
 case class Wrap[E[_], O[_, _], S, A](
   e: E[O[S, A]],
   info: OpticInfo) extends TSel[E, O, S, A]
+
+case class First[E[_], O[_, _], S, A, B](
+  is: S === (A, B)) extends TSel[E, O, S, A]
+
+case class Second[E[_], O[_, _], S, A, B](
+  is: S === (A, B)) extends TSel[E, O, S, B]
 
 case class Id[E[_], O[_, _], S, A](
   is: S === A) extends TSel[E, O, S, A]

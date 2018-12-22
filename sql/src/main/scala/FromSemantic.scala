@@ -9,10 +9,9 @@ trait FromSemantic {
   import OpticLang.Table
 
   def fromSemantic[E[_], S, A](
-      tab: Table,
-      sem: TSemantic[E, Fold[S, A]],
+      sem: Semantic[E, Fold[S, A]],
       keys: Map[TypeNme, FieldName] = Map()): SSelect = {
-    val TFold(expr, filt) = sem
+    val (tab, TFold(expr, filt)) = sem(Table())
     SSelect(selToSql(expr, keys), tabToSql(tab, keys), whrToSql(filt, keys))
   }
 
@@ -25,7 +24,6 @@ trait FromSemantic {
   private def selToSql[E[_], S, A](
       sel: TExpr[E, Fold, S, A],
       keys: Map[TypeNme, FieldName]): SqlSelect = sel match {
-    case Var(e) => SAll(e)
     case t => SList(flatProduct(t).map(e => SField(treeToExpr(e, keys), "")))
   }
 
@@ -69,6 +67,7 @@ trait FromSemantic {
   private def treeToExpr[E[_]](
       t: TExpr[E, Fold, _, _],
       keys: Map[TypeNme, FieldName]): SqlExp = t match {
+    case Var(e) => SAll(e)
     case Wrap(_, info) => SProj("", info.nme)
     case Vertical(Var(nme), Wrap(_, info)) => 
       SProj(nme, info.nme)

@@ -12,7 +12,6 @@ trait ToString {
 
   private def selToString(sel: SqlSelect): String = sel match {
     case SList(es) => es.map(expToString).mkString(", ")
-    case SAll(e) => s"$e.*"
   }
 
   private def frmToString(frm: SqlFrom): String = frm match {
@@ -38,6 +37,7 @@ trait ToString {
   }
 
   private def expToString(exp: SqlExp): String = exp match {
+    case SAll(e) => s"$e.*"
     case SField(e, "") => s"${expToString(e)}"
     case SField(e, fn) => s"${expToString(e)} AS $fn"
     case SProj(v, fn) => s"$v.$fn"
