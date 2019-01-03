@@ -19,6 +19,13 @@ sealed abstract class TExpr[E[_], O[_, _], S, A] {
     case Var(name) => Set(name)
     case _ => Set.empty
   }
+
+  def rwVars(rws: Set[(String, String)]): TExpr[E, O, S, A] = this match {
+    case Product(l, r, is) => Product(l.rwVars(rws), r.rwVars(rws), is)
+    case Vertical(u, d) => Vertical(u.rwVars(rws), d.rwVars(rws))
+    case Var(name) => rws.find(_._1 == name).fold(this)(rw => Var(rw._2))
+    case _ => this
+  }
 }
 
 object TExpr {
@@ -46,6 +53,11 @@ object TExpr {
 
   def id[E[_], O[_, _], S, A](is: S === A): TExpr[E, O, S, A] = 
     Id(is)
+
+  def wrap[E[_], O[_, _], S, A](
+      e: E[O[S, A]], 
+      info: OpticInfo): TExpr[E, O, S, A] =
+    Wrap(e, info)
 }
 
 case class Product[E[_], O[_, _], S, A, B, C](

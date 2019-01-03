@@ -8,10 +8,17 @@ import OpticLang._
 trait FromSemantic {
   import OpticLang.Table
 
+  private val varStr: Stream[String] = {
+    def syms(pattern: Stream[String], i: Int = 0): Stream[String] = 
+      pattern.map(_ + i) #::: syms(pattern, i + 1)
+    val pattern = Stream.range('a', 'z').map(_.toString)
+    pattern #::: syms(pattern)
+  }
+
   def fromSemantic[E[_], S, A](
       sem: Semantic[E, Fold[S, A]],
       keys: Map[TypeNme, FieldName] = Map()): SSelect = {
-    val (tab, TFold(expr, filt)) = sem(Table())
+    val TFold(expr, filt, tab) = sem.eval(varStr)
     SSelect(selToSql(expr, keys), tabToSql(tab, keys), whrToSql(filt, keys))
   }
 
@@ -43,11 +50,11 @@ trait FromSemantic {
     if (n1 == n2) SUsing(n1) else SOn(SProj(v1, n1), SProj(v2, n2))
 
   private def joinToSql[E[_]](
-      vt: (String, TVarNestedVal[E, Fold, _, _]),
+      vt: (String, TVarNestedVal[E, Fold, _, _, _]),
       keys: Map[TypeNme, FieldName]): SqlJoin = {
     val nme = vt._1
     val inf = vt._2.w.info
-    val v = vt._2.vs.lastVar
+    val v = vt._2.v
     if (inf.kind == KGetter) {
       val cond = condToSql(v.name, inf.nme, nme, keys(inf.tgt.nme))
       SEqJoin(s"${inf.tgt.nme}", nme, cond)

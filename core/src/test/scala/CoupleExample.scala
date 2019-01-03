@@ -181,60 +181,50 @@ object CoupleExample {
 
   type Stack[A] = Semantic[Const[String, ?], A]
 
-  private def wrapPlainG[S, A](inf: OpticInfo): Stack[Getter[S, A]] =
-    state(TGetter(Wrap(Const(inf.nme), inf)))
-
   val instance = new CoupleExample[Stack] {
     type Couple = Unit
     type Person = Unit
 
     // XXX: next methods are redundant, unify with tSemantic in OpticLang.
 
-    private def assignValG[S, A](
-        inf: OpticInfo): Stack[Getter[S, A]] =
-      for {
-        s <- gets[Table, Stream[String]](_.src)
-        _ <- modify[Table](_.copy(src = s.tail))
-        _ <- modify[Table](t => t.copy(rows = t.rows + (s.head -> 
-          TVarSimpleVal(Wrap[Const[String, ?], Fold, S, A](Const(inf.nme), inf)))))
-      } yield TGetter(Var(s.head))
+    private def wrapG[S, A](inf: OpticInfo): Stack[Getter[S, A]] =
+      state(TGetter(TExpr.wrap[Const[String, ?], Getter, S, A](
+        Const(inf.nme), inf)))
 
-    private def assignValF[S, A](
-        inf: OpticInfo): Stack[Fold[S, A]] =
+    private def assignRoot[S, A](inf: OpticInfo): Stack[Fold[S, A]] =
       for {
-        s <- gets[Table, Stream[String]](_.src)
-        _ <- modify[Table](_.copy(src = s.tail))
-        _ <- modify[Table](t => t.copy(rows = t.rows + (s.head -> 
-          TVarSimpleVal(Wrap[Const[String, ?], Fold, S, A](Const(inf.nme), inf)))))
-      } yield TFold(Var(s.head), Set())
+        tmp <- assignVal[Const[String, ?], Fold, S, A](TVarSimpleVal(
+          Wrap(Const[String, Fold[S, A]](inf.nme), inf))).run(Table())
+        (vars, v) = tmp
+      } yield TFold(v, Set.empty, vars)
 
     val ev = OpticLang[Stack]
 
-    val couples = assignValF(
+    val couples = assignRoot(
       OpticInfo(KFold, "couples", TypeInfo("Couples"), TypeInfo("Couple", true)))
     
-    val her = assignValG(
+    val her = wrapG(
       OpticInfo(KGetter, "her", TypeInfo("Couple", true), TypeInfo("Person", true)))
 
-    val him = assignValG(
+    val him = wrapG(
       OpticInfo(KGetter, "him", TypeInfo("Couple", true), TypeInfo("Person", true)))
     
-    val people = assignValF(
+    val people = assignRoot(
       OpticInfo(KFold, "people", TypeInfo("People"), TypeInfo("Person", true)))
 
-    val name = wrapPlainG(
+    val name = wrapG(
       OpticInfo(KGetter, "name", TypeInfo("Person", true), TypeInfo("String")))
 
-    val age = wrapPlainG(
+    val age = wrapG(
       OpticInfo(KGetter, "age", TypeInfo("Person", true), TypeInfo("Int")))
 
-    val weight = wrapPlainG(
+    val weight = wrapG(
       OpticInfo(KGetter, "weight", TypeInfo("Person", true), TypeInfo("Int")))
 
-    val address = assignValG(
+    val address = wrapG(
       OpticInfo(KGetter, "address", TypeInfo("Person", true), TypeInfo("Address", true)))
     
-    val street = wrapPlainG(
+    val street = wrapG(
       OpticInfo(KGetter, "street", TypeInfo("Address", true), TypeInfo("String")))
   }
 }
