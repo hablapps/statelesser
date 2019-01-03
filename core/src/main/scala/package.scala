@@ -9,6 +9,6 @@ package object `statelesser` {
 
   type Symbol = String
 
-  type Semantic[E[_], A] = State[Table, TSemantic[E, A]]
+  type Semantic[E[_], A] = State[Stream[Symbol], TSemantic[E, A]]
 }
 
