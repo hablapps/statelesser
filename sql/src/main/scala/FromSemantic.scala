@@ -31,13 +31,15 @@ trait FromSemantic {
       tab: Table,
       keys: Map[TypeNme, FieldName]): SqlFrom =
     tab.simpleTable[E, Fold].toList match {
-      case (nme, TVarSimpleVal(Wrap(_, info))) :: _ => SFrom(List(
+      case List((nme, TVarSimpleVal(Wrap(_, info)))) => SFrom(List(
         STable(
           info.tgt.nme,
           nme,
           tab.nestedTable[E, Fold].toList.sortBy(_._1).map(joinToSql(_, keys)))))
+      case Nil => 
+        throw new Error(s"There's no table to select from: $tab")
       case _ =>
-        throw new Error(s"Sorry, but we don't support product roots yet: $tab")
+        throw new Error(s"Can't translate semantic with multiple roots: $tab")
     }
 
   private def condToSql(
