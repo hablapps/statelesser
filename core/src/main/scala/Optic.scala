@@ -155,10 +155,10 @@ trait VerticalCompose3 extends VerticalCompose4 {
 }
 
 trait VerticalCompose4 {
-  
-  type Aux[L[_, _], R[_, _], Out2[_, _]] = 
+
+  type Aux[L[_, _], R[_, _], Out2[_, _]] =
     VerticalCompose[L, R] { type Out[S, A] = Out2[S, A] }
-  
+
   implicit def flCompose[L[_, _]: AsFold, R[_, _]: AsFold]: Aux[L, R, Fold] =
     new VerticalCompose[L, R] {
       type Out[S, A] = Fold[S, A]
@@ -214,10 +214,10 @@ trait HorizontalCompose3 extends HorizontalCompose4 {
 }
 
 trait HorizontalCompose4 {
-  
-  type Aux[L[_, _], R[_, _], Out2[_, _]] = 
+
+  type Aux[L[_, _], R[_, _], Out2[_, _]] =
     HorizontalCompose[L, R] { type Out[S, A] = Out2[S, A] }
-  
+
   implicit def flCompose[L[_, _]: AsFold, R[_, _]: AsFold]: Aux[L, R, Fold] =
     new HorizontalCompose[L, R] {
       type Out[S, A] = Fold[S, A]
@@ -230,7 +230,7 @@ trait HorizontalCompose4 {
 object Actions {
 
   def get[Op[_, _]: AsGetter, S, A](op: Op[S, A]): S => A = ???
-  
+
   def getAll[Op[_, _] : AsFold, S, A](op: Op[S, A]): S => List[A] = ???
 }
 

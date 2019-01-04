@@ -6,13 +6,13 @@ sealed abstract class TVarVal[E[_], O[_, _], S, A] {
 
   def mapO[O2[_, _]](f: OpticMap[E, O, O2]): TVarVal[E, O2, S, A] = this match {
     case TVarSimpleVal(Wrap(e, info)) => TVarSimpleVal(Wrap(f(e), info))
-    case TVarNestedVal(Var(x), Wrap(e, info)) => 
+    case TVarNestedVal(Var(x), Wrap(e, info)) =>
       TVarNestedVal(Var(x), Wrap(f(e), info))
   }
 
   def rwVars(rws: Set[(String, String)]): TVarVal[E, O, S, A] =
     this match {
-      case TVarNestedVal(Var(s), w) => rws.find(_._1 == s).fold(this){ rw => 
+      case TVarNestedVal(Var(s), w) => rws.find(_._1 == s).fold(this){ rw =>
         TVarNestedVal(Var(rw._2), w)
       }
       case _ => this

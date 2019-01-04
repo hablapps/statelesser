@@ -20,7 +20,7 @@ trait ToString {
 
   private def tabToString(tab: SqlTable): String = tab match {
     case STable(t, v, js) => {
-      val s = (if (js.nonEmpty) " " else "") ++ 
+      val s = (if (js.nonEmpty) " " else "") ++
         js.map(joinToString).mkString(" ")
       s"$t AS $v$s"
     }
