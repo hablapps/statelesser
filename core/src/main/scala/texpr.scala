@@ -35,7 +35,7 @@ object TExpr {
       r: TExpr[E, O, S, B],
       is: (A, B) === C): TExpr[E, O, S, C] =
     Product(l, r, is)
-  
+
   def vertical[E[_], O[_, _], S, A, B](
       u: TExpr[E, O, S, A],
       d: TExpr[E, O, A, B]): TExpr[E, O, S, B] =
@@ -51,11 +51,11 @@ object TExpr {
       is: A === Boolean): TExpr[E, O, S, A] =
     LikeBool(b, is)
 
-  def id[E[_], O[_, _], S, A](is: S === A): TExpr[E, O, S, A] = 
+  def id[E[_], O[_, _], S, A](is: S === A): TExpr[E, O, S, A] =
     Id(is)
 
   def wrap[E[_], O[_, _], S, A](
-      e: E[O[S, A]], 
+      e: E[O[S, A]],
       info: OpticInfo): TExpr[E, O, S, A] =
     Wrap(e, info)
 }

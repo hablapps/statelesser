@@ -204,13 +204,13 @@ object CoupleExample {
 
     val couples = assignRoot(
       OpticInfo(KFold, "couples", TypeInfo("Couples"), TypeInfo("Couple", true)))
-    
+
     val her = wrapG(
       OpticInfo(KGetter, "her", TypeInfo("Couple", true), TypeInfo("Person", true)))
 
     val him = wrapG(
       OpticInfo(KGetter, "him", TypeInfo("Couple", true), TypeInfo("Person", true)))
-    
+
     val people = assignRoot(
       OpticInfo(KFold, "people", TypeInfo("People"), TypeInfo("Person", true)))
 

@@ -22,7 +22,7 @@
 //
 //  "Statelesser" should "query all employees in the organization" in {
 //    matchSql(
-//      "SELECT e.emp FROM Department AS d INNER JOIN Employee AS e USING (dpt);", 
+//      "SELECT e.emp FROM Department AS d INNER JOIN Employee AS e USING (dpt);",
 //      getOrgEmployees)
 //  }
 //
@@ -34,7 +34,7 @@
 //
 //  it should "query containing subqueries" in {
 //    matchSql(
-//      "SELECT e.emp FROM Department AS d INNER JOIN Employee AS e USING (dpt) WHERE EXISTS(SELECT t.tsk FROM Task AS t WHERE (t.tsk = \"abstract\") AND (t.dpt = e.dpt));", 
+//      "SELECT e.emp FROM Department AS d INNER JOIN Employee AS e USING (dpt) WHERE EXISTS(SELECT t.tsk FROM Task AS t WHERE (t.tsk = \"abstract\") AND (t.dpt = e.dpt));",
 //      getAbstractEmployees)
 //  }
 //

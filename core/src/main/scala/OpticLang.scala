@@ -6,15 +6,15 @@ import Leibniz._
 trait OpticLang[Expr[_]] {
 
   def flVert[S, A, B](
-    l: Expr[Fold[S, A]], 
+    l: Expr[Fold[S, A]],
     r: Expr[Fold[A, B]]): Expr[Fold[S, B]]
 
   def flHori[S, A, B](
-    l: Expr[Fold[S, A]], 
+    l: Expr[Fold[S, A]],
     r: Expr[Fold[S, B]]): Expr[Fold[S, (A, B)]]
 
   def gtVert[S, A, B](
-    l: Expr[Getter[S, A]], 
+    l: Expr[Getter[S, A]],
     r: Expr[Getter[A, B]]): Expr[Getter[S, B]]
 
   def gtHori[S, A, B](
@@ -22,7 +22,7 @@ trait OpticLang[Expr[_]] {
     r: Expr[Getter[S, B]]): Expr[Getter[S, (A, B)]]
 
   def aflVert[S, A, B](
-    l: Expr[AffineFold[S, A]], 
+    l: Expr[AffineFold[S, A]],
     r: Expr[AffineFold[A, B]]): Expr[AffineFold[S, B]]
 
   def aflHori[S, A, B](
@@ -65,7 +65,7 @@ trait OpticLang[Expr[_]] {
 
   // derived methods
 
-  def gt(i: Int): Expr[Getter[Int, Boolean]] = 
+  def gt(i: Int): Expr[Getter[Int, Boolean]] =
     gtVert(gtHori(id, likeInt(i)), greaterThan)
 
   def gtAsFl[S, A](gt: Expr[Getter[S, A]]): Expr[Fold[S, A]] =
@@ -88,17 +88,17 @@ object OpticLang {
   implicit val prettyPrinter = new OpticLang[Const[String, ?]] {
 
     def flVert[S, A, B](
-        l: Const[String, Fold[S, A]], 
+        l: Const[String, Fold[S, A]],
         r: Const[String, Fold[A, B]]): Const[String, Fold[S, B]] =
       Const(s"${l.getConst} > ${r.getConst}")
 
     def flHori[S, A, B](
-        l: Const[String, Fold[S, A]], 
+        l: Const[String, Fold[S, A]],
         r: Const[String, Fold[S, B]]): Const[String, Fold[S, (A, B)]] =
       Const(s"${l.getConst} * ${r.getConst}")
 
     def gtVert[S, A, B](
-        l: Const[String, Getter[S, A]], 
+        l: Const[String, Getter[S, A]],
         r: Const[String, Getter[A, B]]): Const[String, Getter[S, B]] =
       Const(s"${l.getConst} > ${r.getConst}")
 
@@ -108,7 +108,7 @@ object OpticLang {
       Const(s"(${l.getConst} * ${r.getConst})")
 
     def aflVert[S, A, B](
-        l: Const[String, AffineFold[S, A]], 
+        l: Const[String, AffineFold[S, A]],
         r: Const[String, AffineFold[A, B]]): Const[String, AffineFold[S, B]] =
       Const(s"${l.getConst} > ${r.getConst}")
 
@@ -141,7 +141,7 @@ object OpticLang {
 
     def likeBool[S](b: Boolean): Const[String, Getter[S, Boolean]] =
       Const(s"likeBool(${b.toString})")
-    
+
     def likeStr[S](s: String): Const[String, Getter[S, String]] =
       Const(s"""likeStr("$s")""")
 
@@ -184,9 +184,9 @@ object OpticLang {
 
   case class TypeInfo(nme: TypeNme, isPrimitive: Boolean = false)
   case class OpticInfo(
-    kind: OpticKind, 
-    nme: OpticNme, 
-    src: TypeInfo, 
+    kind: OpticKind,
+    nme: OpticNme,
+    src: TypeInfo,
     tgt: TypeInfo)
 
   trait OpticMap[E[_], O[_, _], O2[_, _]] {
@@ -199,8 +199,8 @@ object OpticLang {
       val (t, rws) = rows
         .groupBy(_._2)
         .map { case (k, v) => (k, v.keys.toList) }
-        .foldLeft((Table(), Set.empty[(String, String)])) { 
-          case ((Table(rs), rws), (v, k :: ks)) => 
+        .foldLeft((Table(), Set.empty[(String, String)])) {
+          case ((Table(rs), rws), (v, k :: ks)) =>
             (Table(rs + (k -> v)), rws ++ ks.map((_, k)))
         }
       if (rws.isEmpty) (t, rws)
@@ -212,7 +212,7 @@ object OpticLang {
 
     def clean(used: Set[String]): Table = {
       def deps(k: String): Set[String] = rows(k) match {
-        case TVarNestedVal(x: Var[Any, Any, Any, Any], w) => 
+        case TVarNestedVal(x: Var[Any, Any, Any, Any], w) =>
           deps(x.name) + x.name
         case _ => Set()
       }
@@ -225,9 +225,9 @@ object OpticLang {
 
   implicit class TableOps(table: Table) {
 
-    private def splitTables = table.rows.partition { 
-      case (_, TVarSimpleVal(_)) => true 
-      case _ => false 
+    private def splitTables = table.rows.partition {
+      case (_, TVarSimpleVal(_)) => true
+      case _ => false
     }
 
     def getVal[E[_], O[_, _], S, A](v: Var[E, O, S, A]): TVarVal[E, O, S, A] =
@@ -244,19 +244,19 @@ object OpticLang {
   //     sem: Semantic[E, Fold[S, A]])(implicit
   //     ev: OpticLang[E]): E[Fold[S, A]] = {
   //   val (t, TFold(expr, filt)) = sem(Table(Stream.empty, Map()))
-  //   filt.map(reifyExpr(_, t)).foldLeft(reifyExpr(expr, t)) { (acc, e) => 
+  //   filt.map(reifyExpr(_, t)).foldLeft(reifyExpr(expr, t)) { (acc, e) =>
   //     ev.flVert(ev.flHori(acc, e), ev.aflAsFl(ev.gtAsAfl(ev.first[A, Boolean])))
   //   }
   // }
 
   // def reifyVV[E[_], S, A](
   //     vv: TVarVal[E, Fold, S, A],
-  //     t: Table)(implicit 
+  //     t: Table)(implicit
   //     ev: OpticLang[E]): E[Fold[S, A]] = vv match {
   //   case TVarSimpleVal(w) => w.e
   //   case vnv: TVarNestedVal[E, Fold, S, A] => vnv.vs match {
   //     case ONil(v) => ev.flVert(reifyVV(t.getV(v), t), vnv.w.e)
-  //     case OCons(v, vs) => 
+  //     case OCons(v, vs) =>
   //       ev.flVert(reifyVV(t.getV(v), t), reifyVV(TVarNestedVal(vs, vnv.w), t))
   //   }
   // }
@@ -265,19 +265,19 @@ object OpticLang {
   //     expr: TExpr[E, Fold, S, A],
   //     t: Table)(implicit
   //     ev: OpticLang[E]): E[Fold[S, A]] = expr match {
-  //   case Product(l, r, is) => 
+  //   case Product(l, r, is) =>
   //     is.subst[λ[x => E[Fold[S, x]]]](ev.flHori(reifyExpr(l, t), reifyExpr(r, t)))
   //   case Vertical(u, d) => ev.flVert(reifyExpr(u, t), reifyExpr(d, t))
   //   case x: Var[E, Fold, S, A] => reifyVV(t.getV(x), t)
   //   case w: Wrap[E, Fold, S, A] => w.e
-  //   case LikeInt(i, is) => 
+  //   case LikeInt(i, is) =>
   //     is.flip.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.likeInt[S](i)))
   //   case LikeBool(b, is) =>
   //     is.flip.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.likeBool[S](b)))
   //   case Id(is) => is.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.id[S]))
   //   case First(is) => is.flip.subst[λ[x => E[Fold[x, A]]]](ev.gtAsFl(ev.first))
   //   case Second(is) => is.flip.subst[λ[x => E[Fold[x, A]]]](ev.gtAsFl(ev.second))
-  //   case Not(is1, is2) => 
+  //   case Not(is1, is2) =>
   //     is2.flip.subst[λ[x => E[Fold[S, x]]]](
   //       is1.flip.subst[λ[x => E[Fold[x, Boolean]]]](ev.gtAsFl(ev.not)))
   //   case Sub(is1, is2) =>
@@ -290,32 +290,32 @@ object OpticLang {
 
   import State._
 
-  implicit def tsemantic[E[_]: OpticLang]: OpticLang[Semantic[E, ?]] = 
+  implicit def tsemantic[E[_]: OpticLang]: OpticLang[Semantic[E, ?]] =
       new OpticLang[Semantic[E, ?]] {
 
     private def vertAux[O[_, _], S, A, B](
-        u: TExpr[E, O, S, A], 
+        u: TExpr[E, O, S, A],
         d: TExpr[E, O, A, B]): WrapTable[TExpr[E, O, S, B]] =
       (u, d) match {
         case (_, Product(l, r, is)) =>
-          (vertAux(u, l) |@| vertAux(u, r)) { (l1, r1) => 
+          (vertAux(u, l) |@| vertAux(u, r)) { (l1, r1) =>
             TExpr.product(l1, r1, is)
           }
-        case (_, Vertical(u1, d1)) => 
+        case (_, Vertical(u1, d1)) =>
           vertAux(u, u1) >>= (u2 => vertAux(u2, d1))
-        case (Product(l /* : TExpr[E, O, S, B] */, _, _), First(is)) => 
+        case (Product(l /* : TExpr[E, O, S, B] */, _, _), First(is)) =>
           l.asInstanceOf[TExpr[E, O, S, B]].point[WrapTable]
         case (Product(_, r /* : TExpr[E, O, S, B] */, _), Second(is)) =>
           r.asInstanceOf[TExpr[E, O, S, B]].point[WrapTable]
-        case (Id(is), e) => 
+        case (Id(is), e) =>
           is.flip.subst[λ[x => TExpr[E, O, x, B]]](e).point[WrapTable]
-        case (e, Id(is)) => 
+        case (e, Id(is)) =>
           is.subst[λ[x => TExpr[E, O, S, x]]](e).point[WrapTable]
-        case (_, LikeInt(i, is)) => 
+        case (_, LikeInt(i, is)) =>
           TExpr.likeInt(i, is).point[WrapTable]
-        case (_, LikeBool(b, is)) => 
+        case (_, LikeBool(b, is)) =>
           TExpr.likeBool(b, is).point[WrapTable]
-        case (Product(l /*: TExpr[E, O, S, Int] */, LikeInt(0, _), _), Sub(_, is)) => 
+        case (Product(l /*: TExpr[E, O, S, Int] */, LikeInt(0, _), _), Sub(_, is)) =>
           is.flip.subst[λ[x => TExpr[E, O, S, x]]](
             l.asInstanceOf[TExpr[E, O, S, Int]]).point[WrapTable]
         case (Product(LikeInt(x, _), LikeInt(y, _), _), Sub(_, is)) =>
@@ -326,7 +326,7 @@ object OpticLang {
           TExpr.likeBool(! b, is).point[WrapTable]
         case (Vertical(e, Not(is1, _)), Not(_, is2)) =>
           is2.flip.subst(is1.subst(e)).point[WrapTable]
-        case (Not(is1, _), Not(_, is2)) => 
+        case (Not(is1, _), Not(_, is2)) =>
           TExpr.id[E, O, S, B](is2.flip compose is1).point[WrapTable]
         case (x@Var(_), w@Wrap(_, inf)) if inf.tgt.isPrimitive =>
           assignVal(TVarNestedVal(x, w))
@@ -334,7 +334,7 @@ object OpticLang {
       }
 
     def gtVert[S, A, B](
-        usem: Semantic[E, Getter[S, A]], 
+        usem: Semantic[E, Getter[S, A]],
         dsem: Semantic[E, Getter[A, B]]): Semantic[E, Getter[S, B]] =
       for {
         tmp <- usem
@@ -356,7 +356,7 @@ object OpticLang {
       } yield TGetter(Product(expr1, expr2, Leibniz.refl[(A, B)]))
 
     def aflVert[S, A, B](
-        u: Semantic[E, AffineFold[S, A]], 
+        u: Semantic[E, AffineFold[S, A]],
         d: Semantic[E, AffineFold[A, B]]): Semantic[E, AffineFold[S, B]] =
       for {
         tmp <- u
@@ -379,11 +379,11 @@ object OpticLang {
         tmp <- r
         TAffineFold(expr2, filt2) = tmp
       } yield TAffineFold(
-          Product(expr1, expr2, Leibniz.refl[(A, B)]), 
+          Product(expr1, expr2, Leibniz.refl[(A, B)]),
           filt1 ++ filt2)
 
     def flVert[S, A, B](
-        u: Semantic[E, Fold[S, A]], 
+        u: Semantic[E, Fold[S, A]],
         d: Semantic[E, Fold[A, B]]) =
       for {
         tmp <- u
@@ -396,12 +396,12 @@ object OpticLang {
         } yield (expr, filt)).run(vars1)
         (vars3, (expr3, filt3)) = tmp
       } yield TFold(expr3, filt1 ++ filt3, vars3.clean(
-          expr3.vars ++ 
-          filt1.foldLeft(Set.empty[String])(_ ++ _.vars) ++ 
+          expr3.vars ++
+          filt1.foldLeft(Set.empty[String])(_ ++ _.vars) ++
           filt3.foldLeft(Set.empty[String])(_ ++ _.vars)))
 
     def flHori[S, A, B](
-        l: Semantic[E, Fold[S, A]], 
+        l: Semantic[E, Fold[S, A]],
         r: Semantic[E, Fold[S, B]]): Semantic[E, Fold[S, (A, B)]] =
       for {
         tmp <- l
@@ -410,12 +410,12 @@ object OpticLang {
         TFold(expr2, filt2, vars2) = tmp
         (vars3, rws) = vars1.unify(vars2)
       } yield TFold(
-          Product(expr1.rwVars(rws), expr2.rwVars(rws), Leibniz.refl[(A, B)]), 
+          Product(expr1.rwVars(rws), expr2.rwVars(rws), Leibniz.refl[(A, B)]),
           filt1.map(_.rwVars(rws)) ++ filt2.map(_.rwVars(rws)),
           vars3)
 
     def filtered[S](
-        p: Semantic[E, Getter[S, Boolean]]): Semantic[E, AffineFold[S, S]] = 
+        p: Semantic[E, Getter[S, Boolean]]): Semantic[E, AffineFold[S, S]] =
       for {
         tmp <- gtAsAfl(p)
         TAffineFold(fil, _) = tmp
@@ -497,7 +497,7 @@ object OpticLang {
     for {
       os <- MonadState[WrapTable, Table].gets(_.rows.find(_._2 == vv).map(_._1))
       s <- os.fold(
-        StateT.StateMonadTrans[Table].liftM(fresh) >>! { s => 
+        StateT.StateMonadTrans[Table].liftM(fresh) >>! { s =>
           MonadState[WrapTable, Table].modify(t => Table(t.rows + (s -> vv)))
         })(_.point[WrapTable])
     } yield Var(s)
@@ -505,7 +505,7 @@ object OpticLang {
   trait Syntax {
 
     implicit class FoldOps[Expr[_], S, A](
-        l: Expr[Fold[S, A]])(implicit 
+        l: Expr[Fold[S, A]])(implicit
         O: OpticLang[Expr]) {
       def >[B](r: Expr[Fold[A, B]]): Expr[Fold[S, B]] = O.flVert(l, r)
       def *[B](r: Expr[Fold[S, B]]): Expr[Fold[S, (A, B)]] = O.flHori(l, r)
@@ -521,13 +521,13 @@ object OpticLang {
         l: Expr[AffineFold[S, A]])(implicit
         O: OpticLang[Expr]) {
       def asFold: Expr[Fold[S, A]] = O.aflAsFl(l)
-      def >[B](r: Expr[AffineFold[A, B]]): Expr[AffineFold[S, B]] = 
+      def >[B](r: Expr[AffineFold[A, B]]): Expr[AffineFold[S, B]] =
         O.aflVert(l, r)
-      def *[B](r: Expr[AffineFold[S, B]]): Expr[AffineFold[S, (A, B)]] = 
+      def *[B](r: Expr[AffineFold[S, B]]): Expr[AffineFold[S, (A, B)]] =
         O.aflHori(l, r)
-      def <*[B](r: Expr[AffineFold[S, B]]): Expr[AffineFold[S, A]] = 
+      def <*[B](r: Expr[AffineFold[S, B]]): Expr[AffineFold[S, A]] =
         O.aflVert(O.aflHori(l, r), O.gtAsAfl(O.first[A, B]))
-      def *>[B](r: Expr[AffineFold[S, B]]): Expr[AffineFold[S, B]] = 
+      def *>[B](r: Expr[AffineFold[S, B]]): Expr[AffineFold[S, B]] =
         O.aflVert(O.aflHori(l, r), O.gtAsAfl(O.second[A, B]))
     }
 

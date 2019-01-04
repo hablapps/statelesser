@@ -9,7 +9,7 @@ trait FromSemantic {
   import OpticLang.Table
 
   private val varStr: Stream[String] = {
-    def syms(pattern: Stream[String], i: Int = 0): Stream[String] = 
+    def syms(pattern: Stream[String], i: Int = 0): Stream[String] =
       pattern.map(_ + i) #::: syms(pattern, i + 1)
     val pattern = Stream.range('a', 'z').map(_.toString)
     pattern #::: syms(pattern)
@@ -40,15 +40,15 @@ trait FromSemantic {
     tab.simpleTable[E, Fold].toList match {
       case (nme, TVarSimpleVal(Wrap(_, info))) :: _ => SFrom(List(
         STable(
-          info.tgt.nme, 
-          nme, 
+          info.tgt.nme,
+          nme,
           tab.nestedTable[E, Fold].toList.sortBy(_._1).map(joinToSql(_, keys)))))
-      case _ => 
+      case _ =>
         throw new Error(s"Sorry, but we don't support product roots yet: $tab")
     }
 
   private def condToSql(
-      v1: String, n1: FieldName, 
+      v1: String, n1: FieldName,
       v2: String, n2: FieldName): SqlEqJoinCond =
     if (n1 == n2) SUsing(n1) else SOn(SProj(v1, n1), SProj(v2, n2))
 
@@ -79,13 +79,13 @@ trait FromSemantic {
       keys: Map[TypeNme, FieldName]): SqlExp = t match {
     case Var(e) => SAll(e)
     case Wrap(_, info) => SProj("", info.nme)
-    case Vertical(Var(nme), Wrap(_, info)) => 
+    case Vertical(Var(nme), Wrap(_, info)) =>
       SProj(nme, info.nme)
-    case Vertical(Product(l, r, _), Sub(_, _)) => 
+    case Vertical(Product(l, r, _), Sub(_, _)) =>
       SBinOp("-", treeToExpr(l, keys), treeToExpr(r, keys))
-    case Vertical(Product(l, r, _), Gt(_, _)) => 
+    case Vertical(Product(l, r, _), Gt(_, _)) =>
       SBinOp(">", treeToExpr(l, keys), treeToExpr(r, keys))
-    case Vertical(e, Not(_, _)) => 
+    case Vertical(e, Not(_, _)) =>
       SUnOp("NOT", treeToExpr(e, keys))
     case LikeInt(i, _) => SCons(i.toString)
     case LikeBool(b, _) => SCons(b.toString)
