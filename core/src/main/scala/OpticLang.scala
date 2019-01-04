@@ -240,53 +240,57 @@ object OpticLang {
       splitTables._2.asInstanceOf[Map[String, TVarNestedVal[E, O, _, _, _]]]
   }
 
-  // def reifySem[E[_], S, A](
-  //     sem: Semantic[E, Fold[S, A]])(implicit
-  //     ev: OpticLang[E]): E[Fold[S, A]] = {
-  //   val (t, TFold(expr, filt)) = sem(Table(Stream.empty, Map()))
-  //   filt.map(reifyExpr(_, t)).foldLeft(reifyExpr(expr, t)) { (acc, e) =>
-  //     ev.flVert(ev.flHori(acc, e), ev.aflAsFl(ev.gtAsAfl(ev.first[A, Boolean])))
-  //   }
-  // }
+  val varStr: Stream[String] = {
+    def syms(pattern: Stream[String], i: Int = 0): Stream[String] =
+      pattern.map(_ + i) #::: syms(pattern, i + 1)
+    val pattern = Stream.range('a', 'z').map(_.toString)
+    pattern #::: syms(pattern)
+  }
 
-  // def reifyVV[E[_], S, A](
-  //     vv: TVarVal[E, Fold, S, A],
-  //     t: Table)(implicit
-  //     ev: OpticLang[E]): E[Fold[S, A]] = vv match {
-  //   case TVarSimpleVal(w) => w.e
-  //   case vnv: TVarNestedVal[E, Fold, S, A] => vnv.vs match {
-  //     case ONil(v) => ev.flVert(reifyVV(t.getV(v), t), vnv.w.e)
-  //     case OCons(v, vs) =>
-  //       ev.flVert(reifyVV(t.getV(v), t), reifyVV(TVarNestedVal(vs, vnv.w), t))
-  //   }
-  // }
+  def reifySem[E[_], S, A](
+      sem: Semantic[E, Fold[S, A]])(implicit
+      ev: OpticLang[E]): E[Fold[S, A]] = {
+    val TFold(expr, filt, t) = sem.eval(varStr)
+    filt.map(reifyExpr(_, t)).foldLeft(reifyExpr(expr, t)) { (acc, e) =>
+      ev.flVert(ev.flHori(acc, e), ev.aflAsFl(ev.gtAsAfl(ev.first[A, Boolean])))
+    }
+  }
 
-  // def reifyExpr[E[_], S, A](
-  //     expr: TExpr[E, Fold, S, A],
-  //     t: Table)(implicit
-  //     ev: OpticLang[E]): E[Fold[S, A]] = expr match {
-  //   case Product(l, r, is) =>
-  //     is.subst[λ[x => E[Fold[S, x]]]](ev.flHori(reifyExpr(l, t), reifyExpr(r, t)))
-  //   case Vertical(u, d) => ev.flVert(reifyExpr(u, t), reifyExpr(d, t))
-  //   case x: Var[E, Fold, S, A] => reifyVV(t.getV(x), t)
-  //   case w: Wrap[E, Fold, S, A] => w.e
-  //   case LikeInt(i, is) =>
-  //     is.flip.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.likeInt[S](i)))
-  //   case LikeBool(b, is) =>
-  //     is.flip.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.likeBool[S](b)))
-  //   case Id(is) => is.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.id[S]))
-  //   case First(is) => is.flip.subst[λ[x => E[Fold[x, A]]]](ev.gtAsFl(ev.first))
-  //   case Second(is) => is.flip.subst[λ[x => E[Fold[x, A]]]](ev.gtAsFl(ev.second))
-  //   case Not(is1, is2) =>
-  //     is2.flip.subst[λ[x => E[Fold[S, x]]]](
-  //       is1.flip.subst[λ[x => E[Fold[x, Boolean]]]](ev.gtAsFl(ev.not)))
-  //   case Sub(is1, is2) =>
-  //     is2.flip.subst[λ[x => E[Fold[S, x]]]](
-  //       is1.flip.subst[λ[x => E[Fold[x, Int]]]](ev.gtAsFl(ev.sub)))
-  //   case Gt(is1, is2) =>
-  //     is2.flip.subst[λ[x => E[Fold[S, x]]]](
-  //       is1.flip.subst[λ[x => E[Fold[x, Boolean]]]](ev.gtAsFl(ev.greaterThan)))
-  // }
+  def reifyVV[E[_], S, A](
+      vv: TVarVal[E, Fold, S, A],
+      t: Table)(implicit
+      ev: OpticLang[E]): E[Fold[S, A]] = vv match {
+    case TVarSimpleVal(w) => w.e
+    case TVarNestedVal(v, w) =>
+      ev.flVert(reifyVV(t.getVal(v), t), reifyExpr(w, t))
+  }
+
+  def reifyExpr[E[_], S, A](
+      expr: TExpr[E, Fold, S, A],
+      t: Table)(implicit
+      ev: OpticLang[E]): E[Fold[S, A]] = expr match {
+    case Product(l, r, is) =>
+      is.subst[λ[x => E[Fold[S, x]]]](ev.flHori(reifyExpr(l, t), reifyExpr(r, t)))
+    case Vertical(u, d) => ev.flVert(reifyExpr(u, t), reifyExpr(d, t))
+    case x: Var[E, Fold, S, A] => reifyVV(t.getVal(x), t)
+    case w: Wrap[E, Fold, S, A] => w.e
+    case LikeInt(i, is) =>
+      is.flip.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.likeInt[S](i)))
+    case LikeBool(b, is) =>
+      is.flip.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.likeBool[S](b)))
+    case Id(is) => is.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.id[S]))
+    case First(is) => is.flip.subst[λ[x => E[Fold[x, A]]]](ev.gtAsFl(ev.first))
+    case Second(is) => is.flip.subst[λ[x => E[Fold[x, A]]]](ev.gtAsFl(ev.second))
+    case Not(is1, is2) =>
+      is2.flip.subst[λ[x => E[Fold[S, x]]]](
+        is1.flip.subst[λ[x => E[Fold[x, Boolean]]]](ev.gtAsFl(ev.not)))
+    case Sub(is1, is2) =>
+      is2.flip.subst[λ[x => E[Fold[S, x]]]](
+        is1.flip.subst[λ[x => E[Fold[x, Int]]]](ev.gtAsFl(ev.sub)))
+    case Gt(is1, is2) =>
+      is2.flip.subst[λ[x => E[Fold[S, x]]]](
+        is1.flip.subst[λ[x => E[Fold[x, Boolean]]]](ev.gtAsFl(ev.greaterThan)))
+  }
 
   import State._
 
