@@ -12,7 +12,7 @@ class CoupleExampleTest extends FlatSpec with Matchers {
   import CoupleExample._, instance._
   import SQL._
 
-  val keys = Map("Person" -> "name")
+  val keys = Map("Person" -> "name", "Address" -> "id")
 
   def genSql[S, A](sem: Semantic[Const[String, ?], Fold[S, A]]): String =
     sqlToString(fromSemantic(sem, keys))
@@ -108,6 +108,12 @@ class CoupleExampleTest extends FlatSpec with Matchers {
     matchSql(
       raw"SELECT (.+)\.name, \1\.age FROM Person AS \1 WHERE \(\(\1\.age > 30\) AND \(\1\.age > 40\)\);".r,
       dummyNameAndAge)
+  }
+
+  it should "normalise a deeply nested query" in {
+    matchSql(
+      raw"SELECT (.+)\.street, (.+)\.street FROM Couple AS (.+) INNER JOIN Person AS (.+) ON \3\.her = \4\.name INNER JOIN Address AS \1 ON \4\.address = \1\.id INNER JOIN Person AS (.+) ON \3\.him = \5\.name INNER JOIN Address AS \2 ON \5\.address = \2.id;".r, 
+      herAndHimStreet_1)
   }
 }
 
