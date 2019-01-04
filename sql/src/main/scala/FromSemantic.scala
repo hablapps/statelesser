@@ -8,13 +8,6 @@ import OpticLang._
 trait FromSemantic {
   import OpticLang.Table
 
-  private val varStr: Stream[String] = {
-    def syms(pattern: Stream[String], i: Int = 0): Stream[String] =
-      pattern.map(_ + i) #::: syms(pattern, i + 1)
-    val pattern = Stream.range('a', 'z').map(_.toString)
-    pattern #::: syms(pattern)
-  }
-
   def fromSemantic[E[_], S, A](
       sem: Semantic[E, Fold[S, A]],
       keys: Map[TypeNme, FieldName] = Map()): SSelect = {
