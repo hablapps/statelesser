@@ -10,7 +10,7 @@ trait CoupleExample[Expr[_]] {
   implicit val ev: OpticLang[Expr]
 
   /* data layer */
-  
+
   type Couple
   type Couples = List[Couple]
   type Person
@@ -41,7 +41,7 @@ trait CoupleExample[Expr[_]] {
   def getPeopleName_2: Expr[Fold[People, String]] =
     people > ((name * age) > first).asFold
 
-  def peopleName_1: Expr[Fold[People, String]] = 
+  def peopleName_1: Expr[Fold[People, String]] =
     people > (name * age * weight > first > first).asFold
 
   def peopleName_2: Expr[Fold[People, String]] =
@@ -126,23 +126,23 @@ trait CoupleExample[Expr[_]] {
     couples > (id > her > name * age > id > id).asFold
 
   def getPeopleGt30: Expr[Fold[People, (String, Int)]] =
-    people > (name.asAffineFold * 
+    people > (name.asAffineFold *
       (age.asAffineFold > filtered (gt(30)))).asFold
 
   def getHerGt30_1: Expr[Fold[Couples, (String, Int)]] =
-    couples > her.asFold > (name.asAffineFold * 
+    couples > her.asFold > (name.asAffineFold *
       (age.asAffineFold > filtered (gt(30)))).asFold
 
   def getHerGt30_2: Expr[Fold[Couples, (String, Int)]] =
-    couples > ((her > name).asAffineFold * 
+    couples > ((her > name).asAffineFold *
       ((her > age).asAffineFold > filtered (gt(30)))).asFold
 
   def getHerNameGt30_1: Expr[Fold[Couples, String]] =
-    couples > her.asFold > (name.asAffineFold <* 
+    couples > her.asFold > (name.asAffineFold <*
       (age.asAffineFold > filtered (gt(30)))).asFold
-  
+
   def getHerNameGt30_2: Expr[Fold[Couples, String]] =
-    couples > ((her > name).asAffineFold <* 
+    couples > ((her > name).asAffineFold <*
       ((her > age).asAffineFold > filtered (gt(30)))).asFold
 
   def differenceAll: Expr[Couples => List[(String, Int)]] =
@@ -150,30 +150,34 @@ trait CoupleExample[Expr[_]] {
       ((her > name) * ((her > age) * (him > age) > sub)).asFold)
 
   def difference: Expr[Fold[Couples, (String, Int)]] =
-    couples > 
-      ((her > name).asAffineFold * 
+    couples >
+      ((her > name).asAffineFold *
         (((her > age) - (him > age)).asAffineFold > filtered (gt(0)))).asFold
 
+  def difference_1: Expr[Fold[Couples, (String, Int)]] =
+    (couples > (her > name).asFold) *
+    (couples > (((her > age) - (him > age)).asAffineFold > filtered (gt(0))).asFold)
+
   def differenceName_1: Expr[Fold[Couples, String]] =
-    couples > 
-      ((her > name).asAffineFold <* 
+    couples >
+      ((her > name).asAffineFold <*
         (((her > age) - (him > age)).asAffineFold > filtered (gt(0)))).asFold
 
   def differenceName_2: Expr[Fold[Couples, String]] =
-    couples > 
-      ((her > name).asAffineFold * 
-        (((her > age) - (him > age)).asAffineFold > filtered (gt(0))) > 
+    couples >
+      ((her > name).asAffineFold *
+        (((her > age) - (him > age)).asAffineFold > filtered (gt(0))) >
           first.asAffineFold).asFold
 
   def dummyNameAndAge: Expr[Fold[People, (String, Int)]] =
-    people > ((name.asAffineFold * ((name * age > 
-      first * second > 
-      second * first > 
-      second * first > 
-      second).asAffineFold 
+    people > ((name.asAffineFold * ((name * age >
+      first * second >
+      second * first >
+      second * first >
+      second).asAffineFold
       > filtered(gt(30))
       > filtered(
-          id * (likeInt[Int](41) * likeInt[Int](1) > sub) 
+          id * (likeInt[Int](41) * likeInt[Int](1) > sub)
             > greaterThan)))).asFold
 }
 
@@ -184,8 +188,6 @@ object CoupleExample {
   val instance = new CoupleExample[Stack] {
     type Couple = Unit
     type Person = Unit
-
-    // XXX: next methods are redundant, unify with tSemantic in OpticLang.
 
     private def wrapG[S, A](inf: OpticInfo): Stack[Getter[S, A]] =
       state(TGetter(TExpr.wrap[Const[String, ?], Getter, S, A](
@@ -223,7 +225,7 @@ object CoupleExample {
 
     val address = wrapG(
       OpticInfo(KGetter, "address", TypeInfo("Person", true), TypeInfo("Address", true)))
-    
+
     val street = wrapG(
       OpticInfo(KGetter, "street", TypeInfo("Address", true), TypeInfo("String")))
   }

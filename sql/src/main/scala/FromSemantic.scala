@@ -39,7 +39,10 @@ trait FromSemantic {
       keys: Map[TypeNme, FieldName]): SqlFrom =
     tab.simpleTable[E, Fold].toList match {
       case (nme, TVarSimpleVal(Wrap(_, info))) :: _ => SFrom(List(
-        STable(info.tgt.nme, nme, tab.nestedTable[E, Fold].toList.map(joinToSql(_, keys)))))
+        STable(
+          info.tgt.nme, 
+          nme, 
+          tab.nestedTable[E, Fold].toList.sortBy(_._1).map(joinToSql(_, keys)))))
       case _ => 
         throw new Error(s"Sorry, but we don't support product roots yet: $tab")
     }

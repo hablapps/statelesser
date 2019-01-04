@@ -195,15 +195,20 @@ object OpticLang {
 
   case class Table(rows: Map[Symbol, Any] = Map()) {
 
-    def unify(other: Table): (Table, Set[(String, String)]) = {
-      (rows ++ other.rows)
-          .groupBy(_._2)
-          .map { case (k, v) => (k, v.keys) }
-          .foldLeft((Table(), Set.empty[(String, String)])) { 
-        case ((Table(rs), rws), (v, k :: ks)) => 
-          (Table(rs + (k -> v)), rws ++ ks.map((_, k)))
-      }
+    def consistency: (Table, Set[(String, String)]) = {
+      val (t, rws) = rows
+        .groupBy(_._2)
+        .map { case (k, v) => (k, v.keys.toList) }
+        .foldLeft((Table(), Set.empty[(String, String)])) { 
+          case ((Table(rs), rws), (v, k :: ks)) => 
+            (Table(rs + (k -> v)), rws ++ ks.map((_, k)))
+        }
+      if (rws.isEmpty) (t, rws)
+      else t.rwVars(rws).consistency.map(rws ++ _)
     }
+
+    def unify(other: Table): (Table, Set[(String, String)]) =
+      Table(rows ++ other.rows).consistency
 
     def clean(used: Set[String]): Table = {
       def deps(k: String): Set[String] = rows(k) match {
@@ -213,6 +218,9 @@ object OpticLang {
       }
       Table(rows.filterKeys((used ++ (used flatMap deps)).contains(_)))
     }
+
+    def rwVars(rws: Set[(String, String)]): Table =
+      Table(rows.mapValues(_.asInstanceOf[TVarVal[Any, Any, _, _]].rwVars(rws)))
   }
 
   implicit class TableOps(table: Table) {
