@@ -1,7 +1,5 @@
 import scalaz._
 
-import statelesser.OpticLang._
-
 package object `statelesser` {
 
   type TypeNme = String

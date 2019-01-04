@@ -3,8 +3,7 @@ package sql
 package test
 
 import scala.util.matching.Regex
-import scalaz._, Scalaz._
-import OpticLang.Table
+import scalaz._
 import statelesser.test._
 import org.scalatest._
 
