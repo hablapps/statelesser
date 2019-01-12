@@ -55,13 +55,9 @@ trait OpticLang[Expr[_]] {
 
   def lnAsGt[S, A](ln: Expr[Lens[S, A]]): Expr[Getter[S, A]]
 
-  def gtAsFl1[S, A](gt: Expr[Getter[S, A]]): Expr[Fold1[S, A]]
-
   def gtAsAfl[S, A](gt: Expr[Getter[S, A]]): Expr[AffineFold[S, A]]
 
   def aflAsFl[S, A](afl: Expr[AffineFold[S, A]]): Expr[Fold[S, A]]
-
-  def fl1AsFl[S, A](fl1: Expr[Fold1[S, A]]): Expr[Fold[S, A]]
 
   // derived methods
 
@@ -462,8 +458,6 @@ object OpticLang {
 
     def lnAsGt[S, A](ln: Semantic[E, Lens[S, A]]): Semantic[E, Getter[S, A]] = ???
 
-    def gtAsFl1[S, A](gt: Semantic[E, Getter[S, A]]): Semantic[E, Fold1[S, A]] = ???
-
     def gtAsAfl[S, A](
         gt: Semantic[E, Getter[S, A]]): Semantic[E, AffineFold[S, A]] =
       for {
@@ -483,9 +477,6 @@ object OpticLang {
           def apply[X, Y](afl: E[AffineFold[X, Y]]) = OpticLang[E].aflAsFl(afl)
         }
       } yield TFold(expr.mapO(f), filt.map(_.mapO(f)), Table())
-
-    def fl1AsFl[S, A](fl1: Semantic[E, Fold1[S, A]]): Semantic[E, Fold[S, A]] = ???
-
   }
 
   def fresh: State[Stream[String], String] =
@@ -515,12 +506,6 @@ object OpticLang {
       def *[B](r: Expr[Fold[S, B]]): Expr[Fold[S, (A, B)]] = O.flHori(l, r)
     }
 
-    implicit class Fold1Ops[Expr[_], S, A](
-        l: Expr[Fold1[S, A]])(implicit
-        O: OpticLang[Expr]) {
-      def asFold: Expr[Fold[S, A]] = O.fl1AsFl(l)
-    }
-
     implicit class AffineFoldOps[Expr[_], S, A](
         l: Expr[AffineFold[S, A]])(implicit
         O: OpticLang[Expr]) {
@@ -538,7 +523,6 @@ object OpticLang {
     implicit class GetterOps[Expr[_], S, A](
         l: Expr[Getter[S, A]])(implicit
         O: OpticLang[Expr]) {
-      def asFold1: Expr[Fold1[S, A]] = O.gtAsFl1(l)
       def asAffineFold: Expr[AffineFold[S, A]] = O.gtAsAfl(l)
       def asFold: Expr[Fold[S, A]] = O.aflAsFl(O.gtAsAfl(l))
       def >[B](r: Expr[Getter[A, B]]): Expr[Getter[S, B]] = O.gtVert(l, r)
