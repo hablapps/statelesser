@@ -398,21 +398,17 @@ object OpticLang {
         }
       })
 
-    // XXX: according to Scala, `Done[O,S,A]` isn't a valid `Semantic[O[S,A]]`
+    def gtAsAfl[S, A](gt: Semantic[Getter[S, A]]) = 
+      gt.map(_ match {
+        case done: Done[Getter, S, A] => done.as[AffineFold]
+        case todo: Todo[Getter, S, A] => todo.as[AffineFold]
+      })
 
-    def gtAsAfl[S, A](gt: Semantic[Getter[S, A]]) = gt match {
-      case done: Done[Getter, S, A] => 
-        done.as[AffineFold].asInstanceOf[Semantic[AffineFold[S, A]]]
-      case todo: Todo[Getter, S, A] => 
-        todo.as[AffineFold].asInstanceOf[Semantic[AffineFold[S, A]]]
-    }
-
-    def aflAsFl[S, A](afl: Semantic[AffineFold[S, A]]) = afl match {
-      case done: Done[AffineFold, S, A] => 
-        done.as[Fold].asInstanceOf[Semantic[Fold[S, A]]]
-      case todo: Todo[AffineFold, S, A] => 
-        todo.as[Fold].asInstanceOf[Semantic[Fold[S, A]]]
-    }
+    def aflAsFl[S, A](afl: Semantic[AffineFold[S, A]]) = 
+      afl.map(_ match {
+        case done: Done[AffineFold, S, A] => done.as[Fold]
+        case todo: Todo[AffineFold, S, A] => todo.as[Fold]
+      })
   }
  
   def fresh: State[Stream[String], String] =
