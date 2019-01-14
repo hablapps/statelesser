@@ -75,9 +75,9 @@ trait FromSemantic {
       keys: Map[TypeNme, FieldName]): SqlExp = t match {
     case Var(e) => SAll(e)
     case Select(Var(s), ot) => SProj(s, ot.nme)
-    case Sub(l, r) => SBinOp("-", treeToExpr(l, keys), treeToExpr(r, keys))
-    case Gt(l, r) => SBinOp(">", treeToExpr(l, keys), treeToExpr(r, keys))
-    case Not(e) => SUnOp("NOT", treeToExpr(e, keys))
+    case Sub(l, r, _) => SBinOp("-", treeToExpr(l, keys), treeToExpr(r, keys))
+    case Gt(l, r, _) => SBinOp(">", treeToExpr(l, keys), treeToExpr(r, keys))
+    case Not(e, _) => SUnOp("NOT", treeToExpr(e, keys))
     case LikeInt(i) => SCons(i.toString)
     case LikeBool(b) => SCons(b.toString)
     case LikeStr(s) => SCons(s""""$s"""")

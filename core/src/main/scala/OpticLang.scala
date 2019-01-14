@@ -258,6 +258,21 @@ object OpticLang {
         case _ => throw new Error(s"Can't vert compose with 'Done' semantic: $sem2")
       }
 
+    private def unifyVars[O[_, _], S, A](done: Done[O, S, A]): Done[O, S, A] = {
+      val (t, rws) = done.vars
+        .groupBy(_._2)
+        .map { case (k, v) => (k, v.keys.toList) }
+        .foldLeft((Map.empty[Symbol, Value], Set.empty[(String, String)])) {
+          case ((m, rws), (v, k :: ks)) =>
+            (m + (k -> v), rws ++ ks.map((_, k)))
+        }
+      if (rws.isEmpty) done
+      else unifyVars(Done(
+        done.expr.renameVars(rws), 
+        done.filt.map(_.renameVars(rws)), 
+        t))
+    }
+
     def cart[O[_, _], S, A, B](
         lsem: Semantic[O[S, A]],
         rsem: Semantic[O[S, B]]): Semantic[O[S, (A, B)]] =
@@ -269,8 +284,10 @@ object OpticLang {
           new Todo[O, S, (A, B)] {
             def apply[T](done: Done[O, T, S]) = (ltodo(done), rtodo(done)) match {
               case (Done(le, lf, lv), Done(re, rf, rv)) =>
-                // TODO: unify variables
-                Done(Pair[T, (A, B), A, B](le, re, implicitly), lf ++ rf, lv ++ rv)
+                unifyVars(Done[O, T, (A, B)](
+                  Pair[T, (A, B), A, B](le, re, implicitly), 
+                  lf ++ rf, 
+                  lv ++ rv))
             }
           }
         case (Done(le, lf, lv), Done(re, rf, rv)) =>
@@ -330,7 +347,7 @@ object OpticLang {
             Done(Just((pair.l, pair.r) match {
               case (Just(l), Just(LikeInt(0))) => l
               case (Just(LikeInt(x)), Just(LikeInt(y))) => LikeInt(x - y)
-              case (Just(l), Just(r)) => Sub(l, r)
+              case (Just(l), Just(r)) => Sub(l, r, implicitly)
             }), done.filt, done.vars)
         }
       })
@@ -341,7 +358,7 @@ object OpticLang {
           case pair: Pair[S, (Int, Int), Int, Int]@unchecked =>
             Done(Just((pair.l, pair.r) match {
               case (Just(LikeInt(x)), Just(LikeInt(y))) => LikeBool(x > y)
-              case (Just(l), Just(r)) => Gt(l, r)
+              case (Just(l), Just(r)) => Gt(l, r, implicitly)
             }), done.filt, done.vars)
         }
       })
@@ -393,7 +410,7 @@ object OpticLang {
           case just: Just[S, Boolean] =>
             Done(Just(just.e match {
               case LikeBool(b) => LikeBool(!b)
-              case Not(b) => b
+              case Not(b, _) => b
             }), done.filt, done.vars)
         }
       })

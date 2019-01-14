@@ -71,7 +71,7 @@ class CoupleExampleTest extends FlatSpec with Matchers {
       getPeopleNameAnd3_4)
   }
 
-  it should "generate multi-selection with multi-valued fields" in {
+  it should "generate multi-selection with multi-valued fields" ignore {
     matchSql(
       raw"".r,
       getHerNameAndHimAliases_1)

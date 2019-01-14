@@ -15,7 +15,35 @@ case class OpticType[S, A](
   src: TypeInfo, 
   tgt: TypeInfo)
 
-sealed abstract class TExpr[S, A]
+sealed abstract class TExpr[S, A] {
+  def renameVars(rws: Set[(String, String)]): TExpr[S, A] = this match {
+    case Var(sym) => rws.find(_._1 == sym).fold(this)(kv => Var(kv._2))
+    case Select(Var(sym), ot) =>
+      rws.find(_._1 == sym).fold(this)(kv => Select(Var(kv._2), ot))
+    case Not(b, is) => TExpr.not(b.renameVars(rws), is)
+    case Sub(l, r, is) => TExpr.sub(l.renameVars(rws), r.renameVars(rws), is)
+    case Gt(l, r, is) => TExpr.gt(l.renameVars(rws), r.renameVars(rws), is)
+    case _ => this
+  }
+}
+
+object TExpr {
+
+  def not[S, A](b: TExpr[S, Boolean], is: A === Boolean): TExpr[S, A] = 
+    Not(b, is)
+
+  def sub[S, A](
+      l: TExpr[S, Int], 
+      r: TExpr[S, Int], 
+      is: A === Int): TExpr[S, A] = 
+    Sub(l, r, is)
+
+  def gt[S, A](
+      l: TExpr[S, Int], 
+      r: TExpr[S, Int], 
+      is: A === Boolean): TExpr[S, A] = 
+    Gt(l, r, is)
+}
 
 case class LikeInt[S](i: Int) extends TExpr[S, Int]
 
@@ -29,13 +57,26 @@ case class Select[S, A, B](
   v: Var[S, A], 
   ot: OpticType[A, B]) extends TExpr[S, B]
 
-case class Not[S](b: TExpr[S, Boolean]) extends TExpr[S, Boolean]
+case class Not[S, A](
+  b: TExpr[S, Boolean], 
+  is: A === Boolean) extends TExpr[S, A]
 
-case class Sub[S](l: TExpr[S, Int], r: TExpr[S, Int]) extends TExpr[S, Int]
+case class Sub[S, A](
+  l: TExpr[S, Int], 
+  r: TExpr[S, Int],
+  is: A === Int) extends TExpr[S, A]
 
-case class Gt[S](l: TExpr[S, Int], r: TExpr[S, Int]) extends TExpr[S, Boolean]
+case class Gt[S, A](
+  l: TExpr[S, Int], 
+  r: TExpr[S, Int],
+  is: A === Boolean) extends TExpr[S, A]
 
-sealed abstract class TSel[S, A]
+sealed abstract class TSel[S, A] {
+  def renameVars(rws: Set[(String, String)]): TSel[S, A] = this match {
+    case Pair(l, r, is) => Pair(l.renameVars(rws), r.renameVars(rws), is)
+    case Just(e) => Just(e.renameVars(rws))
+  }
+}
 
 case class Just[S, A](e: TExpr[S, A]) extends TSel[S, A]
 
