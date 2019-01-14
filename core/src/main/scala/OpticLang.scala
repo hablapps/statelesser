@@ -308,8 +308,8 @@ object OpticLang {
       cart(lsem, rsem)
 
     def filtered[S](p: Semantic[Getter[S, Boolean]]) =
-      state(new Todo[AffineFold, S, S] {
-        def apply[T](done: Done[AffineFold, T, S]) = p match {
+      p.map(sem => new Todo[AffineFold, S, S] {
+        def apply[T](done: Done[AffineFold, T, S]) = sem match {
           case todo: Todo[Getter, S, Boolean] => {
             // We're just selecting a unique Boolean, so must be `Just` 
             // XXX: weird, turning an `AffineFold` into a `Getter`. It's just a
