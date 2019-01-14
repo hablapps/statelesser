@@ -9,6 +9,6 @@ package object `statelesser` {
 
   type Value = OpticType[_, _] \/ Select[_, _, _]
 
-  type Semantic[E[_], A] = State[Stream[Symbol], TSemantic[A]]
+  type Semantic[A] = State[Stream[Symbol], TSemantic[A]]
 }
 

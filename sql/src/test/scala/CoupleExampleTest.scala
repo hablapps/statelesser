@@ -3,7 +3,6 @@ package sql
 package test
 
 import scala.util.matching.Regex
-import scalaz._
 import statelesser.test._
 import org.scalatest._
 
@@ -14,10 +13,10 @@ class CoupleExampleTest extends FlatSpec with Matchers {
 
   val keys = Map("Person" -> "name", "Address" -> "id")
 
-  def genSql[S, A](sem: Semantic[Const[String, ?], Fold[S, A]]): String =
+  def genSql[S, A](sem: Semantic[Fold[S, A]]): String =
     sqlToString(fromSemantic(sem, keys))
 
-  def matchSql[S, A](r: Regex, stks: Stack[Fold[S, A]]*) =
+  def matchSql[S, A](r: Regex, stks: Semantic[Fold[S, A]]*) =
     stks.foreach { stk =>
       genSql(stk) should fullyMatch regex r
     }
@@ -70,6 +69,12 @@ class CoupleExampleTest extends FlatSpec with Matchers {
       getPeopleNameAnd3_2,
       getPeopleNameAnd3_3,
       getPeopleNameAnd3_4)
+  }
+
+  it should "generate multi-selection with multi-valued fields" in {
+    matchSql(
+      raw"".r,
+      getHerNameAndHimAliases_1)
   }
 
   it should "generate filters" in {
