@@ -3,6 +3,11 @@ package sql
 
 case class SSelect(select: SqlSelect, from: SqlFrom, where: Option[SqlExp])
 
+object SSelect {
+  def toString(sel: SSelect): String = 
+    (new interpreter.ToString).sqlToString(sel)
+}
+
 sealed abstract class SqlFrom
 case class SFrom(ts: List[SqlTable]) extends SqlFrom
 

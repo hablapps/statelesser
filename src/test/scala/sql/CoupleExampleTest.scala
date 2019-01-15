@@ -10,12 +10,11 @@ import optic.Fold
 class CoupleExampleTest extends FlatSpec with Matchers {
 
   import CoupleExample._, instance._
-  import SQL._
 
   val keys = Map("Person" -> "name", "Address" -> "id")
 
   def genSql[S, A](sem: Semantic[Fold[S, A]]): String =
-    sqlToString(fromSemantic(sem, keys))
+    SSelect.toString((new FromSemantic {}).fromSemantic(sem, keys))
 
   def matchSql[S, A](r: Regex, stks: Semantic[Fold[S, A]]*) =
     stks.foreach { stk =>

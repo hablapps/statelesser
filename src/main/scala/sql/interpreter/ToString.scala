@@ -1,7 +1,8 @@
 package statelesser
 package sql
+package interpreter
 
-trait ToString {
+class ToString {
 
   def sqlToString(sql: SSelect): String = {
     val sel = selToString(sql.select)
