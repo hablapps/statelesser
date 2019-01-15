@@ -198,19 +198,19 @@ object CoupleExample {
       fresh.map(s => Done(Just(Var(s)), Set.empty, Map(s -> ot.left)))
 
     def assignNode[O[_, _], S, A](ot: OpticType[S, A]): Semantic[O[S, A]] =
-      fresh.map(s => new Todo[O, S, A] {
-        def apply[T](done: Done[O, T, S]) = done.expr match {
-          case Just(x: Var[T, S]) =>
+      fresh.map(s => Todo(λ[Done[O, ?, S] ~> Done[O, ?, A]] { done =>
+        done.expr match {
+          case Just(x@Var(_)) =>
             Done(Just(Var(s)), done.filt, done.vars + (s -> Select(x, ot).right))
         }
-      })
+      }))
 
     def assignLeaf[O[_, _], S, A](otpe: OpticType[S, A]): Semantic[O[S, A]] =
-      state(new Todo[O, S, A] {
-        def apply[T](done: Done[O, T, S]) = done.expr match {
-          case Just(x: Var[T, S]) => done.copy(expr = Just(Select(x, otpe)))
+      state(Todo(λ[Done[O, ?, S] ~> Done[O, ?, A]] { done =>
+        done.expr match {
+          case Just(x@Var(_)) => done.copy(expr = Just(Select(x, otpe)))
         }
-      })
+      }))
 
     val couples = assignRoot(
       OpticType(KFold, "couples", TypeInfo("Couples"), TypeInfo("Couple", true)))
