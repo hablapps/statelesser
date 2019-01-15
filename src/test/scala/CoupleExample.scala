@@ -1,13 +1,16 @@
 package statelesser
+package core
 package test
 
 import scalaz._, Scalaz._
 
-import OpticLang._
+import optic._
+import sqlnormal._
+import core.Statelesser, Statelesser._
 
 trait CoupleExample[Expr[_]] {
 
-  implicit val ev: OpticLang[Expr]
+  implicit val ev: Statelesser[Expr]
 
   /* data layer */
 
@@ -31,7 +34,7 @@ trait CoupleExample[Expr[_]] {
   /* logic */
 
   import ev._
-  import OpticLang.syntax._
+  import Statelesser.syntax._
 
   def getPeople: Expr[Fold[People, Person]] =
     people
@@ -189,7 +192,7 @@ object CoupleExample {
 
   val instance: CoupleExample[Semantic] = new CoupleExample[Semantic] {
 
-    val ev = OpticLang[Semantic]
+    val ev = Statelesser[Semantic]
 
     def assignRoot[O[_, _], S, A](ot: OpticType[S, A]): Semantic[O[S, A]] = 
       fresh.map(s => Done(Just(Var(s)), Set.empty, Map(s -> ot.left)))

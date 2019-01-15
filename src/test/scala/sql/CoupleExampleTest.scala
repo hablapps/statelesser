@@ -3,18 +3,20 @@ package sql
 package test
 
 import scala.util.matching.Regex
-import statelesser.test._
 import org.scalatest._
+
+import optic.Fold
+import core.test._
+import sqlnormal._
 
 class CoupleExampleTest extends FlatSpec with Matchers {
 
   import CoupleExample._, instance._
-  import SQL._
 
   val keys = Map("Person" -> "name", "Address" -> "id")
 
   def genSql[S, A](sem: Semantic[Fold[S, A]]): String =
-    sqlToString(fromSemantic(sem, keys))
+    SSelect.toString(TSemantic.toSql(sem, keys))
 
   def matchSql[S, A](r: Regex, stks: Semantic[Fold[S, A]]*) =
     stks.foreach { stk =>

@@ -1,24 +1,25 @@
 package statelesser
-package sql
+package sqlnormal
+package interpreter
 
 import scalaz._, Scalaz._
+import optic._
+import sql._
 
-import statelesser.Value
+class ToSql {
 
-trait FromSemantic {
-
-  val varStr: Stream[String] = {
-    def syms(pattern: Stream[String], i: Int = 0): Stream[String] =
-      pattern.map(_ + i) #::: syms(pattern, i + 1)
-    val pattern = Stream.range('a', 'z').map(_.toString)
-    pattern #::: syms(pattern)
-  }
-
-  def fromSemantic[S, A](
+  def toSql[S, A](
       sem: Semantic[Fold[S, A]],
       keys: Map[TypeNme, FieldName] = Map()): SSelect = {
     val Done(expr, filt, vars) = sem.eval(varStr)
     SSelect(selToSql(expr, keys), tabToSql(vars, keys), whrToSql(filt, keys))
+  }
+
+  private val varStr: Stream[String] = {
+    def syms(pattern: Stream[String], i: Int = 0): Stream[String] =
+      pattern.map(_ + i) #::: syms(pattern, i + 1)
+    val pattern = Stream.range('a', 'z').map(_.toString)
+    pattern #::: syms(pattern)
   }
 
   private def flatProduct(
@@ -34,7 +35,7 @@ trait FromSemantic {
   }
 
   private def tabToSql[E[_]](
-      vars: Map[Symbol, Value],
+      vars: Map[Symbol, sqlnormal.Value],
       keys: Map[TypeNme, FieldName]): SqlFrom = {
     val (roots, nodes) = vars.foldLeft(
       (List.empty[(String, OpticType[_, _])], List.empty[(String, Select[_, _, _])])) {
