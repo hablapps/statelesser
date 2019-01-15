@@ -4,6 +4,8 @@ import Function.const
 import scalaz._, Scalaz._
 import Leibniz._
 
+import optic._
+
 trait OpticLang[Expr[_]] {
 
   def flVert[S, A, B](

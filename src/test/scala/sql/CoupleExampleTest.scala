@@ -5,6 +5,7 @@ package test
 import scala.util.matching.Regex
 import statelesser.test._
 import org.scalatest._
+import optic.Fold
 
 class CoupleExampleTest extends FlatSpec with Matchers {
 

@@ -4,6 +4,7 @@ package sql
 import scalaz._, Scalaz._
 
 import statelesser.Value
+import optic.Fold
 
 trait FromSemantic {
 

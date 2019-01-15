@@ -3,6 +3,7 @@ package test
 
 import scalaz._, Scalaz._
 
+import optic._
 import OpticLang._
 
 trait CoupleExample[Expr[_]] {
