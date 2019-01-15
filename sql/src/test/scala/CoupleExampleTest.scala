@@ -3,7 +3,6 @@ package sql
 package test
 
 import scala.util.matching.Regex
-import scalaz._
 import statelesser.test._
 import org.scalatest._
 
@@ -14,10 +13,10 @@ class CoupleExampleTest extends FlatSpec with Matchers {
 
   val keys = Map("Person" -> "name", "Address" -> "id")
 
-  def genSql[S, A](sem: Semantic[Const[String, ?], Fold[S, A]]): String =
+  def genSql[S, A](sem: Semantic[Fold[S, A]]): String =
     sqlToString(fromSemantic(sem, keys))
 
-  def matchSql[S, A](r: Regex, stks: Stack[Fold[S, A]]*) =
+  def matchSql[S, A](r: Regex, stks: Semantic[Fold[S, A]]*) =
     stks.foreach { stk =>
       genSql(stk) should fullyMatch regex r
     }
@@ -72,6 +71,12 @@ class CoupleExampleTest extends FlatSpec with Matchers {
       getPeopleNameAnd3_4)
   }
 
+  it should "generate multi-selection with multi-valued fields" ignore {
+    matchSql(
+      raw"".r,
+      getHerNameAndHimAliases_1)
+  }
+
   it should "generate filters" in {
     matchSql(
       raw"SELECT (.+)\.name, \1\.age FROM Person AS \1 WHERE \(\1\.age > 30\);".r,
@@ -95,8 +100,8 @@ class CoupleExampleTest extends FlatSpec with Matchers {
   it should "generate complex queries" in {
     matchSql(
       raw"SELECT (.+)\.name, \(\1\.age - (.+)\.age\) FROM Couple AS (.+) INNER JOIN Person AS \1 ON \3\.her = \1\.name INNER JOIN Person AS \2 ON \3\.him = \2\.name WHERE \(\(\1\.age - \2\.age\) > 0\);".r,
-      difference,
-      difference_1)
+      difference)
+      //difference_1)
 
     matchSql(
       raw"SELECT (.+)\.name FROM Couple AS (.+) INNER JOIN Person AS \1 ON \2\.her = \1\.name INNER JOIN Person AS (.+) ON \2\.him = \3\.name WHERE \(\(\1\.age - \3\.age\) > 0\);".r,

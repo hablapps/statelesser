@@ -7,6 +7,8 @@ package object `statelesser` {
 
   type Symbol = String
 
-  type Semantic[E[_], A] = State[Stream[Symbol], TSemantic[E, A]]
+  type Value = OpticType[_, _] \/ Select[_, _, _]
+
+  type Semantic[A] = State[Stream[Symbol], TSemantic[A]]
 }
 
