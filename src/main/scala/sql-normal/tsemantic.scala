@@ -1,10 +1,11 @@
 package statelesser
 package sqlnormal
 
-import optic.Fold
-import sql.SSelect
+import scalaz._
 
-/*sealed*/ abstract class TSemantic[A]
+import optic.Fold
+
+sealed abstract class TSemantic[A]
 
 object TSemantic {
   def toSql[S, A](
@@ -21,20 +22,15 @@ case class Done[O[_, _], S, A](
   def as[O2[_, _]]: Done[O2, S, A] = Done(expr, filt, vars)
 }
 
-trait Todo[O[_, _], A, B] extends TSemantic[O[A, B]] { self =>
-
-  def apply[S](done: Done[O, S, A]): Done[O, S, B]
+case class Todo[O[_, _], A, B](
+    f: Done[O, ?, A] ~> Done[O, ?, B]) extends TSemantic[O[A, B]] {
 
   def compose[S](other: TSemantic[O[S, A]]): TSemantic[O[S, B]] = other match {
-    case sem@Done(_, _, _) => apply(sem)
-    case sem: Todo[O, S @ unchecked, A] => new Todo[O, S, B] {
-      def apply[T](done: Done[O, T, S]): Done[O, T, B] = self(sem(done))
-    }
+    case sem@Done(_, _, _) => f(sem)
+    case sem@Todo(g) => Todo(f.compose[Done[O, ?, S]](g))
   }
 
-  def as[O2[_, _]]: Todo[O2, A, B] = new Todo[O2, A, B] {
-    def apply[S](done: Done[O2, S, A]) =
-      self.apply(done.as[O]).as[O2]
-  }
+  def as[O2[_, _]]: Todo[O2, A, B] = 
+    Todo(λ[Done[O2, ?, A] ~> Done[O2, ?, B]](done => f(done.as[O]).as[O2]))
 }
 

@@ -41,23 +41,24 @@ class NBE extends Statelesser[Semantic] {
     cart(lsem, rsem)
 
   def filtered[S](p: Semantic[Getter[S, Boolean]]) =
-    p.map(sem => new Todo[AffineFold, S, S] {
-      def apply[T](done: Done[AffineFold, T, S]) = sem match {
-        case todo: Todo[Getter, S, Boolean] => {
-          // We're just selecting a unique Boolean, so must be `Just` 
-          // XXX: weird, turning an `AffineFold` into a `Getter`. It's just a
-          // phantom type so it won't fail, but conceptually, this is wrong.
-          val Just(e) = todo(Done[Getter, T, S](
-            done.expr, 
-            done.filt, 
-            done.vars)).expr
-          done.copy(filt = done.filt + e)
+    p.map(sem => Todo(
+      λ[Done[AffineFold, ?, S] ~> Done[AffineFold, ?, S]] { done =>
+        sem match {
+          case todo: Todo[Getter, S, Boolean] => {
+            // We're just selecting a unique Boolean, so must be `Just` 
+            // XXX: weird, turning an `AffineFold` into a `Getter`. It's just a
+            // phantom type so it won't fail, but conceptually, this is wrong.
+            val Just(e) = todo.f(Done(
+              done.expr, 
+              done.filt, 
+              done.vars)).expr
+            done.copy(filt = done.filt + e)
+          }
         }
-      }
-    })
+      }))
 
   def sub: Semantic[Getter[(Int, Int), Int]] =
-    state(new Todo[Getter, (Int, Int), Int] {
+    state(Todo(new (Done[Getter, ?, (Int, Int)] ~> Done[Getter, ?, Int]) {
       def apply[S](done: Done[Getter, S, (Int, Int)]) = done.expr match {
         case pair: Pair[S, (Int, Int), Int, Int]@unchecked =>
           Done(Just((pair.l, pair.r) match {
@@ -66,10 +67,10 @@ class NBE extends Statelesser[Semantic] {
             case (Just(l), Just(r)) => Sub(l, r, implicitly)
           }), done.filt, done.vars)
       }
-    })
+    }))
 
   def greaterThan: Semantic[Getter[(Int, Int), Boolean]] =
-    state(new Todo[Getter, (Int, Int), Boolean] {
+    state(Todo(new (Done[Getter, ?, (Int, Int)] ~> Done[Getter, ?, Boolean]) {
       def apply[S](done: Done[Getter, S, (Int, Int)]) = done.expr match {
         case pair: Pair[S, (Int, Int), Int, Int]@unchecked =>
           Done(Just((pair.l, pair.r) match {
@@ -77,49 +78,47 @@ class NBE extends Statelesser[Semantic] {
             case (Just(l), Just(r)) => Gt(l, r, implicitly)
           }), done.filt, done.vars)
       }
-    })
+    }))
 
   def first[A, B]: Semantic[Getter[(A, B), A]] =
-    state(new Todo[Getter, (A, B), A] {
+    state(Todo(new (Done[Getter, ?, (A, B)] ~> Done[Getter, ?, A]) {
       def apply[S](done: Done[Getter, S, (A, B)]) = done.expr match {
         case pair: Pair[S, (A, B), A, B]@unchecked =>
           cleanUnusedVars(Done(pair.l, done.filt, done.vars))
       }
-    })
+    }))
 
   def second[A, B]: Semantic[Getter[(A, B), B]] =
-    state(new Todo[Getter, (A, B), B] {
+    state(Todo(new (Done[Getter, ?, (A, B)] ~> Done[Getter, ?, B]) {
       def apply[S](done: Done[Getter, S, (A, B)]) = done.expr match {
         case pair: Pair[S, (A, B), A, B]@unchecked =>
           cleanUnusedVars(Done(pair.r, done.filt, done.vars))
       }
-    })
+    }))
 
   def likeInt[S](i: Int): Semantic[Getter[S, Int]] =
-    state(new Todo[Getter, S, Int] {
-      def apply[T](done: Done[Getter, T, S]) =
-        Done(Just(LikeInt(i)), done.filt, done.vars)
-    })
+    state(Todo(λ[Done[Getter, ?, S] ~> Done[Getter, ?, Int]] { done =>
+      Done(Just(LikeInt(i)), done.filt, done.vars)
+    }))
 
   def likeBool[S](b: Boolean): Semantic[Getter[S, Boolean]] =
-    state(new Todo[Getter, S, Boolean] {
-      def apply[T](done: Done[Getter, T, S]) =
+    state(Todo(
+      λ[Done[Getter, ?, S] ~> Done[Getter, ?, Boolean]] { done =>
         Done(Just(LikeBool(b)), done.filt, done.vars)
-    })
+      }))
 
   def likeStr[S](s: String): Semantic[Getter[S, String]] =
-    state(new Todo[Getter, S, String] {
-      def apply[T](done: Done[Getter, T, S]) =
-        Done(Just(LikeStr(s)), done.filt, done.vars)
-    })
+    state(Todo(λ[Done[Getter, ?, S] ~> Done[Getter, ?, String]] { done =>
+      Done(Just(LikeStr(s)), done.filt, done.vars)
+    }))
 
   def id[S]: Semantic[Getter[S, S]] =
-    state(new Todo[Getter, S, S] {
-      def apply[T](done: Done[Getter, T, S]) = done
-    })
+    state(Todo(λ[Done[Getter, ?, S] ~> Done[Getter, ?, S]] { done =>
+      done
+    }))
 
   def not: Semantic[Getter[Boolean, Boolean]] =
-    state(new Todo[Getter, Boolean, Boolean] {
+    state(Todo(new (Done[Getter, ?, Boolean] ~> Done[Getter, ?, Boolean]) {
       def apply[S](done: Done[Getter, S, Boolean]) = done.expr match {
         case just: Just[S, Boolean] =>
           Done(Just(just.e match {
@@ -127,7 +126,7 @@ class NBE extends Statelesser[Semantic] {
             case Not(b, _) => b
           }), done.filt, done.vars)
       }
-    })
+    }))
 
   def gtAsAfl[S, A](gt: Semantic[Getter[S, A]]) = 
     gt.map(_ match {
@@ -185,15 +184,15 @@ class NBE extends Statelesser[Semantic] {
       sem2 <- rsem
     } yield (sem1, sem2) match {
       case (ltodo: Todo[O, S, A], rtodo: Todo[O, S, B]) => 
-        new Todo[O, S, (A, B)] {
-          def apply[T](done: Done[O, T, S]) = (ltodo(done), rtodo(done)) match {
+        Todo(new (Done[O, ?, S] ~> Done[O, ?, (A, B)]) {
+          def apply[T](done: Done[O, T, S]) = (ltodo.f(done), rtodo.f(done)) match {
             case (Done(le, lf, lv), Done(re, rf, rv)) =>
               unifyVars(Done[O, T, (A, B)](
                 Pair[T, (A, B), A, B](le, re, implicitly), 
                 lf ++ rf, 
                 lv ++ rv))
           }
-        }
+        })
       case (Done(le, lf, lv), Done(re, rf, rv)) =>
         Done(Pair[S, (A, B), A, B](le, re, implicitly), lf ++ rf, lv ++ rv)
     }
