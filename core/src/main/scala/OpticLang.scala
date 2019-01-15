@@ -7,24 +7,24 @@ import Leibniz._
 trait OpticLang[Expr[_]] {
 
   def flVert[S, A, B](
-    l: Expr[Fold[S, A]],
-    r: Expr[Fold[A, B]]): Expr[Fold[S, B]]
+    u: Expr[Fold[S, A]],
+    d: Expr[Fold[A, B]]): Expr[Fold[S, B]]
 
   def flHori[S, A, B](
     l: Expr[Fold[S, A]],
     r: Expr[Fold[S, B]]): Expr[Fold[S, (A, B)]]
 
   def gtVert[S, A, B](
-    l: Expr[Getter[S, A]],
-    r: Expr[Getter[A, B]]): Expr[Getter[S, B]]
+    u: Expr[Getter[S, A]],
+    d: Expr[Getter[A, B]]): Expr[Getter[S, B]]
 
   def gtHori[S, A, B](
     l: Expr[Getter[S, A]],
     r: Expr[Getter[S, B]]): Expr[Getter[S, (A, B)]]
 
   def aflVert[S, A, B](
-    l: Expr[AffineFold[S, A]],
-    r: Expr[AffineFold[A, B]]): Expr[AffineFold[S, B]]
+    u: Expr[AffineFold[S, A]],
+    d: Expr[AffineFold[A, B]]): Expr[AffineFold[S, B]]
 
   def aflHori[S, A, B](
     l: Expr[AffineFold[S, A]],
@@ -70,9 +70,9 @@ object OpticLang {
   implicit val prettyPrinter = new OpticLang[Const[String, ?]] {
 
     def flVert[S, A, B](
-        l: Const[String, Fold[S, A]],
-        r: Const[String, Fold[A, B]]): Const[String, Fold[S, B]] =
-      Const(s"${l.getConst} > ${r.getConst}")
+        u: Const[String, Fold[S, A]],
+        d: Const[String, Fold[A, B]]): Const[String, Fold[S, B]] =
+      Const(s"${u.getConst} > ${d.getConst}")
 
     def flHori[S, A, B](
         l: Const[String, Fold[S, A]],
@@ -80,9 +80,9 @@ object OpticLang {
       Const(s"${l.getConst} * ${r.getConst}")
 
     def gtVert[S, A, B](
-        l: Const[String, Getter[S, A]],
-        r: Const[String, Getter[A, B]]): Const[String, Getter[S, B]] =
-      Const(s"${l.getConst} > ${r.getConst}")
+        u: Const[String, Getter[S, A]],
+        d: Const[String, Getter[A, B]]): Const[String, Getter[S, B]] =
+      Const(s"${u.getConst} > ${d.getConst}")
 
     def gtHori[S, A, B](
         l: Const[String, Getter[S, A]],
@@ -90,9 +90,9 @@ object OpticLang {
       Const(s"(${l.getConst} * ${r.getConst})")
 
     def aflVert[S, A, B](
-        l: Const[String, AffineFold[S, A]],
-        r: Const[String, AffineFold[A, B]]): Const[String, AffineFold[S, B]] =
-      Const(s"${l.getConst} > ${r.getConst}")
+        u: Const[String, AffineFold[S, A]],
+        d: Const[String, AffineFold[A, B]]): Const[String, AffineFold[S, B]] =
+      Const(s"${u.getConst} > ${d.getConst}")
 
     def aflHori[S, A, B](
         l: Const[String, AffineFold[S, A]],
@@ -137,6 +137,56 @@ object OpticLang {
     def aflAsFl[S, A](
         afl: Const[String, AffineFold[S, A]]): Const[String, Fold[S, A]] =
       Const(s"${afl.getConst}.asFold")
+  }
+
+  implicit def metacircular: OpticLang[Id] = new OpticLang[Id] {
+
+    def flVert[S, A, B](u: Fold[S, A], d: Fold[A, B]): Fold[S, B] =
+      u > d
+
+    def flHori[S, A, B](l: Fold[S, A], r: Fold[S, B]): Fold[S, (A, B)] =
+      l * r
+
+    def gtVert[S, A, B](u: Getter[S, A], d: Getter[A, B]): Getter[S, B] =
+      u > d
+
+    def gtHori[S, A, B](l: Getter[S, A], r: Getter[S, B]): Getter[S, (A, B)] =
+      l * r
+
+    def aflVert[S, A, B](
+        u: AffineFold[S, A], 
+        d: AffineFold[A, B]): AffineFold[S, B] =
+      u > d
+
+    def aflHori[S, A, B](
+        l: AffineFold[S, A],
+        r: AffineFold[S, B]): AffineFold[S, (A, B)] =
+      l * r
+
+    def filtered[S](p: Getter[S, Boolean]): AffineFold[S, S] =
+      AffineFold.filtered(p)
+
+    def sub: Getter[(Int, Int), Int] = Getter.sub
+
+    def greaterThan: Getter[(Int, Int), Boolean] = Getter.gt
+
+    def first[A, B]: Getter[(A, B), A] = Getter.first
+
+    def second[A, B]: Getter[(A, B), B] = Getter.second
+
+    def likeInt[S](i: Int): Getter[S, Int] = Getter.like(i)
+
+    def likeBool[S](b: Boolean): Getter[S, Boolean] = Getter.like(b)
+
+    def likeStr[S](s: String): Getter[S, String] = Getter.like(s)
+
+    def id[S]: Getter[S, S] = Getter.id
+
+    def not: Getter[Boolean, Boolean] = Getter.not
+
+    def gtAsAfl[S, A](gt: Getter[S, A]): AffineFold[S, A] = gt.asAffineFold
+
+    def aflAsFl[S, A](afl: AffineFold[S, A]): Fold[S, A] = afl.asFold
   }
 
   implicit def tsemantic: OpticLang[Semantic] = new OpticLang[Semantic] {
