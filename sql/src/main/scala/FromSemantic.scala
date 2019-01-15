@@ -7,10 +7,17 @@ import statelesser.Value
 
 trait FromSemantic {
 
+  val varStr: Stream[String] = {
+    def syms(pattern: Stream[String], i: Int = 0): Stream[String] =
+      pattern.map(_ + i) #::: syms(pattern, i + 1)
+    val pattern = Stream.range('a', 'z').map(_.toString)
+    pattern #::: syms(pattern)
+  }
+
   def fromSemantic[S, A](
       sem: Semantic[Fold[S, A]],
       keys: Map[TypeNme, FieldName] = Map()): SSelect = {
-    val Done(expr, filt, vars) = sem.eval(OpticLang.varStr)
+    val Done(expr, filt, vars) = sem.eval(varStr)
     SSelect(selToSql(expr, keys), tabToSql(vars, keys), whrToSql(filt, keys))
   }
 
@@ -36,7 +43,7 @@ trait FromSemantic {
       }
     roots.toList match {
       case List((nme, ot)) => SFrom(List(
-        STable(ot.tgt.nme, nme, nodes.toList.map(joinToSql(_, keys)))))
+        STable(ot.tgt.nme, nme, nodes.toList.sortBy(_._1).map(joinToSql(_, keys)))))
       case Nil => 
         throw new Error(s"There's no table to select from: $vars")
       case _ =>

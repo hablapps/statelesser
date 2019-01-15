@@ -16,6 +16,16 @@ case class OpticType[S, A](
   tgt: TypeInfo)
 
 sealed abstract class TExpr[S, A] {
+
+  def vars: Set[String] = this match {
+    case Var(sym) => Set(sym)
+    case Select(Var(sym), _) => Set(sym)
+    case Not(b, _) => b.vars
+    case Sub(l, r, _) => l.vars ++ r.vars
+    case Gt(l, r, _) => l.vars ++ r.vars
+    case _ => Set.empty
+  }
+  
   def renameVars(rws: Set[(String, String)]): TExpr[S, A] = this match {
     case Var(sym) => rws.find(_._1 == sym).fold(this)(kv => Var(kv._2))
     case Select(Var(sym), ot) =>
@@ -72,6 +82,12 @@ case class Gt[S, A](
   is: A === Boolean) extends TExpr[S, A]
 
 sealed abstract class TSel[S, A] {
+
+  def vars: Set[String] = this match {
+    case Pair(l, r, _) => l.vars ++ r.vars
+    case Just(e) => e.vars
+  }
+
   def renameVars(rws: Set[(String, String)]): TSel[S, A] = this match {
     case Pair(l, r, is) => Pair(l.renameVars(rws), r.renameVars(rws), is)
     case Just(e) => Just(e.renameVars(rws))

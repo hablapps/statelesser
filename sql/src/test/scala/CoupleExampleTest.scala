@@ -100,8 +100,8 @@ class CoupleExampleTest extends FlatSpec with Matchers {
   it should "generate complex queries" in {
     matchSql(
       raw"SELECT (.+)\.name, \(\1\.age - (.+)\.age\) FROM Couple AS (.+) INNER JOIN Person AS \1 ON \3\.her = \1\.name INNER JOIN Person AS \2 ON \3\.him = \2\.name WHERE \(\(\1\.age - \2\.age\) > 0\);".r,
-      difference,
-      difference_1)
+      difference)
+      //difference_1)
 
     matchSql(
       raw"SELECT (.+)\.name FROM Couple AS (.+) INNER JOIN Person AS \1 ON \2\.her = \1\.name INNER JOIN Person AS (.+) ON \2\.him = \3\.name WHERE \(\(\1\.age - \3\.age\) > 0\);".r,

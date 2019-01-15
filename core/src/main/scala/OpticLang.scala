@@ -1,5 +1,6 @@
 package statelesser
 
+import Function.const
 import scalaz._, Scalaz._
 import Leibniz._
 
@@ -34,8 +35,6 @@ trait OpticLang[Expr[_]] {
   def sub: Expr[Getter[(Int, Int), Int]]
 
   def greaterThan: Expr[Getter[(Int, Int), Boolean]]
-
-  def equal[A]: Expr[Getter[(A, A), Boolean]]
 
   def first[A, B]: Expr[Getter[(A, B), A]]
 
@@ -110,9 +109,6 @@ object OpticLang {
     def greaterThan: Const[String, Getter[(Int, Int), Boolean]] =
       Const("greaterThan")
 
-    def equal[A]: Const[String, Getter[(A, A), Boolean]] =
-      Const("equal")
-
     def first[A, B]: Const[String, Getter[(A, B), A]] =
       Const("first")
 
@@ -143,156 +139,7 @@ object OpticLang {
       Const(s"${afl.getConst}.asFold")
   }
 
-//   case class Table(rows: Map[Symbol, Any] = Map()) {
-// 
-//     def consistency: (Table, Set[(String, String)]) = {
-//       val (t, rws) = rows
-//         .groupBy(_._2)
-//         .map { case (k, v) => (k, v.keys.toList) }
-//         .foldLeft((Table(), Set.empty[(String, String)])) {
-//           case ((Table(rs), rws), (v, k :: ks)) =>
-//             (Table(rs + (k -> v)), rws ++ ks.map((_, k)))
-//         }
-//       if (rws.isEmpty) (t, rws)
-//       else t.rwVars(rws).consistency.map(rws ++ _)
-//     }
-// 
-//     def unify(other: Table): (Table, Set[(String, String)]) =
-//       Table(rows ++ other.rows).consistency
-// 
-//     def clean(used: Set[String]): Table = {
-//       def deps(k: String): Set[String] = rows(k) match {
-//         case TVarNestedVal(x: Var[Any, Any, Any, Any], w) =>
-//           deps(x.name) + x.name
-//         case _ => Set()
-//       }
-//       Table(rows.filterKeys((used ++ (used flatMap deps)).contains(_)))
-//     }
-// 
-//     def rwVars(rws: Set[(String, String)]): Table =
-//       Table(rows.mapValues(_.asInstanceOf[TVarVal[Any, Any, _, _]].rwVars(rws)))
-//   }
-// 
-//   implicit class TableOps(table: Table) {
-// 
-//     private def splitTables = table.rows.partition {
-//       case (_, TVarSimpleVal(_)) => true
-//       case _ => false
-//     }
-// 
-//     def getVal[E[_], O[_, _], S, A](v: Var[E, O, S, A]): TVarVal[E, O, S, A] =
-//       table.rows(v.name).asInstanceOf[TVarVal[E, O, S, A]]
-// 
-//     def simpleTable[E[_], O[_, _]]: Map[String, TVarSimpleVal[E, O, _, _]] =
-//       splitTables._1.asInstanceOf[Map[String, TVarSimpleVal[E, O, _, _]]]
-// 
-//     def nestedTable[E[_], O[_, _]]: Map[String, TVarNestedVal[E, O, _, _, _]] =
-//       splitTables._2.asInstanceOf[Map[String, TVarNestedVal[E, O, _, _, _]]]
-//   }
-
-  val varStr: Stream[String] = {
-    def syms(pattern: Stream[String], i: Int = 0): Stream[String] =
-      pattern.map(_ + i) #::: syms(pattern, i + 1)
-    val pattern = Stream.range('a', 'z').map(_.toString)
-    pattern #::: syms(pattern)
-  }
-
-//   def reifySem[E[_], S, A](
-//       sem: Semantic[E, Fold[S, A]])(implicit
-//       ev: OpticLang[E]): E[Fold[S, A]] = {
-//     val TFold(expr, filt, t) = sem.eval(varStr)
-//     filt.map(reifyExpr(_, t)).foldLeft(reifyExpr(expr, t)) { (acc, e) =>
-//       ev.flVert(ev.flHori(acc, e), ev.aflAsFl(ev.gtAsAfl(ev.first[A, Boolean])))
-//     }
-//   }
-// 
-//   def reifyVV[E[_], S, A](
-//       vv: TVarVal[E, Fold, S, A],
-//       t: Table)(implicit
-//       ev: OpticLang[E]): E[Fold[S, A]] = vv match {
-//     case TVarSimpleVal(w) => w.e
-//     case TVarNestedVal(v, w) =>
-//       ev.flVert(reifyVV(t.getVal(v), t), reifyExpr(w, t))
-//   }
-// 
-//   def reifyExpr[E[_], S, A](
-//       expr: TExpr[E, Fold, S, A],
-//       t: Table)(implicit
-//       ev: OpticLang[E]): E[Fold[S, A]] = expr match {
-//     case Product(l, r, is) =>
-//       is.subst[λ[x => E[Fold[S, x]]]](ev.flHori(reifyExpr(l, t), reifyExpr(r, t)))
-//     case Vertical(u, d) => ev.flVert(reifyExpr(u, t), reifyExpr(d, t))
-//     case x: Var[E, Fold, S, A] => reifyVV(t.getVal(x), t)
-//     case w: Wrap[E, Fold, S, A] => w.e
-//     case LikeInt(i, is) =>
-//       is.flip.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.likeInt[S](i)))
-//     case LikeBool(b, is) =>
-//       is.flip.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.likeBool[S](b)))
-//     case Id(is) => is.subst[λ[x => E[Fold[S, x]]]](ev.gtAsFl(ev.id[S]))
-//     case First(is) => is.flip.subst[λ[x => E[Fold[x, A]]]](ev.gtAsFl(ev.first))
-//     case Second(is) => is.flip.subst[λ[x => E[Fold[x, A]]]](ev.gtAsFl(ev.second))
-//     case Not(is1, is2) =>
-//       is2.flip.subst[λ[x => E[Fold[S, x]]]](
-//         is1.flip.subst[λ[x => E[Fold[x, Boolean]]]](ev.gtAsFl(ev.not)))
-//     case Sub(is1, is2) =>
-//       is2.flip.subst[λ[x => E[Fold[S, x]]]](
-//         is1.flip.subst[λ[x => E[Fold[x, Int]]]](ev.gtAsFl(ev.sub)))
-//     case Gt(is1, is2) =>
-//       is2.flip.subst[λ[x => E[Fold[S, x]]]](
-//         is1.flip.subst[λ[x => E[Fold[x, Boolean]]]](ev.gtAsFl(ev.greaterThan)))
-//   }
-// 
-// ???
-//   import State._
-
   implicit def tsemantic: OpticLang[Semantic] = new OpticLang[Semantic] {
-
-    def vert[O[_, _], S, A, B](
-        usem: Semantic[O[S, A]],
-        dsem: Semantic[O[A, B]]): Semantic[O[S, B]] = 
-      for {
-        sem1 <- usem
-        sem2 <- dsem
-      } yield (sem1, sem2) match {
-        case (x, todo: Todo[O, A, B]@unchecked) => todo compose x
-        case _ => throw new Error(s"Can't vert compose with 'Done' semantic: $sem2")
-      }
-
-    private def unifyVars[O[_, _], S, A](done: Done[O, S, A]): Done[O, S, A] = {
-      val (t, rws) = done.vars
-        .groupBy(_._2)
-        .map { case (k, v) => (k, v.keys.toList) }
-        .foldLeft((Map.empty[Symbol, Value], Set.empty[(String, String)])) {
-          case ((m, rws), (v, k :: ks)) =>
-            (m + (k -> v), rws ++ ks.map((_, k)))
-        }
-      if (rws.isEmpty) done
-      else unifyVars(Done(
-        done.expr.renameVars(rws), 
-        done.filt.map(_.renameVars(rws)), 
-        t))
-    }
-
-    def cart[O[_, _], S, A, B](
-        lsem: Semantic[O[S, A]],
-        rsem: Semantic[O[S, B]]): Semantic[O[S, (A, B)]] =
-      for {
-        sem1 <- lsem
-        sem2 <- rsem
-      } yield (sem1, sem2) match {
-        case (ltodo: Todo[O, S, A], rtodo: Todo[O, S, B]) => 
-          new Todo[O, S, (A, B)] {
-            def apply[T](done: Done[O, T, S]) = (ltodo(done), rtodo(done)) match {
-              case (Done(le, lf, lv), Done(re, rf, rv)) =>
-                unifyVars(Done[O, T, (A, B)](
-                  Pair[T, (A, B), A, B](le, re, implicitly), 
-                  lf ++ rf, 
-                  lv ++ rv))
-            }
-          }
-        case (Done(le, lf, lv), Done(re, rf, rv)) =>
-          Done(Pair[S, (A, B), A, B](le, re, implicitly), lf ++ rf, lv ++ rv)
-      }
 
     def gtVert[S, A, B](
         usem: Semantic[Getter[S, A]],
@@ -363,13 +210,11 @@ object OpticLang {
         }
       })
 
-    def equal[A]: Semantic[Getter[(A, A), Boolean]] = ???
- 
     def first[A, B]: Semantic[Getter[(A, B), A]] =
       state(new Todo[Getter, (A, B), A] {
         def apply[S](done: Done[Getter, S, (A, B)]) = done.expr match {
           case pair: Pair[S, (A, B), A, B]@unchecked =>
-            Done(pair.l, done.filt, done.vars /* TODO: clean me */)
+            cleanUnusedVars(Done(pair.l, done.filt, done.vars))
         }
       })
 
@@ -377,7 +222,7 @@ object OpticLang {
       state(new Todo[Getter, (A, B), B] {
         def apply[S](done: Done[Getter, S, (A, B)]) = done.expr match {
           case pair: Pair[S, (A, B), A, B]@unchecked =>
-            Done(pair.r, done.filt, done.vars /* TODO: clean me */)
+            cleanUnusedVars(Done(pair.r, done.filt, done.vars))
         }
       })
 
@@ -426,6 +271,63 @@ object OpticLang {
         case done: Done[AffineFold, S, A] => done.as[Fold]
         case todo: Todo[AffineFold, S, A] => todo.as[Fold]
       })
+
+    private def vert[O[_, _], S, A, B](
+        usem: Semantic[O[S, A]],
+        dsem: Semantic[O[A, B]]): Semantic[O[S, B]] = 
+      for {
+        sem1 <- usem
+        sem2 <- dsem
+      } yield (sem1, sem2) match {
+        case (x, todo: Todo[O, A, B]@unchecked) => todo compose x
+        case _ => throw new Error(s"Can't vert compose with 'Done' semantic: $sem2")
+      }
+
+    private def unifyVars[O[_, _], S, A](done: Done[O, S, A]): Done[O, S, A] = {
+      val (t, rws) = done.vars
+        .groupBy(_._2)
+        .map { case (k, v) => (k, v.keys.toList) }
+        .foldLeft((Map.empty[Symbol, Value], Set.empty[(String, String)])) {
+          case ((m, rws), (v, k :: ks)) =>
+            (m + (k -> v), rws ++ ks.map((_, k)))
+        }
+      if (rws.isEmpty) done
+      else unifyVars(Done(
+        done.expr.renameVars(rws), 
+        done.filt.map(_.renameVars(rws)), 
+        t))
+    }
+
+    private def cleanUnusedVars[O[_, _], S, A](
+        done: Done[O, S, A]): Done[O, S, A] = {
+      def deps(k: String): Set[String] =
+        done.vars(k).fold(const(Set()), sel => deps(sel.v.sym) + sel.v.sym)
+      val used: Set[String] =
+        done.expr.vars ++ done.filt.flatMap(_.vars)
+      done.copy(vars = done.vars
+        .filterKeys((used ++ (used.flatMap(deps))).contains(_)))
+    }
+
+    private def cart[O[_, _], S, A, B](
+        lsem: Semantic[O[S, A]],
+        rsem: Semantic[O[S, B]]): Semantic[O[S, (A, B)]] =
+      for {
+        sem1 <- lsem
+        sem2 <- rsem
+      } yield (sem1, sem2) match {
+        case (ltodo: Todo[O, S, A], rtodo: Todo[O, S, B]) => 
+          new Todo[O, S, (A, B)] {
+            def apply[T](done: Done[O, T, S]) = (ltodo(done), rtodo(done)) match {
+              case (Done(le, lf, lv), Done(re, rf, rv)) =>
+                unifyVars(Done[O, T, (A, B)](
+                  Pair[T, (A, B), A, B](le, re, implicitly), 
+                  lf ++ rf, 
+                  lv ++ rv))
+            }
+          }
+        case (Done(le, lf, lv), Done(re, rf, rv)) =>
+          Done(Pair[S, (A, B), A, B](le, re, implicitly), lf ++ rf, lv ++ rv)
+      }
   }
  
   def fresh: State[Stream[String], String] =
@@ -433,18 +335,6 @@ object OpticLang {
       s <- get[Stream[String]]
       _ <- modify[Stream[String]](_.tail)
     } yield s.head
-
-//   type WrapTable[A] = StateT[State[Stream[String], ?], Table, A]
-// 
-//   def assignVal[E[_], O[_, _], S, A](
-//       vv: TVarVal[E, O, S, A]): WrapTable[TExpr[E, O, S, A]] =
-//     for {
-//       os <- MonadState[WrapTable, Table].gets(_.rows.find(_._2 == vv).map(_._1))
-//       s <- os.fold(
-//         StateT.StateMonadTrans[Table].liftM(fresh) >>! { s =>
-//           MonadState[WrapTable, Table].modify(t => Table(t.rows + (s -> vv)))
-//         })(_.point[WrapTable])
-//     } yield Var(s)
 
   trait Syntax {
 
