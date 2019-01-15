@@ -4,6 +4,7 @@ package test
 import scalaz._, Scalaz._
 
 import optic._
+import sqlnormal._
 import core.Statelesser, Statelesser._
 
 trait CoupleExample[Expr[_]] {

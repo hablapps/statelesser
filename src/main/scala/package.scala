@@ -1,5 +1,7 @@
 import scalaz._
 
+import scalaz._, Scalaz._
+
 package object `statelesser` {
 
   type TypeNme = String
@@ -7,8 +9,15 @@ package object `statelesser` {
 
   type Symbol = String
 
-  type Value = OpticType[_, _] \/ Select[_, _, _]
+  type Value = sqlnormal.OpticType[_, _] \/ sqlnormal.Select[_, _, _]
 
-  type Semantic[A] = State[Stream[Symbol], TSemantic[A]]
+  type Semantic[A] = State[Stream[Symbol], sqlnormal.TSemantic[A]]
+
+  def fresh: State[Stream[String], String] =
+    for {
+      s <- get[Stream[String]]
+      _ <- modify[Stream[String]](_.tail)
+    } yield s.head
+
 }
 
