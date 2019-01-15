@@ -5,7 +5,9 @@ package test
 import scala.util.matching.Regex
 import statelesser.test._
 import org.scalatest._
+
 import optic.Fold
+import sqlnormal._
 
 class CoupleExampleTest extends FlatSpec with Matchers {
 
@@ -14,7 +16,7 @@ class CoupleExampleTest extends FlatSpec with Matchers {
   val keys = Map("Person" -> "name", "Address" -> "id")
 
   def genSql[S, A](sem: Semantic[Fold[S, A]]): String =
-    SSelect.toString((new FromSemantic {}).fromSemantic(sem, keys))
+    SSelect.toString(TSemantic.toSql(sem, keys))
 
   def matchSql[S, A](r: Regex, stks: Semantic[Fold[S, A]]*) =
     stks.foreach { stk =>

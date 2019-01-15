@@ -1,12 +1,22 @@
 package statelesser
 package sqlnormal
 
+import optic.Fold
+import sql.SSelect
+
 /*sealed*/ abstract class TSemantic[A]
+
+object TSemantic {
+  def toSql[S, A](
+      sem: Semantic[Fold[S, A]], 
+      keys: Map[String, String]): sql.SSelect =
+    (new interpreter.ToSql).toSql(sem, keys)
+}
 
 case class Done[O[_, _], S, A](
   expr: TSel[S, A], 
   filt: Set[TExpr[S, Boolean]],
-  vars: Map[Symbol, statelesser.Value]) extends TSemantic[O[S, A]] {
+  vars: Map[Symbol, Value]) extends TSemantic[O[S, A]] {
 
   def as[O2[_, _]]: Done[O2, S, A] = Done(expr, filt, vars)
 }

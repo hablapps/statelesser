@@ -156,7 +156,7 @@ class NBE extends Statelesser[Semantic] {
     val (t, rws) = done.vars
       .groupBy(_._2)
       .map { case (k, v) => (k, v.keys.toList) }
-      .foldLeft((Map.empty[Symbol, statelesser.Value], Set.empty[(String, String)])) {
+      .foldLeft((Map.empty[Symbol, sqlnormal.Value], Set.empty[(String, String)])) {
         case ((m, rws), (v, k :: ks)) =>
           (m + (k -> v), rws ++ ks.map((_, k)))
       }
