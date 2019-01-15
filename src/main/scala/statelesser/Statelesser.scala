@@ -6,7 +6,7 @@ import Leibniz._
 
 import optic._
 
-trait OpticLang[Expr[_]] {
+trait Statelesser[Expr[_]] {
 
   def flVert[S, A, B](
     u: Expr[Fold[S, A]],
@@ -65,11 +65,11 @@ trait OpticLang[Expr[_]] {
     aflAsFl(gtAsAfl(gt))
 }
 
-object OpticLang {
+object Statelesser {
 
-  def apply[E[_]](implicit ev: OpticLang[E]): OpticLang[E] = ev
+  def apply[E[_]](implicit ev: Statelesser[E]): Statelesser[E] = ev
 
-  implicit val prettyPrinter = new OpticLang[Const[String, ?]] {
+  implicit val prettyPrinter = new Statelesser[Const[String, ?]] {
 
     def flVert[S, A, B](
         u: Const[String, Fold[S, A]],
@@ -141,7 +141,7 @@ object OpticLang {
       Const(s"${afl.getConst}.asFold")
   }
 
-  implicit def metacircular: OpticLang[Id] = new OpticLang[Id] {
+  implicit def metacircular: Statelesser[Id] = new Statelesser[Id] {
 
     def flVert[S, A, B](u: Fold[S, A], d: Fold[A, B]): Fold[S, B] =
       u > d
@@ -191,7 +191,7 @@ object OpticLang {
     def aflAsFl[S, A](afl: AffineFold[S, A]): Fold[S, A] = afl.asFold
   }
 
-  implicit def tsemantic: OpticLang[Semantic] = new OpticLang[Semantic] {
+  implicit def tsemantic: Statelesser[Semantic] = new Statelesser[Semantic] {
 
     def gtVert[S, A, B](
         usem: Semantic[Getter[S, A]],
@@ -392,14 +392,14 @@ object OpticLang {
 
     implicit class FoldOps[Expr[_], S, A](
         l: Expr[Fold[S, A]])(implicit
-        O: OpticLang[Expr]) {
+        O: Statelesser[Expr]) {
       def >[B](r: Expr[Fold[A, B]]): Expr[Fold[S, B]] = O.flVert(l, r)
       def *[B](r: Expr[Fold[S, B]]): Expr[Fold[S, (A, B)]] = O.flHori(l, r)
     }
 
     implicit class AffineFoldOps[Expr[_], S, A](
         l: Expr[AffineFold[S, A]])(implicit
-        O: OpticLang[Expr]) {
+        O: Statelesser[Expr]) {
       def asFold: Expr[Fold[S, A]] = O.aflAsFl(l)
       def >[B](r: Expr[AffineFold[A, B]]): Expr[AffineFold[S, B]] =
         O.aflVert(l, r)
@@ -413,7 +413,7 @@ object OpticLang {
 
     implicit class GetterOps[Expr[_], S, A](
         l: Expr[Getter[S, A]])(implicit
-        O: OpticLang[Expr]) {
+        O: Statelesser[Expr]) {
       def asAffineFold: Expr[AffineFold[S, A]] = O.gtAsAfl(l)
       def asFold: Expr[Fold[S, A]] = l.asAffineFold.asFold
       def >[B](r: Expr[Getter[A, B]]): Expr[Getter[S, B]] = O.gtVert(l, r)
@@ -422,7 +422,7 @@ object OpticLang {
 
     implicit class IntGetterOps[Expr[_], S](
         l: Expr[Getter[S, Int]])(implicit
-        O: OpticLang[Expr]) {
+        O: Statelesser[Expr]) {
       def -(r: Expr[Getter[S, Int]]): Expr[Getter[S, Int]] = l * r > O.sub
     }
   }
