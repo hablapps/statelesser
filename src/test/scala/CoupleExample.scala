@@ -1,4 +1,5 @@
 package statelesser
+package core
 package test
 
 import scalaz._, Scalaz._

@@ -3,10 +3,10 @@ package sql
 package test
 
 import scala.util.matching.Regex
-import statelesser.test._
 import org.scalatest._
 
 import optic.Fold
+import core.test._
 import sqlnormal._
 
 class CoupleExampleTest extends FlatSpec with Matchers {
