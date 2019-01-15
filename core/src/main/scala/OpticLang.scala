@@ -354,16 +354,16 @@ object OpticLang {
       def *[B](r: Expr[AffineFold[S, B]]): Expr[AffineFold[S, (A, B)]] =
         O.aflHori(l, r)
       def <*[B](r: Expr[AffineFold[S, B]]): Expr[AffineFold[S, A]] =
-        O.aflVert(O.aflHori(l, r), O.gtAsAfl(O.first[A, B]))
+        l * r > O.first.asAffineFold
       def *>[B](r: Expr[AffineFold[S, B]]): Expr[AffineFold[S, B]] =
-        O.aflVert(O.aflHori(l, r), O.gtAsAfl(O.second[A, B]))
+        l * r > O.second.asAffineFold
     }
 
     implicit class GetterOps[Expr[_], S, A](
         l: Expr[Getter[S, A]])(implicit
         O: OpticLang[Expr]) {
       def asAffineFold: Expr[AffineFold[S, A]] = O.gtAsAfl(l)
-      def asFold: Expr[Fold[S, A]] = O.aflAsFl(O.gtAsAfl(l))
+      def asFold: Expr[Fold[S, A]] = l.asAffineFold.asFold
       def >[B](r: Expr[Getter[A, B]]): Expr[Getter[S, B]] = O.gtVert(l, r)
       def *[B](r: Expr[Getter[S, B]]): Expr[Getter[S, (A, B)]] = O.gtHori(l, r)
     }
@@ -371,8 +371,7 @@ object OpticLang {
     implicit class IntGetterOps[Expr[_], S](
         l: Expr[Getter[S, Int]])(implicit
         O: OpticLang[Expr]) {
-      def -(r: Expr[Getter[S, Int]]): Expr[Getter[S, Int]] =
-        O.gtVert(O.gtHori(l, r), O.sub)
+      def -(r: Expr[Getter[S, Int]]): Expr[Getter[S, Int]] = l * r > O.sub
     }
   }
 
