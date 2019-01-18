@@ -18,6 +18,17 @@ package object `sqlnormal` {
     for {
       s <- get[Stream[String]]
       _ <- modify[Stream[String]](_.tail)
-    } yield s.head
+    } yield s.head 
+
+  type IForest[I, A] = Map[I, ITree[I, A]]
+
+  type TVarTree = NonEmptyList[(Symbol, ITree[Symbol, OpticType[_, _]])]
+
+  implicit class TVarTreeOps(tvt: TVarTree) {
+    def loc(s: Symbol): ITreeLoc[Symbol, OpticType[_, _]] = {
+      val ifrs = tvt.toList.toMap
+      ITreeLoc(s, ifrs(s), ifrs - s, Stream.empty)
+    }
+  }
 }
 

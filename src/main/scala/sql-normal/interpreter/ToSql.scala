@@ -35,22 +35,12 @@ class ToSql {
   }
 
   private def tabToSql[E[_]](
-      vars: Map[Symbol, sqlnormal.Value],
-      keys: Map[TypeNme, FieldName]): SqlFrom = {
-    val (roots, nodes) = vars.foldLeft(
-      (List.empty[(String, OpticType[_, _])], List.empty[(String, Select[_, _, _])])) {
-        case ((rs, ns), (k, -\/(x))) => (rs :+ (k, x), ns)
-        case ((rs, ns), (k, \/-(x))) => (rs, ns :+ (k, x))
-      }
-    roots.toList match {
-      case List((nme, ot)) => SFrom(List(
-        STable(ot.tgt.nme, nme, nodes.toList.sortBy(_._1).map(joinToSql(_, keys)))))
-      case Nil => 
-        throw new Error(s"There's no table to select from: $vars")
-      case _ =>
-        // TODO: we should be able to translate this case into a raw JOIN
-        throw new Error(s"Can't translate semantic with multiple roots: $vars")
-    }
+      vars: TVarTree,
+      keys: Map[TypeNme, FieldName]): SqlFrom = vars.toList match {
+    case (nme, ITree(ot, nodes)) :: Nil => 
+      SFrom(List(STable(ot.tgt.nme, nme, seqJoinToSql(nme, nodes, keys))))
+    case _ =>
+      throw new Error(s"Can't translate semantic with multiple roots: $vars")
   }
 
   private def condToSql(
@@ -58,17 +48,24 @@ class ToSql {
       v2: String, n2: FieldName): SqlEqJoinCond =
     if (n1 == n2) SUsing(n1) else SOn(SProj(v1, n1), SProj(v2, n2))
 
-  private def joinToSql[E[_]](
-      vt: (String, Select[_, _, _]),
-      keys: Map[TypeNme, FieldName]): SqlJoin = {
-    val (nme, Select(v, ot)) = vt
-    if (ot.kind == KGetter) {
-      val cond = condToSql(v.sym, ot.nme, nme, keys(ot.tgt.nme))
-      SEqJoin(s"${ot.tgt.nme}", nme, cond)
-    } else {
-      SEqJoin(s"${ot.tgt.nme}", nme, SUsing(keys(ot.src.nme)))
+  private def seqJoinToSql(
+      top: String, 
+      frs: IForest[Symbol, OpticType[_, _]],
+      keys: Map[TypeNme, FieldName]): List[SqlJoin] =
+    frs.foldLeft(List.empty[SqlJoin]) { 
+      case (acc, (now, ITree(ot, child))) =>
+        (acc :+ joinToSql(top, now, ot, keys)) ++ seqJoinToSql(now, child, keys)
     }
-  }
+
+  private def joinToSql(
+      top: String,
+      now: String,
+      ot: OpticType[_, _],
+      keys: Map[TypeNme, FieldName]): SqlJoin = SEqJoin(ot.tgt.nme, now, 
+    if (ot.kind == KGetter) 
+      condToSql(now, ot.nme, top, keys(ot.tgt.nme)) 
+    else 
+      SUsing(keys(ot.src.nme)))
 
   private def whrToSql[S](
       whr: Set[TExpr[S, Boolean]],
@@ -81,8 +78,8 @@ class ToSql {
   private def treeToExpr(
       t: TExpr[_, _],
       keys: Map[TypeNme, FieldName]): SqlExp = t match {
-    case Var(e) => SAll(e)
-    case Select(Var(s), ot) => SProj(s, ot.nme)
+    case Var(es) => SAll(es.head)
+    case Select(Var(syms), ot) => SProj(syms.head, ot.nme)
     case Sub(l, r, _) => SBinOp("-", treeToExpr(l, keys), treeToExpr(r, keys))
     case Gt(l, r, _) => SBinOp(">", treeToExpr(l, keys), treeToExpr(r, keys))
     case Not(e, _) => SUnOp("NOT", treeToExpr(e, keys))

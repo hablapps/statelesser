@@ -152,28 +152,27 @@ class NBE extends Statelesser[Semantic] {
     }
 
   private def unifyVars[O[_, _], S, A](done: Done[O, S, A]): Done[O, S, A] = {
-    val (t, rws) = done.vars
-      .groupBy(_._2)
-      .map { case (k, v) => (k, v.keys.toList) }
-      .foldLeft((Map.empty[Symbol, sqlnormal.Value], Set.empty[(String, String)])) {
-        case ((m, rws), (v, k :: ks)) =>
-          (m + (k -> v), rws ++ ks.map((_, k)))
-      }
-    if (rws.isEmpty) done
-    else unifyVars(Done(
-      done.expr.renameVars(rws), 
-      done.filt.map(_.renameVars(rws)), 
-      t))
+  //  val (t, rws) = done.vars
+  //    .groupBy(_._2)
+  //    .map { case (k, v) => (k, v.keys.toList) }
+  //    .foldLeft((Map.empty[Symbol, sqlnormal.Value], Set.empty[(String, String)])) {
+  //      case ((m, rws), (v, k :: ks)) =>
+  //        (m + (k -> v), rws ++ ks.map((_, k)))
+  //    }
+  //  if (rws.isEmpty) done
+  //  else unifyVars(Done(
+  //    done.expr.renameVars(rws), 
+  //    done.filt.map(_.renameVars(rws)), 
+  //    t))
+    ???
   }
 
   private def cleanUnusedVars[O[_, _], S, A](
       done: Done[O, S, A]): Done[O, S, A] = {
-    def deps(k: String): Set[String] =
-      done.vars(k).fold(const(Set()), sel => deps(sel.v.sym) + sel.v.sym)
-    val used: Set[String] =
-      done.expr.vars ++ done.filt.flatMap(_.vars)
-    done.copy(vars = done.vars
-      .filterKeys((used ++ (used.flatMap(deps))).contains(_)))
+    // val used: Set[String] =
+    //   done.expr.vars ++ done.filt.flatMap(_.vars)
+    // done.copy(vars = done.vars.filterKeys(used.contains(_)))
+    ???
   }
 
   private def cart[O[_, _], S, A, B](
@@ -188,13 +187,11 @@ class NBE extends Statelesser[Semantic] {
           def apply[T](done: Done[O, T, S]) = (ltodo.f(done), rtodo.f(done)) match {
             case (Done(le, lf, lv), Done(re, rf, rv)) =>
               unifyVars(Done[O, T, (A, B)](
-                Pair[T, (A, B), A, B](le, re, implicitly), 
-                lf ++ rf, 
-                lv ++ rv))
+                Pair[T, (A, B), A, B](le, re, implicitly), lf ++ rf, lv append rv))
           }
         })
-      case (Done(le, lf, lv), Done(re, rf, rv)) =>
-        Done(Pair[S, (A, B), A, B](le, re, implicitly), lf ++ rf, lv ++ rv)
+      case (Done(le, lf, lv), Done(re, rf, rv)) => Done(
+        Pair[S, (A, B), A, B](le, re, implicitly), lf ++ rf, lv append rv)
     }
 }
 

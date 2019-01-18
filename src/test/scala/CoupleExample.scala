@@ -195,13 +195,18 @@ object CoupleExample {
     val ev = Statelesser[Semantic]
 
     def assignRoot[O[_, _], S, A](ot: OpticType[S, A]): Semantic[O[S, A]] = 
-      fresh.map(s => Done(Just(Var(s)), Set.empty, Map(s -> ot.left)))
+      fresh.map(s => Done(
+        Just(Var(NonEmptyList(s))), 
+        Set.empty, 
+        Map(s -> ot)))
 
     def assignNode[O[_, _], S, A](ot: OpticType[S, A]): Semantic[O[S, A]] =
       fresh.map(s => Todo(λ[Done[O, ?, S] ~> Done[O, ?, A]] { done =>
         done.expr match {
-          case Just(x@Var(_)) =>
-            Done(Just(Var(s)), done.filt, done.vars + (s -> Select(x, ot).right))
+          case Just(x@Var(syms)) => Done(
+            Just(Var(s <:: syms)), 
+            done.filt, 
+            done.vars + (s -> Select(x, ot).right))
         }
       }))
 

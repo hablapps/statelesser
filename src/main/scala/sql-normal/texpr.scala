@@ -1,13 +1,13 @@
 package statelesser
 package sqlnormal
 
-import scalaz._, Leibniz.===
+import scalaz._, Scalaz._, Leibniz.===
 
 sealed abstract class TExpr[S, A] {
 
   def vars: Set[String] = this match {
-    case Var(sym) => Set(sym)
-    case Select(Var(sym), _) => Set(sym)
+    case Var(syms) => syms.toList.toSet
+    case Select(Var(syms), _) => syms.toList.toSet
     case Not(b, _) => b.vars
     case Sub(l, r, _) => l.vars ++ r.vars
     case Gt(l, r, _) => l.vars ++ r.vars
@@ -15,9 +15,10 @@ sealed abstract class TExpr[S, A] {
   }
   
   def renameVars(rws: Set[(String, String)]): TExpr[S, A] = this match {
-    case Var(sym) => rws.find(_._1 == sym).fold(this)(kv => Var(kv._2))
-    case Select(Var(sym), ot) =>
-      rws.find(_._1 == sym).fold(this)(kv => Select(Var(kv._2), ot))
+    case Var(syms) => 
+      Var(syms.map(sym => rws.find(_._1 == sym).fold(sym)(_._2)))
+    case Select(Var(syms), ot) =>
+      Select(Var(syms.map(sym => rws.find(_._1 == sym).fold(sym)(_._2))), ot)
     case Not(b, is) => TExpr.not(b.renameVars(rws), is)
     case Sub(l, r, is) => TExpr.sub(l.renameVars(rws), r.renameVars(rws), is)
     case Gt(l, r, is) => TExpr.gt(l.renameVars(rws), r.renameVars(rws), is)
@@ -49,7 +50,7 @@ case class LikeBool[S](b: Boolean) extends TExpr[S, Boolean]
 
 case class LikeStr[S](s: String) extends TExpr[S, String]
 
-case class Var[S, A](sym: Symbol) extends TExpr[S, A]
+case class Var[S, A](syms: NonEmptyList[Symbol]) extends TExpr[S, A]
 
 case class Select[S, A, B](
   v: Var[S, A], 
