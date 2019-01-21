@@ -32,13 +32,15 @@ package object `sqlnormal` {
           s => s.list.find(_.label._1 == i))(
           a => s => 
             if (s.head.label._1 == i) 
-              NonEmptyList.nel((i, a), s.tail) 
+              NonEmptyList.nel(a.copy(label = (i, a.label._2)), s.tail) 
             else 
               NonEmptyList.nel(
                 s.head, 
-                iMapIndex[Symbol, ITree[Symbol, (Symbol, OpticType[_, _])]]
-                  // XXX: using `toIList` directly doesn't work, wat!?!?
-                  .index(i).set(a)(s.tail.toMap).toList.toIList))
+                iMapIndex[Symbol, ITree[String, (Symbol, OpticType[_, _])]]
+                  .index(i)
+                  .set(
+                    a.copy(label = (i, a.label._2)))(
+                    s.tail.map(t => (t.label._1, t)).toMap).toIList))
     }
 }
 

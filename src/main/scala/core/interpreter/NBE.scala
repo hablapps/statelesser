@@ -164,7 +164,7 @@ class NBE extends Statelesser[Semantic] {
   //    done.expr.renameVars(rws), 
   //    done.filt.map(_.renameVars(rws)), 
   //    t))
-    ???
+    done
   }
 
   private def cleanUnusedVars[O[_, _], S, A](
@@ -172,7 +172,7 @@ class NBE extends Statelesser[Semantic] {
     // val used: Set[String] =
     //   done.expr.vars ++ done.filt.flatMap(_.vars)
     // done.copy(vars = done.vars.filterKeys(used.contains(_)))
-    ???
+    done
   }
 
   private def cart[O[_, _], S, A, B](

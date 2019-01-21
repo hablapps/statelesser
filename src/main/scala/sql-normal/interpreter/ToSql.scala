@@ -41,7 +41,7 @@ class ToSql {
   private def tabToSql[E[_]](
       vars: TVarTree,
       keys: Map[TypeNme, FieldName]): SqlFrom = vars.toList match {
-    case (nme, ITree((v, ot), nodes)) :: Nil => 
+    case ITree((v, ot), nodes) :: Nil => 
       SFrom(List(STable(ot.tgt.nme, v, seqJoinToSql(v, nodes, keys))))
     case _ =>
       throw new Error(s"Can't translate semantic with multiple roots: $vars")
@@ -66,7 +66,7 @@ class ToSql {
       nme: String,
       v: Symbol,
       ot: OpticType[_, _],
-      keys: Map[TypeNme, FieldName]): SqlJoin = SEqJoin(ot.tgt.nme, nme, 
+      keys: Map[TypeNme, FieldName]): SqlJoin = SEqJoin(ot.tgt.nme, v, 
     if (ot.kind == KGetter) 
       condToSql(topv, nme, v, keys(ot.tgt.nme)) 
     else 
@@ -86,9 +86,12 @@ class ToSql {
       vars: TVarTree,
       keys: Map[TypeNme, FieldName]): SqlExp = t match {
     case Var(op) => op.getOption(vars).fold(???)(it => SAll(it.label._1))
-    case Select(Var(op), (nme, _)) => op.getOption(vars).fold(???)(it => SProj(it.label._1, nme))
-    case Sub(l, r, _) => SBinOp("-", treeToExpr(l, vars, keys), treeToExpr(r, vars, keys))
-    case Gt(l, r, _) => SBinOp(">", treeToExpr(l, vars, keys), treeToExpr(r, vars, keys))
+    case Select(Var(op), (nme, _)) => 
+      op.getOption(vars).fold(???)(it => SProj(it.label._1, nme))
+    case Sub(l, r, _) => 
+      SBinOp("-", treeToExpr(l, vars, keys), treeToExpr(r, vars, keys))
+    case Gt(l, r, _) => 
+      SBinOp(">", treeToExpr(l, vars, keys), treeToExpr(r, vars, keys))
     case Not(e, _) => SUnOp("NOT", treeToExpr(e, vars, keys))
     case LikeInt(i) => SCons(i.toString)
     case LikeBool(b) => SCons(b.toString)
