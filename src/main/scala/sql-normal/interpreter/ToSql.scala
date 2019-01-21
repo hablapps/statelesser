@@ -3,7 +3,7 @@ package sqlnormal
 package interpreter
 
 import scalaz._, Scalaz._
-import optic._
+import monocle._
 import sql._
 
 class ToSql {

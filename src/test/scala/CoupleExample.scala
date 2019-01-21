@@ -3,9 +3,8 @@ package core
 package test
 
 import scalaz._, Scalaz._
-import monocle.function.all._
+import monocle._, function.all._
 
-import optic._
 import sqlnormal._
 import core.Statelesser, Statelesser._
 
