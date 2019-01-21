@@ -12,7 +12,10 @@ class ToSql {
       sem: Semantic[Fold[S, A]],
       keys: Map[TypeNme, FieldName] = Map()): SSelect = {
     val Done(expr, filt, vars) = sem.eval(varStr)
-    SSelect(selToSql(expr, keys), tabToSql(vars, keys), whrToSql(filt, keys))
+    SSelect(
+      selToSql(expr, vars, keys), 
+      tabToSql(vars, keys), 
+      whrToSql(filt, vars, keys))
   }
 
   private val varStr: Stream[String] = {
@@ -30,15 +33,16 @@ class ToSql {
 
   private def selToSql[S, A](
       sel: TSel[S, A],
+      vars: TVarTree,
       keys: Map[TypeNme, FieldName]): SqlSelect = sel match {
-    case t => SList(flatProduct(t).map(e => SField(treeToExpr(e, keys), "")))
+    case t => SList(flatProduct(t).map(e => SField(treeToExpr(e, vars, keys), "")))
   }
 
   private def tabToSql[E[_]](
       vars: TVarTree,
       keys: Map[TypeNme, FieldName]): SqlFrom = vars.toList match {
-    case (nme, ITree(ot, nodes)) :: Nil => 
-      SFrom(List(STable(ot.tgt.nme, nme, seqJoinToSql(nme, nodes, keys))))
+    case (nme, ITree((v, ot), nodes)) :: Nil => 
+      SFrom(List(STable(ot.tgt.nme, v, seqJoinToSql(v, nodes, keys))))
     case _ =>
       throw new Error(s"Can't translate semantic with multiple roots: $vars")
   }
@@ -49,40 +53,43 @@ class ToSql {
     if (n1 == n2) SUsing(n1) else SOn(SProj(v1, n1), SProj(v2, n2))
 
   private def seqJoinToSql(
-      top: String, 
-      frs: IForest[Symbol, OpticType[_, _]],
+      topv: Symbol, 
+      frs: IForest[Symbol, (String, OpticType[_, _])],
       keys: Map[TypeNme, FieldName]): List[SqlJoin] =
     frs.foldLeft(List.empty[SqlJoin]) { 
-      case (acc, (now, ITree(ot, child))) =>
-        (acc :+ joinToSql(top, now, ot, keys)) ++ seqJoinToSql(now, child, keys)
+      case (acc, (nme, ITree((v, ot), child))) =>
+        (acc :+ joinToSql(topv, nme, v, ot, keys)) ++ seqJoinToSql(nme, child, keys)
     }
 
   private def joinToSql(
-      top: String,
-      now: String,
+      topv: Symbol,
+      nme: String,
+      v: Symbol,
       ot: OpticType[_, _],
-      keys: Map[TypeNme, FieldName]): SqlJoin = SEqJoin(ot.tgt.nme, now, 
+      keys: Map[TypeNme, FieldName]): SqlJoin = SEqJoin(ot.tgt.nme, nme, 
     if (ot.kind == KGetter) 
-      condToSql(now, ot.nme, top, keys(ot.tgt.nme)) 
+      condToSql(topv, nme, v, keys(ot.tgt.nme)) 
     else 
       SUsing(keys(ot.src.nme)))
 
   private def whrToSql[S](
       whr: Set[TExpr[S, Boolean]],
+      vars: TVarTree,
       keys: Map[TypeNme, FieldName]): Option[SqlExp] =
     whr.foldLeft(Option.empty[SqlExp]) {
-      case (None, t) => Some(treeToExpr(t, keys))
-      case (Some(e), t) => Some(SBinOp("AND", e, treeToExpr(t, keys)))
+      case (None, t) => Some(treeToExpr(t, vars, keys))
+      case (Some(e), t) => Some(SBinOp("AND", e, treeToExpr(t, vars, keys)))
     }
 
   private def treeToExpr(
       t: TExpr[_, _],
+      vars: TVarTree,
       keys: Map[TypeNme, FieldName]): SqlExp = t match {
-    case Var(es) => SAll(es.head)
-    case Select(Var(syms), ot) => SProj(syms.head, ot.nme)
-    case Sub(l, r, _) => SBinOp("-", treeToExpr(l, keys), treeToExpr(r, keys))
-    case Gt(l, r, _) => SBinOp(">", treeToExpr(l, keys), treeToExpr(r, keys))
-    case Not(e, _) => SUnOp("NOT", treeToExpr(e, keys))
+    case Var(op) => op.getOption(vars).fold(???)(it => SAll(it.label._1))
+    case Select(Var(op), (nme, _)) => op.getOption(vars).fold(???)(it => SProj(it.label._1, nme))
+    case Sub(l, r, _) => SBinOp("-", treeToExpr(l, vars, keys), treeToExpr(r, vars, keys))
+    case Gt(l, r, _) => SBinOp(">", treeToExpr(l, vars, keys), treeToExpr(r, vars, keys))
+    case Not(e, _) => SUnOp("NOT", treeToExpr(e, vars, keys))
     case LikeInt(i) => SCons(i.toString)
     case LikeBool(b) => SCons(b.toString)
     case LikeStr(s) => SCons(s""""$s"""")

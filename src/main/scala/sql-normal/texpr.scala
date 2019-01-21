@@ -2,28 +2,29 @@ package statelesser
 package sqlnormal
 
 import scalaz._, Scalaz._, Leibniz.===
+import monocle.Optional
 
 sealed abstract class TExpr[S, A] {
 
-  def vars: Set[String] = this match {
-    case Var(syms) => syms.toList.toSet
-    case Select(Var(syms), _) => syms.toList.toSet
-    case Not(b, _) => b.vars
-    case Sub(l, r, _) => l.vars ++ r.vars
-    case Gt(l, r, _) => l.vars ++ r.vars
-    case _ => Set.empty
-  }
-  
-  def renameVars(rws: Set[(String, String)]): TExpr[S, A] = this match {
-    case Var(syms) => 
-      Var(syms.map(sym => rws.find(_._1 == sym).fold(sym)(_._2)))
-    case Select(Var(syms), ot) =>
-      Select(Var(syms.map(sym => rws.find(_._1 == sym).fold(sym)(_._2))), ot)
-    case Not(b, is) => TExpr.not(b.renameVars(rws), is)
-    case Sub(l, r, is) => TExpr.sub(l.renameVars(rws), r.renameVars(rws), is)
-    case Gt(l, r, is) => TExpr.gt(l.renameVars(rws), r.renameVars(rws), is)
-    case _ => this
-  }
+  // def vars: Set[String] = this match {
+  //   case Var(syms) => syms.toList.toSet
+  //   case Select(Var(syms), _) => syms.toList.toSet
+  //   case Not(b, _) => b.vars
+  //   case Sub(l, r, _) => l.vars ++ r.vars
+  //   case Gt(l, r, _) => l.vars ++ r.vars
+  //   case _ => Set.empty
+  // }
+  // 
+  // def renameVars(rws: Set[(String, String)]): TExpr[S, A] = this match {
+  //   case Var(syms) => 
+  //     Var(syms.map(sym => rws.find(_._1 == sym).fold(sym)(_._2)))
+  //   case Select(Var(syms), ot) =>
+  //     Select(Var(syms.map(sym => rws.find(_._1 == sym).fold(sym)(_._2))), ot)
+  //   case Not(b, is) => TExpr.not(b.renameVars(rws), is)
+  //   case Sub(l, r, is) => TExpr.sub(l.renameVars(rws), r.renameVars(rws), is)
+  //   case Gt(l, r, is) => TExpr.gt(l.renameVars(rws), r.renameVars(rws), is)
+  //   case _ => this
+  // }
 }
 
 object TExpr {
@@ -50,11 +51,12 @@ case class LikeBool[S](b: Boolean) extends TExpr[S, Boolean]
 
 case class LikeStr[S](s: String) extends TExpr[S, String]
 
-case class Var[S, A](syms: NonEmptyList[Symbol]) extends TExpr[S, A]
+case class Var[S, A](
+  op: Optional[TVarTree, ITree[String, (Symbol, OpticType[_, _])]]) extends TExpr[S, A]
 
 case class Select[S, A, B](
   v: Var[S, A], 
-  ot: OpticType[A, B]) extends TExpr[S, B]
+  label: (String, OpticType[A, B])) extends TExpr[S, B]
 
 case class Not[S, A](
   b: TExpr[S, Boolean], 
