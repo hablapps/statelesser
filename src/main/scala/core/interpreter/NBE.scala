@@ -151,20 +151,18 @@ class NBE extends Statelesser[Semantic] {
       case _ => throw new Error(s"Can't vert compose with 'Done' semantic: $sem2")
     }
 
-  private def unifyVars[O[_, _], S, A](done: Done[O, S, A]): Done[O, S, A] = {
-  //  val (t, rws) = done.vars
-  //    .groupBy(_._2)
-  //    .map { case (k, v) => (k, v.keys.toList) }
-  //    .foldLeft((Map.empty[Symbol, sqlnormal.Value], Set.empty[(String, String)])) {
-  //      case ((m, rws), (v, k :: ks)) =>
-  //        (m + (k -> v), rws ++ ks.map((_, k)))
-  //    }
-  //  if (rws.isEmpty) done
-  //  else unifyVars(Done(
-  //    done.expr.renameVars(rws), 
-  //    done.filt.map(_.renameVars(rws)), 
-  //    t))
-    done
+  // XXX: what if our lists have more elements?
+  private def unifyVarTrees[O[_, _], S, A](l: TVarTree, r: TVarTree): TVarTree =
+    NonEmptyList(unifyITree(l.head, r.head))
+
+  private def unifyITree(
+      l: ITree[String, (Symbol, OpticType[_, _])],
+      r: ITree[String, (Symbol, OpticType[_, _])]): ITree[String, (Symbol, OpticType[_, _])] = {
+    val kmap = (l.children.keySet & r.children.keySet).foldLeft(
+      Map.empty[String, ITree[String, (Symbol, OpticType[_, _])]]) { (acc, k) => 
+      acc + (k -> unifyITree(l.children(k), r.children(k)))
+    }
+    ITree(l.label, l.children ++ r.children ++ kmap)
   }
 
   private def cleanUnusedVars[O[_, _], S, A](
@@ -186,8 +184,10 @@ class NBE extends Statelesser[Semantic] {
         Todo(new (Done[O, ?, S] ~> Done[O, ?, (A, B)]) {
           def apply[T](done: Done[O, T, S]) = (ltodo.f(done), rtodo.f(done)) match {
             case (Done(le, lf, lv), Done(re, rf, rv)) =>
-              unifyVars(Done[O, T, (A, B)](
-                Pair[T, (A, B), A, B](le, re, implicitly), lf ++ rf, lv append rv))
+              Done[O, T, (A, B)](
+                Pair[T, (A, B), A, B](le, re, implicitly), 
+                lf ++ rf, 
+                unifyVarTrees(lv, rv))
           }
         })
       case (Done(le, lf, lv), Done(re, rf, rv)) => Done(
