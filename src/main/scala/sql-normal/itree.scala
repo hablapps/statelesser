@@ -4,8 +4,11 @@ package sqlnormal
 import monocle._, function.Index
 
 case class ITree[I, A](
-  label: A, 
-  children: IForest[I, A] = Map.empty[I, ITree[I, A]])
+    label: A, 
+    children: IForest[I, A] = Map.empty[I, ITree[I, A]]) {
+
+  def contains(a: A): Boolean = ???
+}
 
 object ITree {
   

@@ -167,10 +167,19 @@ class NBE extends Statelesser[Semantic] {
 
   private def cleanUnusedVars[O[_, _], S, A](
       done: Done[O, S, A]): Done[O, S, A] = {
-    // val used: Set[String] =
-    //   done.expr.vars ++ done.filt.flatMap(_.vars)
-    // done.copy(vars = done.vars.filterKeys(used.contains(_)))
-    done
+
+    val used: Set[(Symbol, OpticType[_, _])] = 
+      (done.expr.vars ++ done.filt.flatMap(_.vars))
+        .map(_.getOption(done.vars).map(_.label))
+        .flatten
+
+    def aux(it: ITree[String, (Symbol, OpticType[_, _])])
+        : ITree[String, (Symbol, OpticType[_, _])] = 
+      it.copy(children = it.children.flatMap { case (k, it2) => 
+        if (used.contains(it2.label)) Option(k -> aux(it2)) else None
+      })
+
+    done.copy(vars = done.vars.map(aux))
   }
 
   private def cart[O[_, _], S, A, B](

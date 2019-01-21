@@ -6,25 +6,15 @@ import monocle.Optional
 
 sealed abstract class TExpr[S, A] {
 
-  // def vars: Set[String] = this match {
-  //   case Var(syms) => syms.toList.toSet
-  //   case Select(Var(syms), _) => syms.toList.toSet
-  //   case Not(b, _) => b.vars
-  //   case Sub(l, r, _) => l.vars ++ r.vars
-  //   case Gt(l, r, _) => l.vars ++ r.vars
-  //   case _ => Set.empty
-  // }
-  // 
-  // def renameVars(rws: Set[(String, String)]): TExpr[S, A] = this match {
-  //   case Var(syms) => 
-  //     Var(syms.map(sym => rws.find(_._1 == sym).fold(sym)(_._2)))
-  //   case Select(Var(syms), ot) =>
-  //     Select(Var(syms.map(sym => rws.find(_._1 == sym).fold(sym)(_._2))), ot)
-  //   case Not(b, is) => TExpr.not(b.renameVars(rws), is)
-  //   case Sub(l, r, is) => TExpr.sub(l.renameVars(rws), r.renameVars(rws), is)
-  //   case Gt(l, r, is) => TExpr.gt(l.renameVars(rws), r.renameVars(rws), is)
-  //   case _ => this
-  // }
+  def vars: Set[Optional[TVarTree, ITree[String, (Symbol, OpticType[_, _])]]] = 
+    this match {
+      case Var(op) => Set(op)
+      case Select(v, _) => v.vars
+      case Not(b, _) => b.vars
+      case Sub(l, r, _) => l.vars ++ r.vars
+      case Gt(l, r, _) => l.vars ++ r.vars
+      case _ => Set.empty
+    }
 }
 
 object TExpr {
