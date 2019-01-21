@@ -3,6 +3,7 @@ package core
 package test
 
 import scalaz._, Scalaz._
+import monocle.function.all._
 
 import optic._
 import sqlnormal._
@@ -195,52 +196,63 @@ object CoupleExample {
     val ev = Statelesser[Semantic]
 
     def assignRoot[O[_, _], S, A](ot: OpticType[S, A]): Semantic[O[S, A]] = 
-      fresh.map(s => Done(Just(Var(s)), Set.empty, Map(s -> ot.left)))
+      fresh.map(s => Done(
+        Just(Var(index(s))), 
+        Set.empty, 
+        NonEmptyList(ITree((s, ot), Map.empty))))
 
-    def assignNode[O[_, _], S, A](ot: OpticType[S, A]): Semantic[O[S, A]] =
+    def assignNode[O[_, _], S, A](
+        key: String, 
+        ot: OpticType[S, A]): Semantic[O[S, A]] =
       fresh.map(s => Todo(λ[Done[O, ?, S] ~> Done[O, ?, A]] { done =>
         done.expr match {
-          case Just(x@Var(_)) =>
-            Done(Just(Var(s)), done.filt, done.vars + (s -> Select(x, ot).right))
+          case Just(x@Var(op)) => Done(
+            Just(Var(op composeOptional index(key))), 
+            done.filt, 
+            op.modify(
+              it => it.copy(children = it.children + (key -> ITree((s, ot)))))(
+              done.vars))
         }
       }))
 
-    def assignLeaf[O[_, _], S, A](otpe: OpticType[S, A]): Semantic[O[S, A]] =
+    def assignLeaf[O[_, _], S, A](
+        key: String,
+        otpe: OpticType[S, A]): Semantic[O[S, A]] =
       state(Todo(λ[Done[O, ?, S] ~> Done[O, ?, A]] { done =>
         done.expr match {
-          case Just(x@Var(_)) => done.copy(expr = Just(Select(x, otpe)))
+          case Just(x@Var(_)) => done.copy(expr = Just(Select(x, (key, otpe))))
         }
       }))
 
     val couples = assignRoot(
-      OpticType(KFold, "couples", TypeInfo("Couples"), TypeInfo("Couple", true)))
+      OpticType(KFold, TypeInfo("Couples"), TypeInfo("Couple", true)))
 
-    val her = assignNode(
-      OpticType(KGetter, "her", TypeInfo("Couple", true), TypeInfo("Person", true)))
+    val her = assignNode("her",
+      OpticType(KGetter, TypeInfo("Couple", true), TypeInfo("Person", true)))
 
-    val him = assignNode(
-      OpticType(KGetter, "him", TypeInfo("Couple", true), TypeInfo("Person", true)))
+    val him = assignNode("him",
+      OpticType(KGetter, TypeInfo("Couple", true), TypeInfo("Person", true)))
 
     val people = assignRoot(
-      OpticType(KFold, "people", TypeInfo("People"), TypeInfo("Person", true)))
+      OpticType(KFold, TypeInfo("People"), TypeInfo("Person", true)))
 
-    val name = assignLeaf(
-      OpticType(KGetter, "name", TypeInfo("Person", true), TypeInfo("String")))
+    val name = assignLeaf("name",
+      OpticType(KGetter, TypeInfo("Person", true), TypeInfo("String")))
 
-    val age = assignLeaf(
-      OpticType(KGetter, "age", TypeInfo("Person", true), TypeInfo("Int")))
+    val age = assignLeaf("age",
+      OpticType(KGetter, TypeInfo("Person", true), TypeInfo("Int")))
 
-    val weight = assignLeaf(
-      OpticType(KGetter, "weight", TypeInfo("Person", true), TypeInfo("Int")))
+    val weight = assignLeaf("weight",
+      OpticType(KGetter, TypeInfo("Person", true), TypeInfo("Int")))
 
-    val address = assignNode(
-      OpticType(KGetter, "address", TypeInfo("Person", true), TypeInfo("Address", true)))
+    val address = assignNode("address",
+      OpticType(KGetter, TypeInfo("Person", true), TypeInfo("Address", true)))
 
-    val aliases = assignNode(
-      OpticType(KFold, "aliases", TypeInfo("Person", true), TypeInfo("String")))
+    val aliases = assignNode("aliases",
+      OpticType(KFold, TypeInfo("Person", true), TypeInfo("String")))
 
-    val street = assignLeaf(
-      OpticType(KGetter, "street", TypeInfo("Address", true), TypeInfo("String")))
+    val street = assignLeaf("street",
+      OpticType(KGetter, TypeInfo("Address", true), TypeInfo("String")))
   }
 }
 

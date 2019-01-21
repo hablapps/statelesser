@@ -10,7 +10,6 @@ case class TypeInfo(nme: TypeNme, isPrimitive: Boolean = false)
 
 case class OpticType[S, A](
   kind: OpticKind, 
-  nme: Symbol, 
   src: TypeInfo, 
   tgt: TypeInfo)
 
