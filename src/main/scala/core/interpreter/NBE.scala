@@ -2,10 +2,9 @@ package statelesser
 package core
 package interpreter
 
-import Function.const
 import scalaz._, Scalaz._
+import monocle._
 
-import optic._
 import sqlnormal._
 
 class NBE extends Statelesser[Semantic] {

@@ -1,5 +1,4 @@
-package statelesser
-package optic
+package monocle
 
 import scalaz._, Scalaz._
 
@@ -12,7 +11,7 @@ case class AffineFold[S, A](pre: S => Option[A]) {
     AffineFold(s => pre(s).tuple(other.pre(s)))
 
   def asFold: Fold[S, A] = new Fold[S, A] {
-    def foldMap[M: Monoid](f: A => M): S => M = pre(_).foldMap(f)
+    def foldMap[M: Monoid](f: A => M)(s: S): M = pre(s).foldMap(f)
   }
 }
 

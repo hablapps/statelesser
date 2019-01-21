@@ -5,7 +5,7 @@ package test
 import scala.util.matching.Regex
 import org.scalatest._
 
-import optic.Fold
+import monocle._
 import core.test._
 import sqlnormal._
 

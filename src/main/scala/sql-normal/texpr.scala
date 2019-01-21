@@ -1,7 +1,7 @@
 package statelesser
 package sqlnormal
 
-import scalaz._, Scalaz._, Leibniz.===
+import scalaz._, Leibniz.===
 import monocle.Optional
 
 sealed abstract class TExpr[S, A] {

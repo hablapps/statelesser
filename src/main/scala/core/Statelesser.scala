@@ -1,7 +1,7 @@
 package statelesser
 package core
 
-import optic._
+import monocle._
 
 trait Statelesser[Expr[_]] {
 

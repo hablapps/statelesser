@@ -2,8 +2,8 @@ package statelesser
 package core
 package interpreter
 
+import monocle._
 import scalaz._
-import optic._
 
 class PrettyPrinter extends Statelesser[Const[String, ?]] {
 

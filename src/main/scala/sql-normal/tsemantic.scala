@@ -2,8 +2,7 @@ package statelesser
 package sqlnormal
 
 import scalaz._
-
-import optic.Fold
+import monocle._
 
 sealed abstract class TSemantic[A]
 
