@@ -68,7 +68,7 @@ class ToSql {
       ot: OpticType[_, _],
       keys: Map[TypeNme, FieldName]): SqlJoin = SEqJoin(ot.tgt.nme, v, 
     ot match {
-      case FoldType(src, _) => SUsing(keys(src.nme))
+      case FoldType(_, src, _) => SUsing(keys(src.nme))
       case other => condToSql(topv, nme, v, keys(other.tgt.nme))
     })
 
