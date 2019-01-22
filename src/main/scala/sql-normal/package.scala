@@ -9,8 +9,6 @@ package object `sqlnormal` {
 
   type OpticNme = String
 
-  type Value = OpticType[_, _] \/ Select[_, _, _]
-
   type Semantic[A] = State[Stream[Symbol], TSemantic[A]]
 
   type Symbol = String

@@ -1,14 +1,11 @@
 package statelesser
 package sqlnormal
 
-import monocle._, function.Index
+import monocle._, function.Index, Index._
 
 case class ITree[I, A](
-    label: A, 
-    children: IForest[I, A] = Map.empty[I, ITree[I, A]]) {
-
-  def contains(a: A): Boolean = ???
-}
+  label: A, 
+  children: IForest[I, A] = Map.empty[I, ITree[I, A]])
 
 object ITree {
   
@@ -16,8 +13,8 @@ object ITree {
     
     def index(i: I): Optional[ITree[I, A], ITree[I, A]] =
       Optional[ITree[I, A], ITree[I, A]](
-        s => s.children.get(i))(
-        a => s => s.copy(children = s.children.updated(i, a)))
+        s => mapIndex.index(i).getOption(s.children))(
+        a => s => s.copy(children = mapIndex.index(i).set(a)(s.children)))
   }
 }
 

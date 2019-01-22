@@ -224,34 +224,34 @@ object CoupleExample {
       }))
 
     val couples = assignRoot(
-      OpticType(KFold, TypeInfo("Couples"), TypeInfo("Couple", true)))
+      FoldType(TypeInfo("Couples"), TypeInfo("Couple", true)))
 
     val her = assignNode("her",
-      OpticType(KGetter, TypeInfo("Couple", true), TypeInfo("Person", true)))
+      GetterType(TypeInfo("Couple", true), TypeInfo("Person", true)))
 
     val him = assignNode("him",
-      OpticType(KGetter, TypeInfo("Couple", true), TypeInfo("Person", true)))
+      GetterType(TypeInfo("Couple", true), TypeInfo("Person", true)))
 
     val people = assignRoot(
-      OpticType(KFold, TypeInfo("People"), TypeInfo("Person", true)))
+      FoldType(TypeInfo("People"), TypeInfo("Person", true)))
 
     val name = assignLeaf("name",
-      OpticType(KGetter, TypeInfo("Person", true), TypeInfo("String")))
+      GetterType(TypeInfo("Person", true), TypeInfo("String")))
 
     val age = assignLeaf("age",
-      OpticType(KGetter, TypeInfo("Person", true), TypeInfo("Int")))
+      GetterType(TypeInfo("Person", true), TypeInfo("Int")))
 
     val weight = assignLeaf("weight",
-      OpticType(KGetter, TypeInfo("Person", true), TypeInfo("Int")))
+      GetterType(TypeInfo("Person", true), TypeInfo("Int")))
 
     val address = assignNode("address",
-      OpticType(KGetter, TypeInfo("Person", true), TypeInfo("Address", true)))
+      GetterType(TypeInfo("Person", true), TypeInfo("Address", true)))
 
     val aliases = assignNode("aliases",
-      OpticType(KFold, TypeInfo("Person", true), TypeInfo("String")))
+      FoldType(TypeInfo("Person", true), TypeInfo("String")))
 
     val street = assignLeaf("street",
-      OpticType(KGetter, TypeInfo("Address", true), TypeInfo("String")))
+      GetterType(TypeInfo("Address", true), TypeInfo("String")))
   }
 }
 

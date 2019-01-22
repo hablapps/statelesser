@@ -67,10 +67,10 @@ class ToSql {
       v: Symbol,
       ot: OpticType[_, _],
       keys: Map[TypeNme, FieldName]): SqlJoin = SEqJoin(ot.tgt.nme, v, 
-    if (ot.kind == KGetter) 
-      condToSql(topv, nme, v, keys(ot.tgt.nme)) 
-    else 
-      SUsing(keys(ot.src.nme)))
+    ot match {
+      case FoldType(src, _) => SUsing(keys(src.nme))
+      case other => condToSql(topv, nme, v, keys(other.tgt.nme))
+    })
 
   private def whrToSql[S](
       whr: Set[TExpr[S, Boolean]],
