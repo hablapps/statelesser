@@ -3,9 +3,9 @@ package core
 package test
 
 import scalaz._, Scalaz._
-import monocle._, function.all._
+import monocle._, function.all._, monocle.function.Index.mapIndex
 
-import sqlnormal._
+import sqlnormal._, ITree.indexITree
 import core.Statelesser, Statelesser._
 
 trait CoupleExample[Expr[_]] {
@@ -194,11 +194,11 @@ object CoupleExample {
 
     val ev = Statelesser[Semantic]
 
-    def assignRoot[O[_, _], S, A](ot: OpticType[S, A]): Semantic[O[S, A]] = 
+    def assignRoot[S, A](ot: FoldType[S, A]): Semantic[Fold[S, A]] = 
       fresh.map(s => Done(
-        Just(Var(index(s))), 
+        Just(Var(mapIndex.index(ot))), 
         Set.empty, 
-        NonEmptyList(ITree((s, ot), Map.empty))))
+        Map(ot -> ITree(s))))
 
     def assignNode[O[_, _], S, A](
         key: String, 
@@ -206,7 +206,7 @@ object CoupleExample {
       fresh.map(s => Todo(λ[Done[O, ?, S] ~> Done[O, ?, A]] { done =>
         done.expr match {
           case Just(x@Var(op)) => Done(
-            Just(Var(op composeOptional index(key))), 
+            Just(Var(op.composeOptional(indexITree.index(ot)))), 
             done.filt, 
             op.modify(
               it => it.copy(children = it.children + (key -> ITree((s, ot)))))(

@@ -6,11 +6,10 @@ import monocle.Optional
 
 sealed abstract class TSel[S, A] {
 
-  def vars: Set[Optional[TVarTree, ITree[String, (Symbol, OpticType[_, _])]]] = 
-    this match {
-      case Pair(l, r, _) => l.vars ++ r.vars
-      case Just(e) => e.vars
-    }
+  def vars: Set[Optional[TVarMap, TVarTree]] = this match {
+    case Pair(l, r, _) => l.vars ++ r.vars
+    case Just(e) => e.vars
+  }
 }
 
 case class Just[S, A](e: TExpr[S, A]) extends TSel[S, A]

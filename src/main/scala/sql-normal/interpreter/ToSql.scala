@@ -33,15 +33,15 @@ class ToSql {
 
   private def selToSql[S, A](
       sel: TSel[S, A],
-      vars: TVarTree,
+      vars: TVarMap,
       keys: Map[TypeNme, FieldName]): SqlSelect = sel match {
     case t => SList(flatProduct(t).map(e => SField(treeToExpr(e, vars, keys), "")))
   }
 
   private def tabToSql[E[_]](
-      vars: TVarTree,
+      vars: TVarMap,
       keys: Map[TypeNme, FieldName]): SqlFrom = vars.toList match {
-    case ITree((v, ot), nodes) :: Nil => 
+    case (ot, ITree(v, nodes)) :: Nil =>
       SFrom(List(STable(ot.tgt.nme, v, seqJoinToSql(v, nodes, keys))))
     case _ =>
       throw new Error(s"Can't translate semantic with multiple roots: $vars")
@@ -54,11 +54,12 @@ class ToSql {
 
   private def seqJoinToSql(
       topv: Symbol, 
-      frs: IForest[Symbol, (String, OpticType[_, _])],
+      frs: TVarMap,
       keys: Map[TypeNme, FieldName]): List[SqlJoin] =
     frs.foldLeft(List.empty[SqlJoin]) { 
-      case (acc, (nme, ITree((v, ot), child))) =>
-        (acc :+ joinToSql(topv, nme, v, ot, keys)) ++ seqJoinToSql(nme, child, keys)
+      case (acc, (ot, ITree(v, child))) =>
+        (acc :+ joinToSql(topv, ot.nme, v, ot, keys)) ++ 
+          seqJoinToSql(ot.nme, child, keys)
     }
 
   private def joinToSql(
@@ -74,7 +75,7 @@ class ToSql {
 
   private def whrToSql[S](
       whr: Set[TExpr[S, Boolean]],
-      vars: TVarTree,
+      vars: TVarMap,
       keys: Map[TypeNme, FieldName]): Option[SqlExp] =
     whr.foldLeft(Option.empty[SqlExp]) {
       case (None, t) => Some(treeToExpr(t, vars, keys))
@@ -83,11 +84,11 @@ class ToSql {
 
   private def treeToExpr(
       t: TExpr[_, _],
-      vars: TVarTree,
+      vars: TVarMap,
       keys: Map[TypeNme, FieldName]): SqlExp = t match {
-    case Var(op) => op.getOption(vars).fold(???)(it => SAll(it.label._1))
+        case Var(op) => op.getOption(vars).fold(???)(it => SAll(it.label))
     case Select(Var(op), (nme, _)) => 
-      op.getOption(vars).fold(???)(it => SProj(it.label._1, nme))
+      op.getOption(vars).fold(???)(it => SProj(it.label, nme))
     case Sub(l, r, _) => 
       SBinOp("-", treeToExpr(l, vars, keys), treeToExpr(r, vars, keys))
     case Gt(l, r, _) => 

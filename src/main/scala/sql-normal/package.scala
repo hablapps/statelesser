@@ -21,24 +21,8 @@ package object `sqlnormal` {
 
   type IForest[I, A] = Map[I, ITree[I, A]]
 
-  type TVarTree = NonEmptyList[ITree[String, (Symbol, OpticType[_, _])]]
+  type TVarTree = ITree[OpticType[_, _], Symbol]
 
-  implicit val indexTVarTree = 
-    new Index[TVarTree, Symbol, ITree[String, (Symbol, OpticType[_, _])]] {
-      def index(i: Symbol) = 
-        Optional[TVarTree, ITree[String, (Symbol, OpticType[_, _])]](
-          s => s.list.find(_.label._1 == i))(
-          a => s => 
-            if (s.head.label._1 == i) 
-              NonEmptyList.nel(a.copy(label = (i, a.label._2)), s.tail) 
-            else 
-              NonEmptyList.nel(
-                s.head, 
-                iMapIndex[Symbol, ITree[String, (Symbol, OpticType[_, _])]]
-                  .index(i)
-                  .set(
-                    a.copy(label = (i, a.label._2)))(
-                    s.tail.map(t => (t.label._1, t)).toMap).toIList))
-    }
+  type TVarMap = IForest[OpticType[_, _], Symbol]
 }
 
