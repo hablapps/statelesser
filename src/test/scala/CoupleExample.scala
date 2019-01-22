@@ -209,7 +209,7 @@ object CoupleExample {
             Just(Var(op.composeOptional(indexITree.index(ot)))), 
             done.filt, 
             op.modify(
-              it => it.copy(children = it.children + (key -> ITree((s, ot)))))(
+              it => it.copy(children = it.children + (ot -> ITree(s))))(
               done.vars))
         }
       }))

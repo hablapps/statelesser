@@ -174,7 +174,7 @@ class NBE extends Statelesser[Semantic] {
 
     // done.copy(vars = aux(done.vars))
 
-    ???
+    done
   }
 
   private def cart[O[_, _], S, A, B](
