@@ -45,8 +45,6 @@ class NBE extends Statelesser[Semantic] {
         sem match {
           case todo: Todo[Getter, S, Boolean] => {
             // We're just selecting a unique Boolean, so must be `Just` 
-            // XXX: weird, turning an `AffineFold` into a `Getter`. It's just a
-            // phantom type so it won't fail, but conceptually, this is wrong.
             val Just(e) = todo.f(Done(
               done.expr, 
               done.filt, 
@@ -162,19 +160,18 @@ class NBE extends Statelesser[Semantic] {
   private def cleanUnusedVars[O[_, _], S, A](
       done: Done[O, S, A]): Done[O, S, A] = {
 
-    // val used: Set[(Symbol, OpticType[_, _])] = 
-    //   (done.expr.vars ++ done.filt.flatMap(_.vars))
-    //     .map(_.getOption(done.vars).map(_.label))
-    //     .flatten
+    val used: Set[Symbol] = 
+      (done.expr.vars ++ done.filt.flatMap(_.vars))
+        .map(_.getOption(done.vars).map(_.label))
+        .flatten
 
-    // def aux(it: TVarTree): TVarTree = 
-    //   it.copy(children = it.children.flatMap { case (k, it2) => 
-    //     if (used.contains(it2.label)) Option(k -> aux(it2)) else None
-    //   })
+    def aux(vm: TVarMap): TVarMap = (vm.toList.>>=[(OpticType[_, _], TVarTree)] { 
+      case (k, it) if (it.exists(used.contains(_))) =>
+        List(k -> it.copy(children = aux(it.children))) 
+      case _ => Nil
+    }).toMap
 
-    // done.copy(vars = aux(done.vars))
-
-    done
+    done.copy(vars = aux(done.vars))
   }
 
   private def cart[O[_, _], S, A, B](
