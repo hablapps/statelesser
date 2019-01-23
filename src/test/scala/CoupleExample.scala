@@ -59,25 +59,6 @@ trait CoupleExample[Expr[_]] {
       first >
       second).asFold
 
-  // def getPeopleName_3: Expr[People => List[String]] =
-  //   getAll(people > (((name * age) * weight > first) > first).asFold)
-
-  // def getPeopleName_4: Expr[People => List[String]] =
-  //   getAll(people > (((name * age) * weight > (first > first))).asFold)
-
-  // def getPeopleName_5: Expr[People => List[String]] =
-  //   getAll(people > (name * (age * weight) > (first > id)).asFold)
-
-  // def getPeopleName_6: Expr[People => List[String]] =
-  //   getAll(people >
-  //     (name * weight * age * name * weight >
-  //     id >
-  //     second * first >
-  //     second * first >
-  //     first * id >
-  //     first >
-  //     second).asFold)
-
   def getPeopleNameAnd3_1: Expr[Fold[People, (String, Int)]] =
     people > (name * likeInt(3)).asFold
 
@@ -152,10 +133,6 @@ trait CoupleExample[Expr[_]] {
   def getHerNameGt30_2: Expr[Fold[Couples, String]] =
     couples > ((her > name).asAffineFold <*
       ((her > age).asAffineFold > filtered (gt(30)))).asFold
-
-  // def differenceAll: Expr[Couples => List[(String, Int)]] =
-  //   getAll(couples >
-  //     ((her > name) * ((her > age) * (him > age) > sub)).asFold)
 
   def difference: Expr[Fold[Couples, (String, Int)]] =
     couples >
