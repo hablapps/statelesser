@@ -41,8 +41,11 @@ class ToSql {
   private def tabToSql[E[_]](
       vars: TVarMap,
       keys: Map[TypeNme, FieldName]): SqlFrom = vars.toList match {
-    case (ot, ITree(v, nodes)) :: Nil =>
-      SFrom(List(STable(ot.tgt.nme, v, seqJoinToSql(v, nodes, keys))))
+    case (ot, ITree(v, nodes)) :: xs =>
+      SFrom(List(STable(ot.tgt.nme, v, xs.foldLeft(seqJoinToSql(v, nodes, keys)) {
+        case (acc, (ot2, ITree(v2, nodes2))) => 
+          acc ::: (SJoin(ot2.tgt.nme, v2) :: seqJoinToSql(v2, nodes2, keys))
+      })))
     case _ =>
       throw new Error(s"Can't translate semantic with multiple roots: $vars")
   }
