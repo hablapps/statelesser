@@ -45,7 +45,7 @@ case class Var[S, A](op: Optional[TVarMap, TVarTree]) extends TExpr[S, A]
 
 case class Select[S, A, B](
   v: Var[S, A], 
-  label: (String, OpticType[A, B])) extends TExpr[S, B]
+  label: OpticType[A, B]) extends TExpr[S, B]
 
 case class Not[S, A](
   b: TExpr[S, Boolean], 

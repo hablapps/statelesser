@@ -19,6 +19,7 @@ trait CoupleExample[Expr[_]] {
   type Person
   type People = List[Person]
   type Address
+  type Alias = String
 
   def couples: Expr[Fold[Couples, Couple]]
   def her: Expr[Getter[Couple, Person]]
@@ -28,7 +29,7 @@ trait CoupleExample[Expr[_]] {
   def age: Expr[Getter[Person, Int]]
   def weight: Expr[Getter[Person, Int]]
   def address: Expr[Getter[Person, Address]]
-  def aliases: Expr[Fold[Person, String]]
+  def aliases: Expr[Fold[Person, Alias]]
   def street: Expr[Getter[Address, String]]
 
   /* logic */
@@ -186,6 +187,9 @@ trait CoupleExample[Expr[_]] {
       > filtered(
           id * (likeInt[Int](41) * likeInt[Int](1) > sub)
             > greaterThan)))).asFold
+
+  def getHerCartesianAliases: Expr[Fold[Couples, (String, String)]] =
+    couples > her.asFold > aliases * aliases
 }
 
 object CoupleExample {
@@ -200,9 +204,7 @@ object CoupleExample {
         Set.empty, 
         Map(ot -> ITree(s))))
 
-    def assignNode[O[_, _], S, A](
-        key: String, 
-        ot: OpticType[S, A]): Semantic[O[S, A]] =
+    def assignNode[O[_, _], S, A](ot: OpticType[S, A]): Semantic[O[S, A]] =
       fresh.map(s => Todo(λ[Done[O, ?, S] ~> Done[O, ?, A]] { done =>
         done.expr match {
           case Just(x@Var(op)) => Done(
@@ -214,43 +216,41 @@ object CoupleExample {
         }
       }))
 
-    def assignLeaf[O[_, _], S, A](
-        key: String,
-        otpe: OpticType[S, A]): Semantic[O[S, A]] =
+    def assignLeaf[O[_, _], S, A](ot: OpticType[S, A]): Semantic[O[S, A]] =
       state(Todo(λ[Done[O, ?, S] ~> Done[O, ?, A]] { done =>
         done.expr match {
-          case Just(x@Var(_)) => done.copy(expr = Just(Select(x, (key, otpe))))
+          case Just(x@Var(_)) => done.copy(expr = Just(Select(x, ot)))
         }
       }))
 
     val couples = assignRoot(
       FoldType("couples", TypeInfo("Couples"), TypeInfo("Couple", true)))
 
-    val her = assignNode("her",
+    val her = assignNode(
       GetterType("her", TypeInfo("Couple", true), TypeInfo("Person", true)))
 
-    val him = assignNode("him",
+    val him = assignNode(
       GetterType("him", TypeInfo("Couple", true), TypeInfo("Person", true)))
 
     val people = assignRoot(
       FoldType("people", TypeInfo("People"), TypeInfo("Person", true)))
 
-    val name = assignLeaf("name",
+    val name = assignLeaf(
       GetterType("name", TypeInfo("Person", true), TypeInfo("String")))
 
-    val age = assignLeaf("age",
+    val age = assignLeaf(
       GetterType("age", TypeInfo("Person", true), TypeInfo("Int")))
 
-    val weight = assignLeaf("weight",
+    val weight = assignLeaf(
       GetterType("weight", TypeInfo("Person", true), TypeInfo("Int")))
 
-    val address = assignNode("address",
+    val address = assignNode(
       GetterType("address", TypeInfo("Person", true), TypeInfo("Address", true)))
 
-    val aliases = assignNode("aliases",
-      FoldType("aliases", TypeInfo("Person", true), TypeInfo("String")))
+    val aliases = assignNode(
+      FoldType("aliases", TypeInfo("Person", true), TypeInfo("Alias", true)))
 
-    val street = assignLeaf("street",
+    val street = assignLeaf(
       GetterType("street", TypeInfo("Address", true), TypeInfo("String")))
   }
 }
