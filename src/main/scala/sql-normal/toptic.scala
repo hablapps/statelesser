@@ -24,7 +24,7 @@ case class FoldType[S, A](
     src: TypeInfo, 
     tgt: TypeInfo) extends OpticType[S, A] {
   override def equals(that: Any): Boolean = that match {
-    case other: FoldType[S, A] => this eq other
+    case other: AnyRef => this eq other
     case _ => false
   }
 }

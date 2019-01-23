@@ -223,34 +223,34 @@ object CoupleExample {
         }
       }))
 
-    val couples = assignRoot(
+    def couples = assignRoot(
       FoldType("couples", TypeInfo("Couples"), TypeInfo("Couple", true)))
 
-    val her = assignNode(
+    def her = assignNode(
       GetterType("her", TypeInfo("Couple", true), TypeInfo("Person", true)))
 
-    val him = assignNode(
+    def him = assignNode(
       GetterType("him", TypeInfo("Couple", true), TypeInfo("Person", true)))
 
-    val people = assignRoot(
+    def people = assignRoot(
       FoldType("people", TypeInfo("People"), TypeInfo("Person", true)))
 
-    val name = assignLeaf(
+    def name = assignLeaf(
       GetterType("name", TypeInfo("Person", true), TypeInfo("String")))
 
-    val age = assignLeaf(
+    def age = assignLeaf(
       GetterType("age", TypeInfo("Person", true), TypeInfo("Int")))
 
-    val weight = assignLeaf(
+    def weight = assignLeaf(
       GetterType("weight", TypeInfo("Person", true), TypeInfo("Int")))
 
-    val address = assignNode(
+    def address = assignNode(
       GetterType("address", TypeInfo("Person", true), TypeInfo("Address", true)))
 
-    val aliases = assignNode(
+    def aliases = assignNode(
       FoldType("aliases", TypeInfo("Person", true), TypeInfo("Alias", true)))
 
-    val street = assignLeaf(
+    def street = assignLeaf(
       GetterType("street", TypeInfo("Address", true), TypeInfo("String")))
   }
 }
