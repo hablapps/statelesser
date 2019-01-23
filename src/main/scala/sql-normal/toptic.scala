@@ -1,15 +1,31 @@
 package statelesser
 package sqlnormal
 
-sealed abstract class OpticKind
-case object KGetter extends OpticKind
-case object KAffineFold extends OpticKind
-case object KFold extends OpticKind
-
 case class TypeInfo(nme: TypeNme, isPrimitive: Boolean = false)
 
-case class OpticType[S, A](
-  kind: OpticKind, 
+sealed abstract class OpticType[S, A] {
+  val nme: String
+  val src: TypeInfo
+  val tgt: TypeInfo
+}
+
+case class GetterType[S, A](
+  nme: String,
   src: TypeInfo, 
-  tgt: TypeInfo)
+  tgt: TypeInfo) extends OpticType[S, A]
+
+case class AffineFoldType[S, A](
+  nme: String,
+  src: TypeInfo, 
+  tgt: TypeInfo) extends OpticType[S, A]
+
+case class FoldType[S, A](
+    nme: String,
+    src: TypeInfo, 
+    tgt: TypeInfo) extends OpticType[S, A] {
+  override def equals(that: Any): Boolean = that match {
+    case other: AnyRef => this eq other
+    case _ => false
+  }
+}
 

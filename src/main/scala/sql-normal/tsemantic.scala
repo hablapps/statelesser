@@ -14,10 +14,9 @@ object TSemantic {
 }
 
 case class Done[O[_, _], S, A](
-  expr: TSel[S, A], 
-  filt: Set[TExpr[S, Boolean]],
-  vars: TVarTree) extends TSemantic[O[S, A]] {
-
+    expr: TSel[S, A], 
+    filt: Set[TExpr[S, Boolean]],
+    vars: TVarMap) extends TSemantic[O[S, A]] {
   def as[O2[_, _]]: Done[O2, S, A] = Done(expr, filt, vars)
 }
 

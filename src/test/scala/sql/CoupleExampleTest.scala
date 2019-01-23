@@ -122,5 +122,13 @@ class CoupleExampleTest extends FlatSpec with Matchers {
       raw"SELECT (.+)\.street, (.+)\.street FROM Couple AS (.+) INNER JOIN Person AS (.+) ON \3\.her = \4\.name INNER JOIN Address AS \1 ON \4\.address = \1\.id INNER JOIN Person AS (.+) ON \3\.him = \5\.name INNER JOIN Address AS \2 ON \5\.address = \2.id;".r, 
       herAndHimStreet_1)
   }
+
+  it should "generate cartesian product when achieving fold products" in {
+    matchSql(raw"".r, /*getHerCartesianAliases_1,*/ getHerCartesianAliases_2)
+  }
+
+  it should "generate cartesian product in the root, aka. JOIN" in {
+    matchSql(raw"".r, difference_1)
+  }
 }
 

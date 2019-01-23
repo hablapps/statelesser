@@ -3,9 +3,9 @@ package core
 package test
 
 import scalaz._, Scalaz._
-import monocle._, function.all._
+import monocle._, function.all._, monocle.function.Index.mapIndex
 
-import sqlnormal._
+import sqlnormal._, ITree.indexITree
 import core.Statelesser, Statelesser._
 
 trait CoupleExample[Expr[_]] {
@@ -19,6 +19,7 @@ trait CoupleExample[Expr[_]] {
   type Person
   type People = List[Person]
   type Address
+  type Alias = String
 
   def couples: Expr[Fold[Couples, Couple]]
   def her: Expr[Getter[Couple, Person]]
@@ -28,7 +29,7 @@ trait CoupleExample[Expr[_]] {
   def age: Expr[Getter[Person, Int]]
   def weight: Expr[Getter[Person, Int]]
   def address: Expr[Getter[Person, Address]]
-  def aliases: Expr[Fold[Person, String]]
+  def aliases: Expr[Fold[Person, Alias]]
   def street: Expr[Getter[Address, String]]
 
   /* logic */
@@ -57,25 +58,6 @@ trait CoupleExample[Expr[_]] {
       first * id >
       first >
       second).asFold
-
-  // def getPeopleName_3: Expr[People => List[String]] =
-  //   getAll(people > (((name * age) * weight > first) > first).asFold)
-
-  // def getPeopleName_4: Expr[People => List[String]] =
-  //   getAll(people > (((name * age) * weight > (first > first))).asFold)
-
-  // def getPeopleName_5: Expr[People => List[String]] =
-  //   getAll(people > (name * (age * weight) > (first > id)).asFold)
-
-  // def getPeopleName_6: Expr[People => List[String]] =
-  //   getAll(people >
-  //     (name * weight * age * name * weight >
-  //     id >
-  //     second * first >
-  //     second * first >
-  //     first * id >
-  //     first >
-  //     second).asFold)
 
   def getPeopleNameAnd3_1: Expr[Fold[People, (String, Int)]] =
     people > (name * likeInt(3)).asFold
@@ -152,10 +134,6 @@ trait CoupleExample[Expr[_]] {
     couples > ((her > name).asAffineFold <*
       ((her > age).asAffineFold > filtered (gt(30)))).asFold
 
-  // def differenceAll: Expr[Couples => List[(String, Int)]] =
-  //   getAll(couples >
-  //     ((her > name) * ((her > age) * (him > age) > sub)).asFold)
-
   def difference: Expr[Fold[Couples, (String, Int)]] =
     couples >
       ((her > name).asAffineFold *
@@ -186,6 +164,12 @@ trait CoupleExample[Expr[_]] {
       > filtered(
           id * (likeInt[Int](41) * likeInt[Int](1) > sub)
             > greaterThan)))).asFold
+
+  def getHerCartesianAliases_1: Expr[Fold[Couples, (String, String)]] =
+    couples > her.asFold > aliases * aliases
+
+  def getHerCartesianAliases_2: Expr[Fold[Couples, (String, String)]] =
+    couples > (her.asFold > aliases) * (her.asFold > aliases)
 }
 
 object CoupleExample {
@@ -194,64 +178,60 @@ object CoupleExample {
 
     val ev = Statelesser[Semantic]
 
-    def assignRoot[O[_, _], S, A](ot: OpticType[S, A]): Semantic[O[S, A]] = 
+    def assignRoot[S, A](ot: FoldType[S, A]): Semantic[Fold[S, A]] = 
       fresh.map(s => Done(
-        Just(Var(index(s))), 
+        Just(Var(mapIndex.index(ot))), 
         Set.empty, 
-        NonEmptyList(ITree((s, ot), Map.empty))))
+        Map(ot -> ITree(s))))
 
-    def assignNode[O[_, _], S, A](
-        key: String, 
-        ot: OpticType[S, A]): Semantic[O[S, A]] =
+    def assignNode[O[_, _], S, A](ot: OpticType[S, A]): Semantic[O[S, A]] =
       fresh.map(s => Todo(λ[Done[O, ?, S] ~> Done[O, ?, A]] { done =>
         done.expr match {
           case Just(x@Var(op)) => Done(
-            Just(Var(op composeOptional index(key))), 
+            Just(Var(op.composeOptional(indexITree.index(ot)))), 
             done.filt, 
             op.modify(
-              it => it.copy(children = it.children + (key -> ITree((s, ot)))))(
+              it => it.copy(children = it.children + (ot -> ITree(s))))(
               done.vars))
         }
       }))
 
-    def assignLeaf[O[_, _], S, A](
-        key: String,
-        otpe: OpticType[S, A]): Semantic[O[S, A]] =
+    def assignLeaf[O[_, _], S, A](ot: OpticType[S, A]): Semantic[O[S, A]] =
       state(Todo(λ[Done[O, ?, S] ~> Done[O, ?, A]] { done =>
         done.expr match {
-          case Just(x@Var(_)) => done.copy(expr = Just(Select(x, (key, otpe))))
+          case Just(x@Var(_)) => done.copy(expr = Just(Select(x, ot)))
         }
       }))
 
-    val couples = assignRoot(
-      OpticType(KFold, TypeInfo("Couples"), TypeInfo("Couple", true)))
+    def couples = assignRoot(
+      FoldType("couples", TypeInfo("Couples"), TypeInfo("Couple", true)))
 
-    val her = assignNode("her",
-      OpticType(KGetter, TypeInfo("Couple", true), TypeInfo("Person", true)))
+    def her = assignNode(
+      GetterType("her", TypeInfo("Couple", true), TypeInfo("Person", true)))
 
-    val him = assignNode("him",
-      OpticType(KGetter, TypeInfo("Couple", true), TypeInfo("Person", true)))
+    def him = assignNode(
+      GetterType("him", TypeInfo("Couple", true), TypeInfo("Person", true)))
 
-    val people = assignRoot(
-      OpticType(KFold, TypeInfo("People"), TypeInfo("Person", true)))
+    def people = assignRoot(
+      FoldType("people", TypeInfo("People"), TypeInfo("Person", true)))
 
-    val name = assignLeaf("name",
-      OpticType(KGetter, TypeInfo("Person", true), TypeInfo("String")))
+    def name = assignLeaf(
+      GetterType("name", TypeInfo("Person", true), TypeInfo("String")))
 
-    val age = assignLeaf("age",
-      OpticType(KGetter, TypeInfo("Person", true), TypeInfo("Int")))
+    def age = assignLeaf(
+      GetterType("age", TypeInfo("Person", true), TypeInfo("Int")))
 
-    val weight = assignLeaf("weight",
-      OpticType(KGetter, TypeInfo("Person", true), TypeInfo("Int")))
+    def weight = assignLeaf(
+      GetterType("weight", TypeInfo("Person", true), TypeInfo("Int")))
 
-    val address = assignNode("address",
-      OpticType(KGetter, TypeInfo("Person", true), TypeInfo("Address", true)))
+    def address = assignNode(
+      GetterType("address", TypeInfo("Person", true), TypeInfo("Address", true)))
 
-    val aliases = assignNode("aliases",
-      OpticType(KFold, TypeInfo("Person", true), TypeInfo("String")))
+    def aliases = assignNode(
+      FoldType("aliases", TypeInfo("Person", true), TypeInfo("Alias", true)))
 
-    val street = assignLeaf("street",
-      OpticType(KGetter, TypeInfo("Address", true), TypeInfo("String")))
+    def street = assignLeaf(
+      GetterType("street", TypeInfo("Address", true), TypeInfo("String")))
   }
 }
 

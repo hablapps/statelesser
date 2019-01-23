@@ -6,7 +6,7 @@ import monocle.Optional
 
 sealed abstract class TExpr[S, A] {
 
-  def vars: Set[Optional[TVarTree, ITree[String, (Symbol, OpticType[_, _])]]] = 
+  def vars: Set[Optional[TVarMap, TVarTree]] = 
     this match {
       case Var(op) => Set(op)
       case Select(v, _) => v.vars
@@ -41,12 +41,11 @@ case class LikeBool[S](b: Boolean) extends TExpr[S, Boolean]
 
 case class LikeStr[S](s: String) extends TExpr[S, String]
 
-case class Var[S, A](
-  op: Optional[TVarTree, ITree[String, (Symbol, OpticType[_, _])]]) extends TExpr[S, A]
+case class Var[S, A](op: Optional[TVarMap, TVarTree]) extends TExpr[S, A]
 
 case class Select[S, A, B](
   v: Var[S, A], 
-  label: (String, OpticType[A, B])) extends TExpr[S, B]
+  label: OpticType[A, B]) extends TExpr[S, B]
 
 case class Not[S, A](
   b: TExpr[S, Boolean], 

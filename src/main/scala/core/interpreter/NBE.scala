@@ -45,8 +45,6 @@ class NBE extends Statelesser[Semantic] {
         sem match {
           case todo: Todo[Getter, S, Boolean] => {
             // We're just selecting a unique Boolean, so must be `Just` 
-            // XXX: weird, turning an `AffineFold` into a `Getter`. It's just a
-            // phantom type so it won't fail, but conceptually, this is wrong.
             val Just(e) = todo.f(Done(
               done.expr, 
               done.filt, 
@@ -150,35 +148,30 @@ class NBE extends Statelesser[Semantic] {
       case _ => throw new Error(s"Can't vert compose with 'Done' semantic: $sem2")
     }
 
-  // XXX: what if our lists have more elements?
-  private def unifyVarTrees[O[_, _], S, A](l: TVarTree, r: TVarTree): TVarTree =
-    NonEmptyList(unifyITree(l.head, r.head))
+  private def unifyIVarMap(l: TVarMap, r: TVarMap): TVarMap =
+    l ++ r ++ (l.keySet & r.keySet).foldLeft(
+      Map.empty[OpticType[_, _], TVarTree]) { (acc, k) => 
+        acc + (k -> unifyIVarTree(l(k), r(k)))
+      }
 
-  private def unifyITree(
-      l: ITree[String, (Symbol, OpticType[_, _])],
-      r: ITree[String, (Symbol, OpticType[_, _])]): ITree[String, (Symbol, OpticType[_, _])] = {
-    val kmap = (l.children.keySet & r.children.keySet).foldLeft(
-      Map.empty[String, ITree[String, (Symbol, OpticType[_, _])]]) { (acc, k) => 
-      acc + (k -> unifyITree(l.children(k), r.children(k)))
-    }
-    ITree(l.label, l.children ++ r.children ++ kmap)
-  }
+  private def unifyIVarTree(l: TVarTree, r: TVarTree): TVarTree =
+    ITree(l.label, unifyIVarMap(l.children, r.children))
 
   private def cleanUnusedVars[O[_, _], S, A](
       done: Done[O, S, A]): Done[O, S, A] = {
 
-    val used: Set[(Symbol, OpticType[_, _])] = 
+    val used: Set[Symbol] = 
       (done.expr.vars ++ done.filt.flatMap(_.vars))
         .map(_.getOption(done.vars).map(_.label))
         .flatten
 
-    def aux(it: ITree[String, (Symbol, OpticType[_, _])])
-        : ITree[String, (Symbol, OpticType[_, _])] = 
-      it.copy(children = it.children.flatMap { case (k, it2) => 
-        if (used.contains(it2.label)) Option(k -> aux(it2)) else None
-      })
+    def aux(vm: TVarMap): TVarMap = (vm.toList.>>=[(OpticType[_, _], TVarTree)] { 
+      case (k, it) if (it.exists(used.contains(_))) =>
+        List(k -> it.copy(children = aux(it.children))) 
+      case _ => Nil
+    }).toMap
 
-    done.copy(vars = done.vars.map(aux))
+    done.copy(vars = aux(done.vars))
   }
 
   private def cart[O[_, _], S, A, B](
@@ -195,11 +188,11 @@ class NBE extends Statelesser[Semantic] {
               Done[O, T, (A, B)](
                 Pair[T, (A, B), A, B](le, re, implicitly), 
                 lf ++ rf, 
-                unifyVarTrees(lv, rv))
+                unifyIVarMap(lv, rv))
           }
         })
       case (Done(le, lf, lv), Done(re, rf, rv)) => Done(
-        Pair[S, (A, B), A, B](le, re, implicitly), lf ++ rf, lv append rv)
+        Pair[S, (A, B), A, B](le, re, implicitly), lf ++ rf, lv ++ rv)
     }
 }
 
