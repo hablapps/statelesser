@@ -165,8 +165,11 @@ trait CoupleExample[Expr[_]] {
           id * (likeInt[Int](41) * likeInt[Int](1) > sub)
             > greaterThan)))).asFold
 
-  def getHerCartesianAliases: Expr[Fold[Couples, (String, String)]] =
+  def getHerCartesianAliases_1: Expr[Fold[Couples, (String, String)]] =
     couples > her.asFold > aliases * aliases
+
+  def getHerCartesianAliases_2: Expr[Fold[Couples, (String, String)]] =
+    couples > (her.asFold > aliases) * (her.asFold > aliases)
 }
 
 object CoupleExample {

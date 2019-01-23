@@ -124,7 +124,7 @@ class CoupleExampleTest extends FlatSpec with Matchers {
   }
 
   it should "generate cartesian product when achieving fold products" in {
-    matchSql(raw"".r, getHerCartesianAliases)
+    matchSql(raw"".r, /*getHerCartesianAliases_1,*/ getHerCartesianAliases_2)
   }
 
   it should "generate cartesian product in the root, aka. JOIN" in {
