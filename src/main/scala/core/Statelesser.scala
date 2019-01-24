@@ -66,6 +66,10 @@ object Statelesser {
 
   def apply[E[_]](implicit ev: Statelesser[E]): Statelesser[E] = ev
 
+  trait Church[A] {
+    def apply[E[_]: Statelesser]: E[A]
+  }
+
   implicit val prettyPrinter = new interpreter.PrettyPrinter
 
   implicit def metacircular = new interpreter.Metacircular
