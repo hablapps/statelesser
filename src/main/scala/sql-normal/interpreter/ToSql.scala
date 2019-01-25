@@ -89,9 +89,10 @@ class ToSql {
       t: TExpr[_, _],
       vars: TVarMap,
       keys: Map[TypeNme, FieldName]): SqlExp = t match {
-        case Var(op) => op.getOption(vars).fold(???)(it => SAll(it.label))
-    case Select(Var(op), ot) => 
-      op.getOption(vars).fold(???)(it => SProj(it.label, ot.nme))
+    case v: TVar[_, _] => 
+      v.apply.getOption(vars).fold(???)(it => SAll(it.label))
+    case Select(v: TVar[_, _], ot) => 
+      v.apply.getOption(vars).fold(???)(it => SProj(it.label, ot.nme))
     case Sub(l, r, _) => 
       SBinOp("-", treeToExpr(l, vars, keys), treeToExpr(r, vars, keys))
     case Gt(l, r, _) => 

@@ -160,13 +160,12 @@ class NBE extends Statelesser[Semantic] {
   private def cleanUnusedVars[O[_, _], S, A](
       done: Done[O, S, A]): Done[O, S, A] = {
 
-    val used: Set[Symbol] = 
+    val used: Set[Symbol] =
       (done.expr.vars ++ done.filt.flatMap(_.vars))
-        .map(_.getOption(done.vars).map(_.label))
-        .flatten
+        .flatMap(v => v.symbols(done.vars).toSet.flatMap(_.toSet))
 
     def aux(vm: TVarMap): TVarMap = (vm.toList.>>=[(OpticType[_, _], TVarTree)] { 
-      case (k, it) if (it.exists(used.contains(_))) =>
+      case (k, it) if (used.contains(it.label)) =>
         List(k -> it.copy(children = aux(it.children))) 
       case _ => Nil
     }).toMap

@@ -2,19 +2,18 @@ package statelesser
 package sqlnormal
 
 import scalaz._, Leibniz.===
-import monocle.Optional
+import monocle.Optional, monocle.function.all._
 
 sealed abstract class TExpr[S, A] {
 
-  def vars: Set[Optional[TVarMap, TVarTree]] = 
-    this match {
-      case Var(op) => Set(op)
-      case Select(v, _) => v.vars
-      case Not(b, _) => b.vars
-      case Sub(l, r, _) => l.vars ++ r.vars
-      case Gt(l, r, _) => l.vars ++ r.vars
-      case _ => Set.empty
-    }
+  def vars: Set[TVar[_, _]] = this match {
+    case v: TVar[_, _] => Set(v)
+    case Select(v, _) => Set(v)
+    case Not(b, _) => b.vars
+    case Sub(l, r, _) => l.vars ++ r.vars
+    case Gt(l, r, _) => l.vars ++ r.vars
+    case _ => Set.empty
+  }
 }
 
 object TExpr {
@@ -41,10 +40,29 @@ case class LikeBool[S](b: Boolean) extends TExpr[S, Boolean]
 
 case class LikeStr[S](s: String) extends TExpr[S, String]
 
-case class Var[S, A](op: Optional[TVarMap, TVarTree]) extends TExpr[S, A]
+sealed abstract class TVar[S, A] extends TExpr[S, A] {
+
+  def apply: Optional[TVarMap, TVarTree]
+
+  def symbols(tvm: TVarMap): Option[NonEmptyList[Symbol]] = this match {
+    case RootVar(op) => op.getOption(tvm).map(tvt => NonEmptyList(tvt.label))
+    case v@Var(t, i) => v.apply.getOption(tvm).flatMap { tvt => 
+      t.symbols(tvm).map(_ append NonEmptyList(tvt.label))
+    }
+  }
+}
+
+case class RootVar[S, A](apply: Optional[TVarMap, TVarTree]) extends TVar[S, A]
+
+case class Var[S, A, B](
+    top: TVar[S, A], 
+    i: OpticType[A, B]) extends TVar[S, B] {
+  def apply: Optional[TVarMap, TVarTree] = 
+    top.apply.composeOptional(index[TVarTree, OpticType[_, _], TVarTree](i))
+}
 
 case class Select[S, A, B](
-  v: Var[S, A], 
+  v: TVar[S, A], 
   label: OpticType[A, B]) extends TExpr[S, B]
 
 case class Not[S, A](

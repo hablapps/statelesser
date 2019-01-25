@@ -75,6 +75,8 @@ object Statelesser {
   implicit def metacircular = new interpreter.Metacircular
 
   implicit def tsemantic = new interpreter.NBE
+
+  implicit def church = new interpreter.ChurchEncoding
  
   object syntax extends Syntax
 }

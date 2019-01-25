@@ -134,6 +134,10 @@ trait CoupleExample[Expr[_]] {
     couples > ((her > name).asAffineFold <*
       ((her > age).asAffineFold > filtered (gt(30)))).asFold
 
+  def getHerNameGt30_3: Expr[Fold[Couples, String]] =
+    couples > (
+      her.asAffineFold > filtered (age > gt(30)) > name.asAffineFold).asFold
+
   def difference: Expr[Fold[Couples, (String, Int)]] =
     couples >
       ((her > name).asAffineFold *
@@ -180,17 +184,17 @@ object CoupleExample {
 
     def assignRoot[S, A](ot: FoldType[S, A]): Semantic[Fold[S, A]] = 
       fresh.map(s => Done(
-        Just(Var(mapIndex.index(ot))), 
+        Just(RootVar(mapIndex.index(ot))), 
         Set.empty, 
         Map(ot -> ITree(s))))
 
     def assignNode[O[_, _], S, A](ot: OpticType[S, A]): Semantic[O[S, A]] =
       fresh.map(s => Todo(λ[Done[O, ?, S] ~> Done[O, ?, A]] { done =>
         done.expr match {
-          case Just(x@Var(op)) => Done(
-            Just(Var(op.composeOptional(indexITree.index(ot)))), 
+          case Just(x: TVar[_, _]) => Done(
+            Just(Var(x, ot)),
             done.filt, 
-            op.modify(
+            x.apply.modify(
               it => it.copy(children = it.children + (ot -> ITree(s))))(
               done.vars))
         }
@@ -199,7 +203,7 @@ object CoupleExample {
     def assignLeaf[O[_, _], S, A](ot: OpticType[S, A]): Semantic[O[S, A]] =
       state(Todo(λ[Done[O, ?, S] ~> Done[O, ?, A]] { done =>
         done.expr match {
-          case Just(x@Var(_)) => done.copy(expr = Just(Select(x, ot)))
+          case Just(x: TVar[_, _]) => done.copy(expr = Just(Select(x, ot)))
         }
       }))
 

@@ -6,7 +6,7 @@ import monocle.Optional
 
 sealed abstract class TSel[S, A] {
 
-  def vars: Set[Optional[TVarMap, TVarTree]] = this match {
+  def vars: Set[TVar[_, _]] = this match {
     case Pair(l, r, _) => l.vars ++ r.vars
     case Just(e) => e.vars
   }
