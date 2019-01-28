@@ -183,10 +183,7 @@ object CoupleExample {
     val ev = Statelesser[Semantic]
 
     def assignRoot[S, A](ot: FoldType[S, A]): Semantic[Fold[S, A]] = 
-      fresh.map(s => Done(
-        Just(RootVar(mapIndex.index(ot))), 
-        Set.empty, 
-        Map(ot -> ITree(s))))
+      fresh.map(s => Done(Just(RootVar(ot)), Set.empty, Map(ot -> ITree(s))))
 
     def assignNode[O[_, _], S, A](ot: OpticType[S, A]): Semantic[O[S, A]] =
       fresh.map(s => Todo(λ[Done[O, ?, S] ~> Done[O, ?, A]] { done =>

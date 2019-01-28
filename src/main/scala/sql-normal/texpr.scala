@@ -2,7 +2,7 @@ package statelesser
 package sqlnormal
 
 import scalaz._, Leibniz.===
-import monocle.Optional, monocle.function.all._
+import monocle.Optional, monocle.function.all._, monocle.function.Index.mapIndex
 
 sealed abstract class TExpr[S, A] {
 
@@ -53,8 +53,7 @@ sealed abstract class TVar[S, A] extends TExpr[S, A] {
 }
 
 case class RootVar[S, A](i: OpticType[S, A]) extends TVar[S, A] {
-  def apply: Optional[TVarMap, TVarTree] =
-    index[TVarTree, OpticType[_, _], TVarTree](i)
+  def apply: Optional[TVarMap, TVarTree] = mapIndex.index(i)
 }
 
 case class Var[S, A, B](
