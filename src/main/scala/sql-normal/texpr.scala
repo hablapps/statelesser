@@ -45,14 +45,17 @@ sealed abstract class TVar[S, A] extends TExpr[S, A] {
   def apply: Optional[TVarMap, TVarTree]
 
   def symbols(tvm: TVarMap): Option[NonEmptyList[Symbol]] = this match {
-    case RootVar(op) => op.getOption(tvm).map(tvt => NonEmptyList(tvt.label))
+    case v@RootVar(_) => v.apply.getOption(tvm).map(tvt => NonEmptyList(tvt.label))
     case v@Var(t, i) => v.apply.getOption(tvm).flatMap { tvt => 
       t.symbols(tvm).map(_ append NonEmptyList(tvt.label))
     }
   }
 }
 
-case class RootVar[S, A](apply: Optional[TVarMap, TVarTree]) extends TVar[S, A]
+case class RootVar[S, A](i: OpticType[S, A]) extends TVar[S, A] {
+  def apply: Optional[TVarMap, TVarTree] =
+    index[TVarTree, OpticType[_, _], TVarTree](i)
+}
 
 case class Var[S, A, B](
     top: TVar[S, A], 

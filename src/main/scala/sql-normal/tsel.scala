@@ -2,13 +2,17 @@ package statelesser
 package sqlnormal
 
 import scalaz._, Leibniz.===
-import monocle.Optional
 
 sealed abstract class TSel[S, A] {
 
   def vars: Set[TVar[_, _]] = this match {
     case Pair(l, r, _) => l.vars ++ r.vars
     case Just(e) => e.vars
+  }
+
+  def toNel: NonEmptyList[TExpr[S, _]] = this match {
+    case Pair(l, r, _) => l.toNel append r.toNel
+    case Just(e) => NonEmptyList(e)
   }
 }
 

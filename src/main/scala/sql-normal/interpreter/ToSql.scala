@@ -25,17 +25,12 @@ class ToSql {
     pattern #::: syms(pattern)
   }
 
-  private def flatProduct(
-      x: TSel[_, _]): List[TExpr[_, _]] = x match {
-    case Pair(l, r, _) => List(flatProduct(l), flatProduct(r)).join
-    case Just(e) => List(e)
-  }
-
   private def selToSql[S, A](
       sel: TSel[S, A],
       vars: TVarMap,
       keys: Map[TypeNme, FieldName]): SqlSelect = sel match {
-    case t => SList(flatProduct(t).map(e => SField(treeToExpr(e, vars, keys), "")))
+    case t => 
+      SList(t.toNel.toList.map(e => SField(treeToExpr(e, vars, keys), "")))
   }
 
   private def tabToSql[E[_]](
