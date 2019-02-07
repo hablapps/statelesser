@@ -71,6 +71,8 @@ object Statelesser {
   implicit def metacircular = new interpreter.Metacircular
 
   implicit def tsemantic = new interpreter.NBE
+
+  implicit def xpath = new interpreter.XPath
  
   object syntax extends Syntax
 }

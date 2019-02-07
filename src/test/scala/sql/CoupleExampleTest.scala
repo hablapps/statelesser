@@ -82,7 +82,8 @@ class CoupleExampleTest extends FlatSpec with Matchers {
   it should "generate filters" in {
     matchSql(
       raw"SELECT (.+)\.name, \1\.age FROM Person AS \1 WHERE \(\1\.age > 30\);".r,
-      getPeopleGt30)
+      getPeopleGt30_1,
+      getPeopleGt30_2)
   }
 
   it should "generate filters for nested fields" in {

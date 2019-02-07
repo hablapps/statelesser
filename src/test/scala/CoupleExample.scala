@@ -114,9 +114,13 @@ trait CoupleExample[Expr[_]] {
   def getHerNameAndHimAliases_1: Expr[Fold[Couples, (String, String)]] =
     couples > (her > name).asFold * (him.asFold > aliases)
 
-  def getPeopleGt30: Expr[Fold[People, (String, Int)]] =
+  def getPeopleGt30_1: Expr[Fold[People, (String, Int)]] =
     people > (name.asAffineFold *
       (age.asAffineFold > filtered (gt(30)))).asFold
+
+  def getPeopleGt30_2: Expr[Fold[People, (String, Int)]] =
+    people > 
+      (filtered (age > gt(30)) > (name * age).asAffineFold).asFold
 
   def getHerGt30_1: Expr[Fold[Couples, (String, Int)]] =
     couples > her.asFold > (name.asAffineFold *
@@ -232,6 +236,36 @@ object CoupleExample {
 
     def street = assignLeaf(
       GetterType("street", TypeInfo("Address", true), TypeInfo("String")))
+  }
+
+  import statelesser.xpath.Path
+
+  val xpathInstance: CoupleExample[Const[Path, ?]] = 
+      new CoupleExample[Const[Path, ?]] {
+
+    import statelesser.xpath.{Attribute, Name}
+
+    val ev = Statelesser[Const[Path, ?]]
+
+    def couples = Const(Name("couples"))
+
+    def her = Const(Name("her"))
+
+    def him = Const(Name("him"))
+
+    def people = Const(Name("people"))
+
+    def name = Const(Attribute("name"))
+
+    def age = Const(Attribute("age"))
+
+    def weight = Const(Attribute("weight"))
+
+    def address = Const(Name("address"))
+
+    def aliases = Const(Name("aliases"))
+
+    def street = Const(Attribute("street"))
   }
 }
 
