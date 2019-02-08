@@ -28,6 +28,11 @@ class XPath extends Statelesser[Const[Path, ?]] {
       // app
       case (Seq(p, q), Todo(f)) => Seq(p, f(q))
       case (x, Todo(f)) => f(x)
+      // attribute does not support child axis, force reductions!
+      case (att: Attribute, For(List((x, l), (y, r)), ret)) =>
+        For(List((x, aux(att, l)), (y, aux(att, r))), ret)
+      case (att: Attribute, GreaterThan(p, q)) =>
+        GreaterThan(aux(att, p), aux(att, q))
       // no optimization
       case (x, y) => Seq(x, y)
     }
@@ -38,7 +43,11 @@ class XPath extends Statelesser[Const[Path, ?]] {
       l: Const[Path, O[S, A]],
       r: Const[Path, O[S, B]]): Const[Path, O[S, (A, B)]] = {
     val x = Var(fresh); val y = Var(fresh)
-    Const(For(List(x -> l.getConst, y -> r.getConst), Union(x, y)))
+    Const((l.getConst, r.getConst) match {
+      case (Seq(p, q), Seq(r, s)) if p == r => 
+        Seq(p, For(List(x -> q, y -> s), Union(x, y)))
+      case (p, q) => For(List(x -> p, y -> q), Union(x, y))
+    })
   }
 
   def flVert[S, A, B](
@@ -59,10 +68,7 @@ class XPath extends Statelesser[Const[Path, ?]] {
   def gtHori[S, A, B](
       l: Const[Path, Getter[S, A]],
       r: Const[Path, Getter[S, B]]): Const[Path, Getter[S, (A, B)]] =
-    Const((l.getConst, r.getConst) match {
-      case (Seq(p, q), Seq(r, s)) if p == r => Seq(p, Union(q, s))
-      case (p, q) => Union(p, q)
-    })
+    hori(l, r)
 
   def aflVert[S, A, B](
       u: Const[Path, AffineFold[S, A]],
@@ -76,27 +82,31 @@ class XPath extends Statelesser[Const[Path, ?]] {
 
   def filtered[S](
       p: Const[Path, Getter[S, Boolean]]): Const[Path, AffineFold[S, S]] =
-    Const(Filter(p.getConst))
+    Const(Todo {
+      case Attribute(s) => vert(
+        Const(Filter(vert(Const(Attribute(s)), p).getConst)), 
+        Const(Attribute(s))).getConst
+      case x => vert(Const(x), Const(Filter(p.getConst))).getConst
+    })
 
   def sub: Const[Path, Getter[(Int, Int), Int]] = Const(Todo {
     case Union(p, PInt(0)) => p
+    case Union(p, q) if p == q => PInt(0)
     case Union(PInt(i), PInt(j)) => PInt(i - j)
     case Union(p, q) => Sub(p, q)
   })
 
   def greaterThan: Const[Path, Getter[(Int, Int), Boolean]] = Const(Todo {
-    case Union(PInt(i), PInt(j)) => PBool(i > j)
-    case Union(p, q) => GreaterThan(p, q)
+    case (For(List((_, PInt(i)), (_, PInt(j))), Union(_, _))) => PBool(i > j)
+    case (For(List((_, p), (_, q)), Union(_, _))) => GreaterThan(p, q)
   })
 
-  // XXX: first and second break filters!?!?
-
   def first[A, B]: Const[Path, Getter[(A, B), A]] = Const(Todo {
-    case Union(p, _) => p
+    case For(List((_, v), _), Union(_, _)) => v
   })
 
   def second[A, B]: Const[Path, Getter[(A, B), B]] = Const(Todo {
-    case Union(_, q) => q
+    case For(List(_, (_, v)), Union(_, _)) => v
   })
 
   def not: Const[Path, Getter[Boolean, Boolean]] = Const(Todo {

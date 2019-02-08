@@ -71,7 +71,7 @@ class CoupleExampleTest extends FlatSpec with Matchers {
 
   it should "generate filters" in {
     matchXPath(
-      raw"people/(@name | @age)[@age > 30]".r, 
+      raw"people[@age > 30]/(@name | @age)".r, 
       //getPeopleGt30_1, 
       getPeopleGt30_2)
   }

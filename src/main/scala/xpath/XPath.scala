@@ -8,11 +8,14 @@ sealed abstract class Path {
 object Path {
   
   def toString(path: Path): String = path match {
+    case Root => "/"
+    case Seq(p, q: Filter) => s"$p$q"
     case Seq(p, q) => s"$p/($q)"
     case Name(s) => s
     case Attribute(s) => s"@$s"
     case Filter(p) => s"[$p]"
-    case PAxis(self) => "self::*"
+    case PAxis(Self) => "."
+    case PAxis(SelfOrDescendant) => "//"
     case Union(p, q) => s"$p | $q" 
     case For(pairs, ret) => s"for ${pairs.map {
       case (k, v) => s"$k in ($v)"
@@ -24,9 +27,11 @@ object Path {
     case PInt(i) => s"$i"
     case PBool(b) => s"$b()"
     case PString(s) => s""""$s""""
+    case Todo(_) => "???" // not standard XPath
   }
 }
 
+case object Root extends Path
 case class Seq(p: Path, q: Path) extends Path
 case class Name(s: String) extends Path
 case class Attribute(s: String) extends Path
@@ -50,8 +55,7 @@ case class PString(s: String) extends Constant
 
 sealed abstract class Axis
 case object Self extends Axis
-// case object Child extends Axis
+case object SelfOrDescendant extends Axis
 
-// XXX: this isn't XPath, move to another semantic case! Path \/ Todo
 case class Todo(f: Path => Path) extends Path
 
