@@ -29,7 +29,7 @@ class CoupleExampleTest extends FlatSpec with Matchers {
 
   it should "generate multi-selection" in {
     matchXPath(
-      raw"people/\(@name \| @age\)".r,
+      raw"people/\(for (.+) in \(@name\), (.+) in \(@age\) return \(\1 \| \2\)\)".r,
       getPeopleNameAndAge_1,
       getPeopleNameAndAge_2)
   }
@@ -72,23 +72,23 @@ class CoupleExampleTest extends FlatSpec with Matchers {
   it should "generate filters" in {
     matchXPath(
       raw"people[@age > 30]/(@name | @age)".r, 
-      //getPeopleGt30_1, 
+      getPeopleGt30_1, 
       getPeopleGt30_2)
   }
 
-  // it should "generate filters for nested fields" in {
-  //   matchSql(
-  //     raw"SELECT (.+)\.name, \1\.age FROM Couple AS (.+) INNER JOIN Person AS \1 ON \2\.her = \1\.name WHERE \(\1\.age > 30\);".r,
-  //     getHerGt30_1,
-  //     getHerGt30_2)
-  // }
+  it should "generate filters for nested fields" in {
+    matchXPath(
+      raw"xyz".r,
+      getHerGt30_1,
+      getHerGt30_2)
+  }
 
-  // it should "generate remove filtering fields from select" in {
-  //   matchSql(
-  //     raw"SELECT (.+)\.name FROM Couple AS (.+) INNER JOIN Person AS \1 ON \2\.her = \1\.name WHERE \(\1\.age > 30\);".r,
-  //     getHerNameGt30_1,
-  //     getHerNameGt30_2)
-  // }
+  it should "generate remove filtering fields from select" in {
+    matchXPath(
+      raw"xyz".r,
+      getHerNameGt30_1,
+      getHerNameGt30_2)
+  }
 
   // it should "generate complex queries" in {
   //   matchSql(

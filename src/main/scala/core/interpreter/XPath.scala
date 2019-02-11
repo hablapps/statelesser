@@ -9,8 +9,14 @@ import xpath._
 class XPath extends Statelesser[Const[Path, ?]] {
 
   // XXX: Look at you, functional programmer!
-  var last: Char = ('a' - 1).toChar
-  def fresh: String = { last = (last + 1).toChar; last.toString }
+  var seed: (Char, Int) = ('a', -1)
+
+  def fresh: String = {
+    if (seed._2 >= 9) seed = ((seed._1 + 1).toChar, 0)
+    else seed = (seed._1, seed._2 + 1)
+    s"${seed._1}${seed._2}"
+  }
+  ///////////////////////////////////////////
 
   private def vert[O[_, _], S, A, B](
       u: Const[Path, O[S, A]],
@@ -23,6 +29,11 @@ class XPath extends Statelesser[Const[Path, ?]] {
       case (x, PAxis(self)) => x
       // constant optimization
       case (_, c: Constant) => c
+      // fors reduced by first/second
+      case (For(List((x, p), snd), z: Var), r) if x == z =>
+        For(List((x, aux(p, r)), snd), x)
+      case (For(List(fst, (y, q)), z: Var), r) if y == z =>
+        For(List(fst, (y, aux(q, r))), y)
       // function composition
       case (Todo(f), Todo(g)) => Todo(f andThen g)
       // app
@@ -102,11 +113,11 @@ class XPath extends Statelesser[Const[Path, ?]] {
   })
 
   def first[A, B]: Const[Path, Getter[(A, B), A]] = Const(Todo {
-    case For(List((_, v), _), Union(_, _)) => v
+    case For(vars, Union(l, _)) => For(vars, l)
   })
 
   def second[A, B]: Const[Path, Getter[(A, B), B]] = Const(Todo {
-    case For(List(_, (_, v)), Union(_, _)) => v
+    case For(vars, Union(_, r)) => For(vars, r)
   })
 
   def not: Const[Path, Getter[Boolean, Boolean]] = Const(Todo {

@@ -99,6 +99,9 @@ trait CoupleExample[Expr[_]] {
     couples > (
       her * him > (first > address > street) * (second > address > street)).asFold
 
+  def herAndHimStreet_2: Expr[Fold[Couples, (String, String)]] =
+    couples > ((her > address > street) * (him > address > street)).asFold
+
   def getHerName: Expr[Fold[Couples, String]] =
     couples > her.asFold > name.asFold
 

@@ -9,11 +9,10 @@ object Path {
   
   def toString(path: Path): String = path match {
     case Root => "/"
-    case Seq(p, q: Filter) => s"$p$q"
     case Seq(p, q) => s"$p/($q)"
     case Name(s) => s
     case Attribute(s) => s"@$s"
-    case Filter(p) => s"[$p]"
+    case Filter(p) => s".[$p]"
     case PAxis(Self) => "."
     case PAxis(SelfOrDescendant) => "//"
     case Union(p, q) => s"$p | $q" 
