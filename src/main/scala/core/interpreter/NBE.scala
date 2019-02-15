@@ -125,6 +125,12 @@ class NBE extends Statelesser[Semantic] {
       }
     }))
 
+  def notNullOf[S, A](fl: Semantic[Fold[S, A]]): Semantic[Getter[S, Boolean]] =
+    ???
+
+  def eq[S]: Semantic[Getter[(S, S), Boolean]] = 
+    ???
+
   def gtAsAfl[S, A](gt: Semantic[Getter[S, A]]) = 
     gt.map(_ match {
       case done: Done[Getter, S, A] => done.as[AffineFold]

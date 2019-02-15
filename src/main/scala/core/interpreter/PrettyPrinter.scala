@@ -68,6 +68,13 @@ class PrettyPrinter extends Statelesser[Const[String, ?]] {
   def not: Const[String, Getter[Boolean, Boolean]] =
     Const("not")
 
+  def notNullOf[S, A](
+      fl: Const[String, Fold[S, A]]): Const[String, Getter[S, Boolean]] =
+    Const(s"notNullOf(${fl.getConst})")
+
+  def eq[S]: Const[String, Getter[(S, S), Boolean]] =
+    Const("eq")
+
   def gtAsAfl[S, A](
       gt: Const[String, Getter[S, A]]): Const[String, AffineFold[S, A]] =
     Const(s"${gt.getConst}.asAffineFold")

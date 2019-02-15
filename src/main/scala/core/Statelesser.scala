@@ -49,11 +49,33 @@ trait Statelesser[Expr[_]] {
 
   def not: Expr[Getter[Boolean, Boolean]]
 
+  def eq[S]: Expr[Getter[(S, S), Boolean]]
+
+  def notNullOf[S, A](fl: Expr[Fold[S, A]]): Expr[Getter[S, Boolean]]
+
   def gtAsAfl[S, A](gt: Expr[Getter[S, A]]): Expr[AffineFold[S, A]]
 
   def aflAsFl[S, A](afl: Expr[AffineFold[S, A]]): Expr[Fold[S, A]]
 
   // derived methods
+
+  def nullOf[S, A](fl: Expr[Fold[S, A]]): Expr[Getter[S, Boolean]] =
+    gtVert(notNullOf(fl), not)
+
+  def anyOf[S, A](
+      fl: Expr[Fold[S, A]])(
+      p: Expr[Getter[A, Boolean]]): Expr[Getter[S, Boolean]] =
+    notNullOf(flVert(fl, aflAsFl(filtered(p))))
+
+  def allOf[S, A](
+      fl: Expr[Fold[S, A]])(
+      p: Expr[Getter[A, Boolean]]): Expr[Getter[S, Boolean]] =
+    nullOf(flVert(fl, aflAsFl(filtered (gtVert(p, not)))))
+
+  def elemOf[S](
+      fl: Expr[Fold[S, String]])(
+      s: String): Expr[Getter[S, Boolean]] =
+    anyOf(fl)(gtVert(gtHori(id,  likeStr(s)), eq[String]))
 
   def gt(i: Int): Expr[Getter[Int, Boolean]] =
     gtVert(gtHori(id, likeInt(i)), greaterThan)

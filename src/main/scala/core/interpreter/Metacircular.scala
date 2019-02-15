@@ -53,6 +53,11 @@ class Metacircular extends Statelesser[Id] {
 
   def not: Getter[Boolean, Boolean] = Getter(!(_))
 
+  def notNullOf[S, A](fl: Fold[S, A]): Getter[S, Boolean] =
+    Getter(fl.nonEmpty)
+
+  def eq[S]: Getter[(S, S), Boolean] = Getter { case (s1, s2) => s1 == s2 }
+
   def gtAsAfl[S, A](gt: Getter[S, A]): AffineFold[S, A] = gt.asAffineFold
 
   def aflAsFl[S, A](afl: AffineFold[S, A]): Fold[S, A] = afl.asFold

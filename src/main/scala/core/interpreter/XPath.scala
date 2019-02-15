@@ -138,6 +138,12 @@ class XPath extends Statelesser[Const[Path, ?]] {
   def id[S]: Const[Path, Getter[S, S]] =
     Const(PAxis(Self))
 
+  def notNullOf[S, A](
+      fl: Const[Path, Fold[S, A]]): Const[Path, Getter[S, Boolean]] =
+    Const(Filter(fl.getConst))
+
+  def eq[S]: Const[Path, Getter[(S, S), Boolean]] = ???
+
   def gtAsAfl[S, A](
       gt: Const[Path, Getter[S, A]]): Const[Path, AffineFold[S, A]] =
     Const(gt.getConst)
